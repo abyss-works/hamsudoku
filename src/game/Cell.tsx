@@ -3,7 +3,7 @@ import { Heart, X } from 'lucide-react';
 import { Button } from '../ui/Button';
 import { HamsterFace } from '../ui/HamsterFace';
 import type { CellState } from './puzzles';
-import type { TapKind } from './tap';
+import { delayForPointerType, type TapKind } from './tap';
 
 interface CellProps {
   row: number;
@@ -25,10 +25,9 @@ const LABEL: Record<CellState, string> = {
   wrong: '틀린 칸',
 };
 
-const SINGLE_TAP_MS = 150;
-
 export function Cell({ row, col, state, islandId, conflicted, hit, pulseDelay, onTap, onPress }: CellProps) {
   const timer = useRef<number | null>(null);
+  const pointerKind = useRef<string | null>(null);
 
   useEffect(
     () => () => {
@@ -49,7 +48,12 @@ export function Cell({ row, col, state, islandId, conflicted, hit, pulseDelay, o
     timer.current = window.setTimeout(() => {
       timer.current = null;
       onTap('single');
-    }, SINGLE_TAP_MS);
+    }, delayForPointerType(pointerKind.current));
+  };
+
+  const handlePress = (e: React.PointerEvent) => {
+    pointerKind.current = e.pointerType ?? null;
+    onPress();
   };
 
   const handleDoubleClick = () => {
@@ -72,7 +76,7 @@ export function Cell({ row, col, state, islandId, conflicted, hit, pulseDelay, o
       aria-label={`${LABEL[state]} (색 ${islandId + 1})`}
       onClick={handleClick}
       onDoubleClick={handleDoubleClick}
-      onPointerDown={onPress}
+      onPointerDown={handlePress}
       style={pulseDelay !== undefined ? ({ '--d': `${pulseDelay}ms` } as CSSProperties) : undefined}
     >
       <span key={state} className={`cell-glyph${state === 'hamster' ? ' pop' : ''}`} aria-hidden="true">

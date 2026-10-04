@@ -35,6 +35,23 @@ describe('Cell', () => {
     expect(onTap).toHaveBeenCalledWith('double');
   });
 
+  it('터치는 250ms 뒤에 전달된다', () => {
+    vi.useFakeTimers();
+    const onTap = vi.fn();
+    render(<Cell row={0} col={0} state="empty" islandId={0} conflicted={false} onTap={onTap} onPress={() => {}} />);
+    const btn = screen.getByRole('button', { name: /빈칸/ });
+    fireEvent.pointerDown(btn, { pointerType: 'touch' });
+    fireEvent.click(btn);
+    act(() => {
+      vi.advanceTimersByTime(150);
+    });
+    expect(onTap).not.toHaveBeenCalled();
+    act(() => {
+      vi.advanceTimersByTime(100);
+    });
+    expect(onTap).toHaveBeenCalledWith('single');
+  });
+
   it('빠른 두 클릭은 dblclick 없이 더블로 확정된다', () => {
     vi.useFakeTimers();
     const onTap = vi.fn();

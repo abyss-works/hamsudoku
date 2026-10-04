@@ -69,7 +69,7 @@ export function RulesHelp() {
   return (
     <div className="help-card" aria-label="기본 규칙">
       {RULES.map((r) => (
-        <div key={r.text} className="help-row">
+        <div key={r.text} className="help-col">
           {r.fig}
           <p>{r.text}</p>
         </div>

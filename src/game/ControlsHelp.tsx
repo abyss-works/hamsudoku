@@ -10,7 +10,7 @@ export function ControlsHelp() {
   return (
     <div className="help-card" aria-label="기본 조작">
       {CONTROLS.map((c) => (
-        <div key={c.text} className="help-row">
+        <div key={c.text} className="help-col">
           {c.icon}
           <p>{c.text}</p>
         </div>
