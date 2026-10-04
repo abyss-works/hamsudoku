@@ -23,11 +23,14 @@ export interface HamSudoku {
 }
 
 // 한 스트로크 동안 바뀐 칸 목록. 닿은 칸만 바뀌고, 다시 닿으면 그 칸만 되돌린다.
+// 같은 칸 연발 진입은 무시한다 (pointermove가 셀 안에서 계속 들어오기 때문).
 interface Stroke {
   sr: number;
   sc: number;
   toMark: boolean;
   engaged: boolean;
+  lastR: number | null;
+  lastC: number | null;
   trail: { r: number; c: number; prev: CellState }[];
 }
 
@@ -105,12 +108,15 @@ export function useHamSudoku(puzzle: Puzzle): HamSudoku {
       strokeRef.current = null;
       return;
     }
-    strokeRef.current = { sr: r, sc: c, toMark: cur === 'empty', engaged: false, trail: [] };
+    strokeRef.current = { sr: r, sc: c, toMark: cur === 'empty', engaged: false, lastR: null, lastC: null, trail: [] };
   };
 
   const strokeEnter = (r: number, c: number) => {
     const st = strokeRef.current;
     if (!st) return;
+    if (st.lastR === r && st.lastC === c) return;
+    st.lastR = r;
+    st.lastC = c;
     if (!st.engaged) {
       st.engaged = true;
       applyStrokeCell(st, st.sr, st.sc);
