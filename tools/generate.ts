@@ -1,28 +1,8 @@
 import fs from 'node:fs';
-import type { Puzzle } from '../src/game/puzzles';
+import { LEVEL_CONFIGS, type GeneratedLevel } from '../src/game/levels';
 import type { Pos } from '../src/game/solver';
 import { checkIslands, countSolutions } from '../src/game/solver';
 import { scoreDifficulty } from '../src/game/shape';
-
-export interface GeneratedLevel {
-  level: number;
-  no: number;
-  code: string;
-  puzzle: Puzzle;
-}
-
-interface LevelConfig {
-  size: number;
-  count: number;
-  minStraight: number;
-  maxStraight: number;
-}
-
-const CONFIGS: Record<number, LevelConfig> = {
-  1: { size: 5, count: 10, minStraight: 0.6, maxStraight: 1 },
-  2: { size: 6, count: 10, minStraight: 0.3, maxStraight: 0.6 },
-  3: { size: 7, count: 10, minStraight: 0, maxStraight: 1 },
-};
 
 const DIRS: Pos[] = [
   [1, 0],
@@ -130,13 +110,13 @@ function uniquify(islands: number[][], spots: Pos[], rand: () => number): number
   return bestCount === 1 ? best : null;
 }
 
-function inBand(islands: number[][], cfg: LevelConfig): boolean {
+function inBand(islands: number[][], cfg: { minStraight: number; maxStraight: number }): boolean {
   const s = scoreDifficulty(islands);
   return s.straightRatio >= cfg.minStraight && s.straightRatio <= cfg.maxStraight;
 }
 
 export function generateLevels(level: number, seed: number): GeneratedLevel[] {
-  const cfg = CONFIGS[level];
+  const cfg = LEVEL_CONFIGS[level];
   if (!cfg) throw new Error(`알 수 없는 레벨: ${level}`);
   const rand = mulberry32(seed);
   const out: GeneratedLevel[] = [];
@@ -178,15 +158,8 @@ export function renderModule(levels: GeneratedLevel[], seed: number): string {
   const lines = [
     `// 생성 산출물. 직접 수정 금지 — npx tsx tools/generate.ts --seed ${seed} 로 재생성한다.`,
     `// 개수: ${levels.length}`,
-    `import type { Puzzle } from './puzzles';`,
-    ``,
-    `export interface GeneratedLevel {`,
-    `  level: number;`,
-    `  no: number;`,
-    `  code: string;`,
-    `  puzzle: Puzzle;`,
-    `}`,
-    ``,
+    `// 밴드: ${JSON.stringify(LEVEL_CONFIGS)}`,
+    `import type { GeneratedLevel } from './levels';`,
     `export const LEVELS: GeneratedLevel[] = ${JSON.stringify(levels)};`,
     ``,
   ];
