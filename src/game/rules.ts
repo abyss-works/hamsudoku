@@ -1,5 +1,7 @@
 import type { CellState } from './puzzles';
 
+export type { CellState };
+
 export interface Violations {
   rows: Set<number>;
   cols: Set<number>;
@@ -29,15 +31,16 @@ export function getViolations(cells: CellState[][], islands: number[][]): Violat
 
   for (const [r, n] of rowCount) if (n >= 2) rows.add(r);
   for (const [c, n] of colCount) if (n >= 2) cols.add(c);
-  const unfilled = new Set<number>();
-  for (const [id, n] of islandCount) if (n !== 1) unfilled.add(id);
+  const overfilled = new Set<number>();
+  for (const [id, n] of islandCount) if (n >= 2) overfilled.add(id);
 
-  return { rows, cols, islands: unfilled };
+  return { rows, cols, islands: overfilled };
 }
 
 export function isCleared(cells: CellState[][], islands: number[][]): boolean {
   let total = 0;
   for (const line of cells) for (const cell of line) if (cell === 'hamster') total += 1;
+  // 섬 5개에 햄스터 5마리, 꽉 찬 곳 없음 → 각 섬 정확히 1마리, 행·열 중복 없음
   if (total !== 5) return false;
   const v = getViolations(cells, islands);
   return v.rows.size === 0 && v.cols.size === 0 && v.islands.size === 0;
