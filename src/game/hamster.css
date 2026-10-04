@@ -1,0 +1,93 @@
+/* 햄스터 팝 테마. 기본 레이아웃은 index.css, 색·애니메이션은 여기. */
+
+.board {
+  min-width: 280px;
+  max-width: 480px;
+  margin: 0 auto;
+}
+
+.cell[data-island='0'] { background: #ffe9ec; }
+.cell[data-island='1'] { background: #fff4d6; }
+.cell[data-island='2'] { background: #e4f5e1; }
+.cell[data-island='3'] { background: #e2eefc; }
+.cell[data-island='4'] { background: #f0e6fa; }
+
+.cell[data-state='seed'] {
+  font-size: 20px;
+}
+
+.cell-glyph {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  position: relative;
+}
+
+.cell-glyph.pop {
+  animation: ham-pop 0.25s ease-out;
+}
+
+.cell-glyph svg {
+  width: 42px;
+  height: 42px;
+  max-width: 85%;
+  max-height: 85%;
+}
+
+@keyframes ham-pop {
+  0% { transform: scale(0.3); }
+  60% { transform: scale(1.25); }
+  100% { transform: scale(1); }
+}
+
+.ham-heart {
+  position: absolute;
+  right: -6px;
+  top: -8px;
+  font-size: 14px;
+  animation: ham-heart 0.6s ease-out;
+}
+
+@keyframes ham-heart {
+  0% { opacity: 0; transform: translateY(4px) scale(0.5); }
+  40% { opacity: 1; }
+  100% { opacity: 0; transform: translateY(-8px) scale(1); }
+}
+
+.clear-party {
+  display: flex;
+  gap: 4px;
+  font-size: 0;
+}
+
+.clear-party svg {
+  width: 44px;
+  height: 44px;
+  animation: ham-pop 0.35s ease-out backwards;
+}
+
+.clear-party svg:nth-child(2) { animation-delay: 0.08s; }
+.clear-party svg:nth-child(3) { animation-delay: 0.16s; }
+.clear-party svg:nth-child(4) { animation-delay: 0.24s; }
+.clear-party svg:nth-child(5) { animation-delay: 0.32s; }
+
+.confetti {
+  position: absolute;
+  inset: 0;
+  overflow: hidden;
+  pointer-events: none;
+}
+
+.confetti i {
+  position: absolute;
+  top: -12px;
+  left: var(--x);
+  width: 8px;
+  height: 12px;
+  background: var(--c);
+  animation: confetti-fall var(--d) linear infinite;
+}
+
+@keyframes confetti-fall {
+  to { transform: translateY(420px) rotate(540deg); }
+}
