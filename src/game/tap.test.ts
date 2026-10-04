@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest';
-import { nextState, spreadMarks, type TapKind } from './tap';
+import { delayForPointerType, nextState, spreadMarks, type TapKind } from './tap';
 import type { CellState } from './puzzles';
 
 describe('nextState', () => {
@@ -27,6 +27,15 @@ describe('nextState', () => {
   });
   it('자동 마커는 싱글로도 안 풀린다', () => {
     expect(nextState('auto', 'single', false)).toBe('auto');
+  });
+});
+
+describe('delayForPointerType', () => {
+  it('터치는 250ms, 나머지는 150ms다', () => {
+    expect(delayForPointerType('touch')).toBe(250);
+    expect(delayForPointerType('mouse')).toBe(150);
+    expect(delayForPointerType('pen')).toBe(150);
+    expect(delayForPointerType(null)).toBe(150);
   });
 });
 

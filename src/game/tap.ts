@@ -2,6 +2,13 @@ import type { CellState } from './puzzles';
 
 export type TapKind = 'single' | 'double';
 
+export const SINGLE_TAP_MS_MOUSE = 150;
+export const SINGLE_TAP_MS_TOUCH = 250;
+
+export function delayForPointerType(t: string | null | undefined): number {
+  return t === 'touch' ? SINGLE_TAP_MS_TOUCH : SINGLE_TAP_MS_MOUSE;
+}
+
 export function nextState(state: CellState, kind: TapKind, isCorrect: boolean): CellState {
   if (state === 'wrong' || state === 'auto') return state;
   if (kind === 'single') {
