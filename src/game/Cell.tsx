@@ -64,7 +64,7 @@ export function Cell({ state, islandId, conflicted, hit, pulseDelay, onTap }: Ce
       }`}
       data-island={islandId}
       data-state={state}
-      aria-label={`${LABEL[state]} (섬 ${islandId + 1})`}
+      aria-label={`${LABEL[state]} (색 ${islandId + 1})`}
       onClick={handleClick}
       onDoubleClick={handleDoubleClick}
       style={pulseDelay !== undefined ? ({ '--d': `${pulseDelay}ms` } as CSSProperties) : undefined}

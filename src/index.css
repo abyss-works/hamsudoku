@@ -205,16 +205,6 @@ button:disabled {
   gap: 12px;
 }
 
-.rules {
-  margin: 4px 0 0;
-  padding-left: 20px;
-  color: var(--ink-soft);
-  font-size: 14px;
-  display: flex;
-  flex-direction: column;
-  gap: 2px;
-}
-
 .select {
   width: 100%;
   display: flex;
@@ -266,6 +256,66 @@ button:disabled {
   display: flex;
   flex-direction: column;
   gap: 12px;
+}
+
+.rules-row {
+  display: grid;
+  grid-template-columns: repeat(3, 1fr);
+  gap: 8px;
+}
+
+.help-intro {
+  grid-column: 1 / -1;
+  margin: 0;
+  text-align: center;
+  color: var(--ink-soft);
+  font-size: 14px;
+}
+
+.rule-card {
+  border: 3px solid var(--ink);
+  border-radius: var(--radius-md);
+  background: var(--card);
+  box-shadow: var(--shadow-hard-sm);
+  padding: 8px 6px;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 6px;
+  text-align: center;
+}
+
+.rule-card p {
+  margin: 0;
+  font-size: 13px;
+  line-height: 1.3;
+}
+
+.mini-fig {
+  width: 44px;
+  height: 44px;
+}
+
+.controls-row {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 8px;
+}
+
+.control-card {
+  border: 3px solid var(--ink);
+  border-radius: var(--radius-md);
+  background: var(--card);
+  padding: 8px 6px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 6px;
+}
+
+.control-card p {
+  margin: 0;
+  font-size: 14px;
 }
 
 .hud {
