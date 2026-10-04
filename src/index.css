@@ -264,15 +264,6 @@ button:disabled {
   gap: 8px;
 }
 
-.help-intro {
-  grid-column: 1 / -1;
-  margin: 0;
-  text-align: center;
-  color: var(--ink-soft);
-  font-family: var(--font-help);
-  font-size: 14px;
-}
-
 .rule-card {
   border: 3px solid var(--ink);
   border-radius: var(--radius-md);

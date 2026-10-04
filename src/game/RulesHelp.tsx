@@ -59,15 +59,14 @@ function LineFig() {
 }
 
 const RULES = [
-  { fig: <IslandFig />, text: '같은 색 칸에는 한 마리만 숨어 있어요' },
-  { fig: <TouchFig />, text: '햄스터 주변 여덟 칸에는 친구가 없어요' },
-  { fig: <LineFig />, text: '가로 세로 한 줄에 한 마리씩 찾을 수 있어요' },
+  { fig: <IslandFig />, text: '색깔당 햄스터 1마리' },
+  { fig: <TouchFig />, text: '주변 8칸 빈칸' },
+  { fig: <LineFig />, text: '가로/세로 햄스터 1마리' },
 ];
 
 export function RulesHelp() {
   return (
     <div className="rules-row" aria-label="기본 규칙">
-      <p className="help-intro">길잡이 몽이가 알려줘요</p>
       {RULES.map((r) => (
         <div key={r.text} className="rule-card">
           {r.fig}
