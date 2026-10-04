@@ -5,6 +5,6 @@ interface ButtonProps extends ButtonHTMLAttributes<HTMLButtonElement> {
 }
 
 export function Button({ variant = 'plain', className = '', type = 'button', ...rest }: ButtonProps) {
-  const cls = `${variant === 'sticker' ? 'btn-sticker ' : ''}${className}`.trim();
+  const cls = `btn ${variant === 'sticker' ? 'btn-sticker ' : ''}${className}`.trim();
   return <button type={type} {...rest} className={cls} />;
 }
