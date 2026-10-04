@@ -2,6 +2,7 @@ import { useState } from 'react';
 import { Board } from './game/Board';
 import { useHamSudoku } from './game/useHamSudoku';
 import { PUZZLES, type Puzzle } from './game/puzzles';
+import { Button } from './ui/Button';
 
 interface GameProps {
   puzzle: Puzzle;
@@ -20,13 +21,18 @@ function Game({ puzzle, puzzleIndex, onSelectMap, onNextMap }: GameProps) {
       </p>
       <div className="map-switch" role="group" aria-label="맵 선택">
         {PUZZLES.map((p, i) => (
-          <button key={p.name} type="button" disabled={i === puzzleIndex} onClick={() => onSelectMap(i)}>
+          <Button
+            key={p.name}
+            variant="sticker"
+            disabled={i === puzzleIndex}
+            onClick={() => onSelectMap(i)}
+          >
             {p.name}
-          </button>
+          </Button>
         ))}
-        <button type="button" onClick={reset}>
+        <Button variant="sticker" onClick={reset}>
           리셋
-        </button>
+        </Button>
       </div>
       <Board
         puzzle={puzzle}

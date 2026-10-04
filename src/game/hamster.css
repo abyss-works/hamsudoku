@@ -4,6 +4,14 @@
   min-width: 280px;
   max-width: 480px;
   margin: 0 auto;
+  border: 3px solid var(--ink);
+  border-radius: var(--radius-lg);
+  overflow: hidden;
+  box-shadow: var(--shadow-hard);
+}
+
+.cell {
+  border-color: rgb(74 49 40 / 0.25);
 }
 
 .cell[data-island='0'] { background: #ffe9ec; }
