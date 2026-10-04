@@ -1,0 +1,47 @@
+@import url('https://fonts.googleapis.com/css2?family=Jua&display=swap');
+
+:root {
+  --paper: #f6ebd3;
+  --paper-deep: #efdfc0;
+  --ink: #4a3128;
+  --ink-soft: #7a5c4d;
+  --carrot: #e8823c;
+  --carrot-deep: #c46426;
+  --leaf: #6fa05a;
+  --card: #fffdf6;
+  --radius-lg: 20px;
+  --radius-md: 14px;
+  --shadow-hard: 0 4px 0 var(--ink);
+  --shadow-hard-sm: 0 3px 0 var(--ink);
+  --font-display: 'Jua', 'Hiragino Maru Gothic ProN', system-ui, sans-serif;
+}
+
+body {
+  background: var(--paper);
+  color: var(--ink);
+}
+
+.btn-sticker {
+  border: 3px solid var(--ink);
+  border-radius: var(--radius-md);
+  background: var(--card);
+  color: var(--ink);
+  font-family: var(--font-display);
+  font-size: 17px;
+  box-shadow: var(--shadow-hard-sm);
+}
+
+.btn-sticker:active:not(:disabled) {
+  transform: translateY(2px);
+  box-shadow: 0 1px 0 var(--ink);
+}
+
+.btn-sticker:disabled {
+  opacity: 0.45;
+  box-shadow: none;
+}
+
+.btn-sticker.btn-primary {
+  background: var(--carrot);
+  color: #fff;
+}

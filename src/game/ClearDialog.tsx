@@ -21,8 +21,12 @@ export function ClearDialog({ onReset, onNextMap }: ClearDialogProps) {
       </div>
       <p className="clear-title">🎉 햄스터 5마리를 다 찾았다!</p>
       <div className="clear-actions">
-        <Button onClick={onReset}>다시하기</Button>
-        <Button onClick={onNextMap}>다음 맵</Button>
+        <Button variant="sticker" onClick={onReset}>
+          다시하기
+        </Button>
+        <Button variant="sticker" className="btn-primary" onClick={onNextMap}>
+          다음 맵
+        </Button>
       </div>
     </Overlay>
   );
