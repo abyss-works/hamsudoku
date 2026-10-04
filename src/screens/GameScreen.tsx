@@ -19,7 +19,7 @@ export function GameScreen({ stage, onBack, onNextMap }: GameScreenProps) {
           뒤로
         </Button>
         <p className="map-line">
-          {stage.puzzle.name} · 햄스터 {hamsterCount}/5
+          {stage.code} · 햄스터 {hamsterCount}/5
         </p>
         <Button variant="sticker" onClick={reset}>
           리셋

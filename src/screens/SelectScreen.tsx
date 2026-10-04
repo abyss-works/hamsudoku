@@ -34,7 +34,7 @@ export function SelectScreen({ chapters, loading, error, onSelect, onBack }: Sel
                   disabled={stage.locked}
                   onClick={() => onSelect(stage)}
                 >
-                  {stage.title}
+                  {stage.code}
                 </Button>
               ))}
             </div>
