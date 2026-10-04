@@ -35,14 +35,14 @@ describe('화면 전환', () => {
     fireEvent.click(screen.getByRole('button', { name: '시작하기' }));
     await screen.findByText('레벨 1');
     fireEvent.click(screen.getByRole('button', { name: '1-1' }));
-    const line = () => screen.getByText((_, el) => el?.className === 'map-line');
+    const line = () => screen.getByRole('status').getAttribute('aria-label') ?? '';
     const first = screen.getAllByRole('button', { name: /빈칸/ })[0];
     fireEvent.click(first);
-    expect(line().textContent).toContain('햄스터 1/5');
+    expect(line()).toContain('햄스터 1/5');
     fireEvent.click(screen.getByRole('button', { name: '뒤로' }));
     await screen.findByText('레벨 1');
     fireEvent.click(screen.getByRole('button', { name: '1-1' }));
-    expect(line().textContent).toContain('햄스터 0/5');
+    expect(line()).toContain('햄스터 0/5');
   });
 });
 
