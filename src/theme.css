@@ -1,4 +1,5 @@
 @import url('https://fonts.googleapis.com/css2?family=Jua&display=swap');
+@import url('https://fonts.googleapis.com/css2?family=Noto+Sans+KR:wght@400&display=swap');
 
 :root {
   --paper: #f6ebd3;
@@ -14,6 +15,7 @@
   --shadow-hard: 0 4px 0 var(--ink);
   --shadow-hard-sm: 0 3px 0 var(--ink);
   --font-display: 'Jua', 'Hiragino Maru Gothic ProN', system-ui, sans-serif;
+  --font-help: 'Noto Sans KR', 'Apple SD Gothic Neo', system-ui, sans-serif;
 }
 
 body {
