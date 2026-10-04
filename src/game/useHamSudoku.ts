@@ -7,12 +7,6 @@ function blankBoard(size: number): CellState[][] {
   return Array.from({ length: size }, () => Array<CellState>(size).fill('empty'));
 }
 
-export interface PaintPatch {
-  r: number;
-  c: number;
-  prev: CellState;
-}
-
 export interface HamSudoku {
   cells: CellState[][];
   violations: Violations;
@@ -22,9 +16,19 @@ export interface HamSudoku {
   hitKey: string | null;
   shake: number;
   tapCell: (r: number, c: number, kind: TapKind) => void;
-  paintCell: (r: number, c: number, toMark: boolean) => void;
-  revertPaint: (patches: PaintPatch[]) => void;
+  beginStroke: (r: number, c: number) => void;
+  strokeEnter: (r: number, c: number) => void;
+  endStroke: () => boolean;
   reset: () => void;
+}
+
+// 한 스트로크 동안 바뀐 칸 목록. 닿은 칸만 바뀌고, 다시 닿으면 그 칸만 되돌린다.
+interface Stroke {
+  sr: number;
+  sc: number;
+  toMark: boolean;
+  engaged: boolean;
+  trail: { r: number; c: number; prev: CellState }[];
 }
 
 export function useHamSudoku(puzzle: Puzzle): HamSudoku {
@@ -32,6 +36,8 @@ export function useHamSudoku(puzzle: Puzzle): HamSudoku {
   // 지연 탭(타이머 콜백)이 클릭 시점 스냅샷이 아닌 최신 판을 보도록 ref 미러를 둔다.
   // tapCell은 동기적으로 ref까지 갱신하므로 연타·더블클릭 경합에서도 덮어쓰기가 없다.
   const latest = useRef(cells);
+  // 진행 중 스트로크. 최신 판은 latest ref로만 읽어서 지연 이벤트 경합을 피한다.
+  const strokeRef = useRef<Stroke | null>(null);
   const [pulse, setPulse] = useState<ReadonlyMap<string, number>>(new Map());
   const [hitKey, setHitKey] = useState<string | null>(null);
   const [shake, setShake] = useState(0);
@@ -69,35 +75,55 @@ export function useHamSudoku(puzzle: Puzzle): HamSudoku {
   const reset = () => {
     const blank = blankBoard(puzzle.size);
     latest.current = blank;
+    strokeRef.current = null;
     setCells(blank);
     setPulse(new Map());
     setHitKey(null);
   };
 
-  // 같은 스트로크에서 되돌아가면 trail 이후 칠분을 칠하기 전 상태로 되돌린다.
-  const revertPaint = (patches: PaintPatch[]) => {
-    if (patches.length === 0) return;
+  const applyStrokeCell = (st: Stroke, r: number, c: number) => {
+    const cur = latest.current[r][c];
     const next = latest.current.map((line) => [...line]);
-    for (const p of patches) next[p.r][p.c] = p.prev;
+    const at = st.trail.findIndex((t) => t.r === r && t.c === c);
+    if (at >= 0) {
+      const [t] = st.trail.splice(at, 1);
+      next[t.r][t.c] = t.prev;
+    } else {
+      if (st.toMark ? cur !== 'empty' : cur !== 'mark') return;
+      next[r][c] = st.toMark ? 'mark' : 'empty';
+      st.trail.push({ r, c, prev: cur });
+    }
     latest.current = next;
     setCells(next);
     setPulse(new Map());
     setHitKey(null);
   };
 
-  // 드래그 칠하기: 전제 상태가 아니면 무시하므로 같은 칸 반복 진입에 안전하다.
-  const paintCell = (r: number, c: number, toMark: boolean) => {
-    const prev = latest.current;
-    const want: CellState = toMark ? 'mark' : 'empty';
-    const cur = prev[r][c];
-    if (toMark ? cur !== 'empty' : cur !== 'mark') return;
-    const next = prev.map((line) => [...line]);
-    next[r][c] = want;
-    latest.current = next;
-    setCells(next);
-    setPulse(new Map());
-    setHitKey(null);
+  const beginStroke = (r: number, c: number) => {
+    const cur = latest.current[r][c];
+    if (cur !== 'empty' && cur !== 'mark') {
+      strokeRef.current = null;
+      return;
+    }
+    strokeRef.current = { sr: r, sc: c, toMark: cur === 'empty', engaged: false, trail: [] };
   };
 
-  return { cells, violations, cleared, hamsterCount, pulse, hitKey, shake, tapCell, paintCell, revertPaint, reset };
+  const strokeEnter = (r: number, c: number) => {
+    const st = strokeRef.current;
+    if (!st) return;
+    if (!st.engaged) {
+      st.engaged = true;
+      applyStrokeCell(st, st.sr, st.sc);
+      if (r === st.sr && c === st.sc) return;
+    }
+    applyStrokeCell(st, r, c);
+  };
+
+  const endStroke = () => {
+    const engaged = strokeRef.current?.engaged ?? false;
+    strokeRef.current = null;
+    return engaged;
+  };
+
+  return { cells, violations, cleared, hamsterCount, pulse, hitKey, shake, tapCell, beginStroke, strokeEnter, endStroke, reset };
 }

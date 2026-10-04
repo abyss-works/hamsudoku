@@ -18,8 +18,9 @@ describe('Board', () => {
         violations={emptyViolations()}
         cleared={false}
         onCell={() => {}}
-        onPaint={() => {}}
-        onRevert={() => {}}
+        onPress={() => {}}
+        onEnter={() => {}}
+        onRelease={() => false}
         onReset={() => {}}
         onNextMap={() => {}}
       />,
