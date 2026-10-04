@@ -11,7 +11,6 @@ export type Screen = 'home' | 'select' | 'game';
 function App() {
   const [screen, setScreen] = useState<Screen>('home');
   const [stageId, setStageId] = useState<string | null>(null);
-  const [chapterId, setChapterId] = useState<string | null>(null);
   const [lastId, setLastId] = useState<string | null>(loadLastStageId);
   const { chapters, loading, error } = useStages();
 
@@ -24,11 +23,6 @@ function App() {
     setLastId(s.id);
     setStageId(s.id);
     setScreen('game');
-  };
-
-  const openStages = (id: string) => {
-    setChapterId(id);
-    setScreen('select');
   };
 
   const goNextMap = () => {
@@ -48,14 +42,13 @@ function App() {
   return (
     <main className="app">
       {screen === 'home' && (
-        <HomeScreen chapters={chapters} loading={loading} lastStage={lastStage} onResume={enter} onOpenStages={openStages} />
+        <HomeScreen loading={loading} lastStage={lastStage} onResume={enter} onBrowse={() => setScreen('select')} />
       )}
       {screen === 'select' && (
         <SelectScreen
           chapters={chapters}
           loading={loading}
           error={error}
-          initialChapterId={chapterId}
           onSelect={enter}
           onBack={() => setScreen('home')}
         />

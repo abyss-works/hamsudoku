@@ -11,17 +11,17 @@ afterEach(() => {
 });
 
 describe('화면 전환', () => {
-  it('홈 스테이지 버튼은 해당 장이 열린 선택화면으로 간다', async () => {
+  it('홈 스테이지 버튼은 선택화면으로 간다', async () => {
     render(<App />);
     expect((screen.getByRole('button', { name: '이어하기' }) as HTMLButtonElement).disabled).toBe(true);
-    fireEvent.click(await screen.findByRole('button', { name: '2-1' }));
+    fireEvent.click(await screen.findByRole('button', { name: '스테이지' }));
     expect(await screen.findByText('레벨 선택')).toBeTruthy();
-    expect(screen.getByRole('button', { name: '레벨 2' }).getAttribute('aria-pressed')).toBe('true');
+    expect(screen.getByRole('button', { name: '1-1' })).toBeTruthy();
   });
 
   it('마지막 스테이지 클리어 후 다음 맵은 홈으로 돌아간다', async () => {
     const { container } = render(<App />);
-    fireEvent.click(await screen.findByRole('button', { name: '2-1' }));
+    fireEvent.click(await screen.findByRole('button', { name: '스테이지' }));
     await screen.findByText('레벨 선택');
     fireEvent.click(screen.getByRole('button', { name: '레벨 2' }));
     fireEvent.click(screen.getByRole('button', { name: '2-1' }));
@@ -50,7 +50,7 @@ describe('화면 전환', () => {
 
   it('게임 중 뒤로가기 후 재진입하면 빈판이다', async () => {
     render(<App />);
-    fireEvent.click(await screen.findByRole('button', { name: '1-1' }));
+    fireEvent.click(await screen.findByRole('button', { name: '스테이지' }));
     await screen.findByText('레벨 선택');
     fireEvent.click(screen.getByRole('button', { name: '1-1' }));
     const line = () => screen.getByRole('status').getAttribute('aria-label') ?? '';
