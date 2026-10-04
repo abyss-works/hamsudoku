@@ -264,25 +264,25 @@ button:disabled {
   border-radius: var(--radius-lg);
   background: var(--card);
   box-shadow: var(--shadow-hard);
-  padding: 4px 12px;
+  padding: 6px 4px;
+  display: grid;
+  grid-template-columns: repeat(3, 1fr);
+}
+
+.help-col {
   display: flex;
   flex-direction: column;
-}
-
-.help-row {
-  display: flex;
-  flex-direction: row;
   align-items: center;
-  gap: 10px;
-  padding: 7px 0;
-  text-align: left;
+  gap: 4px;
+  padding: 4px 2px;
+  text-align: center;
 }
 
-.help-row + .help-row {
-  border-top: 2px dashed rgb(74 49 40 / 0.18);
+.help-col + .help-col {
+  border-left: 2px dashed rgb(74 49 40 / 0.18);
 }
 
-.help-row p {
+.help-col p {
   margin: 0;
   font-family: var(--font-help);
   font-size: 12px;

@@ -17,26 +17,28 @@ function withCss() {
 }
 
 describe('도움말 레이아웃', () => {
-  it('규칙 행은 가로 플렉스다', () => {
+  it('규칙은 한 장에 3열, 열힌 세로 배치다', () => {
     withCss();
     const { container } = render(<RulesHelp />);
-    const rows = container.querySelectorAll('.help-row');
-    expect(rows).toHaveLength(3);
-    for (const row of rows) {
-      const cs = getComputedStyle(row as HTMLElement);
+    expect(container.querySelectorAll('.help-card')).toHaveLength(1);
+    const cols = container.querySelectorAll('.help-col');
+    expect(cols).toHaveLength(3);
+    for (const col of cols) {
+      const cs = getComputedStyle(col as HTMLElement);
       expect(cs.display).toBe('flex');
-      expect(cs.flexDirection).toBe('row');
+      expect(cs.flexDirection).toBe('column');
     }
   });
-  it('조작 행은 가로 플렉스다', () => {
+  it('조작은 한 장에 3열, 열힌 세로 배치다', () => {
     withCss();
     const { container } = render(<ControlsHelp />);
-    const rows = container.querySelectorAll('.help-row');
-    expect(rows.length).toBeGreaterThan(0);
-    for (const row of rows) {
-      const cs = getComputedStyle(row as HTMLElement);
+    expect(container.querySelectorAll('.help-card')).toHaveLength(1);
+    const cols = container.querySelectorAll('.help-col');
+    expect(cols).toHaveLength(3);
+    for (const col of cols) {
+      const cs = getComputedStyle(col as HTMLElement);
       expect(cs.display).toBe('flex');
-      expect(cs.flexDirection).toBe('row');
+      expect(cs.flexDirection).toBe('column');
     }
   });
 });
