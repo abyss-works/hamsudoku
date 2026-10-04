@@ -1,6 +1,15 @@
-import { Cell } from './Cell';
+import type { CSSProperties } from 'react';
+import { Cell, HamsterFace } from './Cell';
 import type { Violations } from './rules';
 import type { CellState, Puzzle } from './puzzles';
+import './hamster.css';
+
+const CONFETTI_COLORS = ['#e5484d', '#f5a524', '#46a758', '#3e63dd', '#8e4ec6', '#f76b15'];
+const CONFETTI: { x: string; c: string; d: string }[] = Array.from({ length: 24 }, (_, i) => ({
+  x: `${(i * 41) % 100}%`,
+  c: CONFETTI_COLORS[i % CONFETTI_COLORS.length],
+  d: `${1.6 + ((i * 7) % 10) / 10}s`,
+}));
 
 interface BoardProps {
   puzzle: Puzzle;
@@ -34,6 +43,18 @@ export function Board({ puzzle, cells, violations, cleared, onCell, onReset, onN
       </div>
       {cleared && (
         <div className="clear-overlay" role="dialog" aria-label="클리어">
+          <div className="confetti" aria-hidden="true">
+            {CONFETTI.map((p, i) => (
+              <i key={i} style={{ '--x': p.x, '--c': p.c, '--d': p.d } as CSSProperties} />
+            ))}
+          </div>
+          <div className="clear-party" aria-hidden="true">
+            <HamsterFace />
+            <HamsterFace />
+            <HamsterFace />
+            <HamsterFace />
+            <HamsterFace />
+          </div>
           <p className="clear-title">🎉 햄스터 5마리를 다 찾았다!</p>
           <div className="clear-actions">
             <button type="button" onClick={onReset}>
