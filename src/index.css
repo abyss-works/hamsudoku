@@ -121,26 +121,12 @@ button:disabled {
   display: flex;
   flex-direction: column;
   align-items: center;
-  gap: 12px;
-  padding: 48px 0 24px;
-}
-
-.home-mascot svg {
-  width: 120px;
-  height: 120px;
-}
-
-.home-title {
-  font-family: var(--font-display);
-  font-size: clamp(36px, 12vw, 44px);
-  font-weight: 400;
-  margin: 0;
-  letter-spacing: 2px;
-}
-
-.home-sub {
-  margin: 0;
-  color: var(--ink-soft);
+  gap: 10px;
+  width: 100%;
+  min-height: calc(100dvh - 32px);
+  padding: 8px 0 16px;
+  background-image: radial-gradient(rgb(74 49 40 / 0.07) 2px, transparent 2.5px);
+  background-size: 28px 28px;
 }
 
 .home-top {
@@ -149,11 +135,53 @@ button:disabled {
   justify-content: flex-end;
 }
 
+.home-mascot {
+  background: var(--paper-deep);
+  border: 3px dashed var(--ink);
+  border-radius: 50%;
+  padding: 18px;
+  margin-top: 12px;
+  box-shadow: var(--shadow-hard-sm);
+}
+
+.home-mascot svg {
+  width: 120px;
+  height: 120px;
+  display: block;
+}
+
+.home-title {
+  font-family: var(--font-display);
+  font-size: clamp(40px, 13vw, 52px);
+  font-weight: 400;
+  margin: 0;
+  letter-spacing: 2px;
+}
+
+.home-sub {
+  margin: 0;
+  color: var(--ink-soft);
+  font-size: 18px;
+}
+
 .home-actions {
   display: flex;
   flex-direction: column;
-  gap: 8px;
-  width: min(100%, 280px);
+  gap: 10px;
+  width: min(100%, 300px);
+  margin-top: auto;
+  padding-bottom: 8px;
+}
+
+.home-actions .btn-sticker {
+  font-size: 20px;
+  padding: 12px 14px;
+}
+
+.home-foot {
+  margin: 0;
+  color: var(--ink-soft);
+  font-size: 13px;
 }
 
 .settings {
