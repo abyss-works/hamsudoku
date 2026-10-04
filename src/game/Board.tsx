@@ -1,7 +1,7 @@
 import { useEffect, useRef } from 'react';
 import { Cell } from './Cell';
 import { ClearDialog } from './ClearDialog';
-import type { Violations } from './rules';
+import { cellConflicted, type Violations } from './rules';
 import type { CellState, Puzzle } from './puzzles';
 import type { TapKind } from './tap';
 import './hamster.css';
@@ -103,11 +103,6 @@ export function Board({
         {cells.map((line, r) =>
           line.map((state, c) => {
             const key = `${r},${c}`;
-            const conflicted =
-              violations.rows.has(r) ||
-              violations.cols.has(c) ||
-              violations.islands.has(puzzle.islands[r][c]) ||
-              violations.touch.has(key);
             return (
               <Cell
                 key={`${r}-${c}`}
@@ -115,7 +110,7 @@ export function Board({
                 col={c}
                 state={state}
                 islandId={puzzle.islands[r][c]}
-                conflicted={conflicted}
+                conflicted={cellConflicted(violations, puzzle.islands, r, c)}
                 hit={hitKey === key}
                 pulseDelay={pulse.get(key)}
                 onTap={(kind) => onCell(r, c, kind)}

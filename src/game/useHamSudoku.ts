@@ -1,5 +1,5 @@
 import { useRef, useState } from 'react';
-import { getViolations, isCleared, isSolutionCell, type Violations } from './rules';
+import { countHamsters, getViolations, isCleared, isSolutionCell, type Violations } from './rules';
 import type { CellState, Puzzle } from './puzzles';
 import { nextState, spreadMarks, type TapKind } from './tap';
 
@@ -49,8 +49,7 @@ export function useHamSudoku(puzzle: Puzzle): HamSudoku {
 
   const violations = getViolations(cells, puzzle.islands);
   const cleared = isCleared(cells, puzzle.islands);
-  let hamsterCount = 0;
-  for (const line of cells) for (const cell of line) if (cell === 'hamster') hamsterCount += 1;
+  const hamsterCount = countHamsters(cells);
 
   const tapCell = (r: number, c: number, kind: TapKind) => {
     const prev = latest.current;
