@@ -1,6 +1,7 @@
 import { describe, expect, it } from 'vitest';
 import { PUZZLES } from './puzzles';
 import { getViolations, isCleared, type CellState } from './rules';
+import { countSolutions } from './solver';
 
 const blank = (): CellState[][] => Array.from({ length: 5 }, () => Array(5).fill('empty'));
 
@@ -64,5 +65,13 @@ describe('isCleared', () => {
     const c = blank();
     c[0][3] = 'hamster'; c[1][4] = 'hamster'; c[2][0] = 'hamster'; c[3][1] = 'hamster'; c[4][2] = 'hamster';
     expect(isCleared(c, PUZZLES[0].islands)).toBe(false);
+  });
+  it('6x6 유효 배치는 클리어 (솔버 도출 배치)', () => {
+    const islands = Array.from({ length: 6 }, (_, r) => Array(6).fill(r));
+    const sols = countSolutions(islands, 1);
+    expect(sols.length).toBeGreaterThan(0);
+    const c: CellState[][] = Array.from({ length: 6 }, () => Array<CellState>(6).fill('empty'));
+    for (const [r, col] of sols[0]) c[r][col] = 'hamster';
+    expect(isCleared(c, islands)).toBe(true);
   });
 });

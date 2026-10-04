@@ -2,7 +2,7 @@ export type CellState = 'empty' | 'hamster' | 'seed';
 
 export interface Puzzle {
   name: string;
-  size: 5;
+  size: number;
   islands: number[][];
   solution: [number, number][];
 }
