@@ -59,6 +59,8 @@ function LineFig() {
   );
 }
 
+import { HelpCard, HelpCol } from '../ui/HelpCard';
+
 const RULES = [
   { fig: <IslandFig />, text: '한 색상에 햄스터 1마리' },
   { fig: <TouchFig />, text: '햄스터 주변 8칸 빈칸' },
@@ -67,13 +69,13 @@ const RULES = [
 
 export function RulesHelp() {
   return (
-    <div className="help-card" aria-label="기본 규칙">
+    <HelpCard label="기본 규칙">
       {RULES.map((r) => (
-        <div key={r.text} className="help-col">
+        <HelpCol key={r.text}>
           {r.fig}
           <p>{r.text}</p>
-        </div>
+        </HelpCol>
       ))}
-    </div>
+    </HelpCard>
   );
 }
