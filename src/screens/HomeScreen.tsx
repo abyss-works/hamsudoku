@@ -1,4 +1,5 @@
 import { useState } from 'react';
+import { PawPrint, Settings } from 'lucide-react';
 import type { Stage } from '../api/stagesApi';
 import { Button } from '../ui/Button';
 import { HamsterFace } from '../ui/HamsterFace';
@@ -18,13 +19,15 @@ export function HomeScreen({ loading, lastStage, onResume, onBrowse }: HomeScree
     <div className="home">
       <div className="home-top">
         <Button variant="sticker" aria-label="설정" onClick={() => setSettingsOpen(true)}>
-          ⚙
+          <Settings size={22} aria-hidden="true" />
         </Button>
       </div>
       <div className="home-mascot" aria-hidden="true">
         <HamsterFace />
       </div>
-      <h1 className="home-title">hamsudoku</h1>
+      <h1 className="home-title">
+        <PawPrint size={34} aria-hidden="true" /> hamsudoku
+      </h1>
       <p className="home-sub">숨은 햄스터를 찾아라</p>
       <div className="home-actions">
         {loading && <p>불러오는 중…</p>}

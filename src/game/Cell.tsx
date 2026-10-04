@@ -1,3 +1,4 @@
+import { Heart, Sprout } from 'lucide-react';
 import { Button } from '../ui/Button';
 import { HamsterFace } from '../ui/HamsterFace';
 import type { CellState } from './puzzles';
@@ -28,10 +29,10 @@ export function Cell({ state, islandId, conflicted, onTap }: CellProps) {
         {state === 'hamster' ? (
           <>
             <HamsterFace />
-            <span className="ham-heart">❤</span>
+            <Heart className="ham-heart" size={14} fill="currentColor" aria-hidden="true" />
           </>
         ) : state === 'seed' ? (
-          '🌻'
+          <Sprout className="seed-mark" aria-hidden="true" />
         ) : (
           ''
         )}

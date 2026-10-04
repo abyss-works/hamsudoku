@@ -1,3 +1,4 @@
+import { PartyPopper } from 'lucide-react';
 import { Button } from '../ui/Button';
 import { Confetti } from '../ui/Confetti';
 import { HamsterFace } from '../ui/HamsterFace';
@@ -19,7 +20,9 @@ export function ClearDialog({ onReset, onNextMap }: ClearDialogProps) {
         <HamsterFace />
         <HamsterFace />
       </div>
-      <p className="clear-title">🎉 햄스터 5마리를 다 찾았다!</p>
+      <p className="clear-title">
+        <PartyPopper size={26} aria-hidden="true" /> 햄스터 5마리를 다 찾았다!
+      </p>
       <div className="clear-actions">
         <Button variant="sticker" onClick={onReset}>
           다시하기

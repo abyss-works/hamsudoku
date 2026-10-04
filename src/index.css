@@ -110,6 +110,9 @@ button:disabled {
   font-size: 24px;
   font-weight: 400;
   margin: 0;
+  display: inline-flex;
+  align-items: center;
+  gap: 8px;
 }
 
 .clear-actions {
@@ -156,6 +159,9 @@ button:disabled {
   font-weight: 400;
   margin: 0;
   letter-spacing: 2px;
+  display: flex;
+  align-items: center;
+  gap: 8px;
 }
 
 .home-sub {

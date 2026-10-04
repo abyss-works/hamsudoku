@@ -8,10 +8,10 @@ describe('Button', () => {
     const onClick = vi.fn();
     render(
       <Button className="cell" data-island={1} onClick={onClick}>
-        🌻
+        표시
       </Button>,
     );
-    const btn = screen.getByRole('button', { name: '🌻' });
+    const btn = screen.getByRole('button', { name: '표시' });
     expect(btn.className).toContain('cell');
     expect(btn.getAttribute('data-island')).toBe('1');
     fireEvent.click(btn);
