@@ -94,9 +94,10 @@ button:disabled {
 }
 
 .clear-overlay {
-  position: absolute;
+  position: fixed;
   inset: 0;
-  background: rgb(255 248 239 / 0.92);
+  z-index: 50;
+  background: rgb(255 248 239 / 0.94);
   display: flex;
   flex-direction: column;
   align-items: center;
@@ -262,15 +263,6 @@ button:disabled {
   display: grid;
   grid-template-columns: repeat(3, 1fr);
   gap: 8px;
-}
-
-.help-intro {
-  grid-column: 1 / -1;
-  margin: 0;
-  text-align: center;
-  color: var(--ink-soft);
-  font-family: var(--font-help);
-  font-size: 14px;
 }
 
 .rule-card {
