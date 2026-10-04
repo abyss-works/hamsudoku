@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest';
-import { nextState, type TapKind } from './tap';
+import { nextState, spreadMarks, type TapKind } from './tap';
 import type { CellState } from './puzzles';
 
 describe('nextState', () => {
@@ -18,11 +18,26 @@ describe('nextState', () => {
     expect(nextState('mark', 'double', false)).toBe('wrong');
   });
   it('더블클릭은 햄스터와 오답을 바꾸지 않는다', () => {
-    const states: CellState[] = ['hamster', 'wrong'];
+    const states: CellState[] = ['hamster', 'wrong', 'auto'];
     for (const s of states) {
       const kind: TapKind = 'double';
       expect(nextState(s, kind, true)).toBe(s);
       expect(nextState(s, kind, false)).toBe(s);
     }
+  });
+  it('자동 마커는 싱글로도 안 풀린다', () => {
+    expect(nextState('auto', 'single', false)).toBe('auto');
+  });
+});
+
+describe('spreadMarks', () => {
+  it('같은 줄과 주변 8칸을 거리순 딜레이로 낸다', () => {
+    const marks = spreadMarks(5, 2, 2);
+    const byKey = new Map(marks.map((m) => [`${m.r},${m.c}`, m.delayMs]));
+    expect(byKey.get('2,0')).toBe(120);
+    expect(byKey.get('2,4')).toBe(120);
+    expect(byKey.get('1,1')).toBe(60);
+    expect(byKey.get('2,2')).toBeUndefined();
+    expect(marks.length).toBe(new Set(marks.map((m) => `${m.r},${m.c}`)).size);
   });
 });

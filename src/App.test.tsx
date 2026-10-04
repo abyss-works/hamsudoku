@@ -89,7 +89,41 @@ describe('탭 UX', () => {
     fireEvent.click(screen.getByRole('button', { name: '1-1' }));
     const cells = () => Array.from(container.querySelectorAll('.board .cell'));
     fireEvent.dblClick(cells()[solutionOf('1-1')[0]]);
-    expect((await screen.findAllByRole('button', { name: /X 표시/ })).length).toBeGreaterThan(0);
+    expect((await screen.findAllByRole('button', { name: /자동 표시/ })).length).toBeGreaterThan(0);
+  });
+
+  it('정답 셀은 초록 링이 뜬다', async () => {
+    const { container } = render(<App />);
+    fireEvent.click(await screen.findByRole('button', { name: '스테이지' }));
+    await screen.findByText('레벨 선택');
+    fireEvent.click(screen.getByRole('button', { name: '1-1' }));
+    const cells = () => Array.from(container.querySelectorAll('.board .cell'));
+    fireEvent.dblClick(cells()[solutionOf('1-1')[0]]);
+    expect(container.querySelector('.cell-hit')).toBeTruthy();
+  });
+
+  it('자동 마커는 싱글로 안 풀린다', async () => {
+    render(<App />);
+    fireEvent.click(await screen.findByRole('button', { name: '스테이지' }));
+    await screen.findByText('레벨 선택');
+    fireEvent.click(screen.getByRole('button', { name: '1-1' }));
+    const cells = () => Array.from(document.querySelectorAll('.board .cell'));
+    fireEvent.dblClick(cells()[solutionOf('1-1')[0]]);
+    const auto = await screen.findAllByRole('button', { name: /자동 표시/ });
+    fireEvent.click(auto[0]);
+    expect(await screen.findAllByRole('button', { name: /자동 표시/ })).not.toHaveLength(0);
+  });
+
+  it('오답 더블클릭은 보드가 흔들린다', async () => {
+    const { container } = render(<App />);
+    fireEvent.click(await screen.findByRole('button', { name: '스테이지' }));
+    await screen.findByText('레벨 선택');
+    fireEvent.click(screen.getByRole('button', { name: '1-1' }));
+    const cells = () => Array.from(container.querySelectorAll('.board .cell'));
+    const sol = new Set(solutionOf('1-1'));
+    const wrongIdx = Array.from({ length: 25 }, (_, i) => i).find((i) => !sol.has(i)) as number;
+    fireEvent.dblClick(cells()[wrongIdx]);
+    expect(container.querySelector('.board-wrap.shake')).toBeTruthy();
   });
 
   it('오답 더블클릭은 빨간 고정 마커가 되고 토글 안 된다', async () => {

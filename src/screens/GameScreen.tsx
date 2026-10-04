@@ -13,7 +13,7 @@ interface GameScreenProps {
 const RULES = ['색 섬마다 햄스터 1마리', '주변 8칸에 다른 햄스터 금지', '가로·세로줄에 1마리씩'];
 
 export function GameScreen({ stage, onBack, onNextMap }: GameScreenProps) {
-  const { cells, violations, cleared, hamsterCount, tapCell, reset } = useHamSudoku(stage.puzzle);
+  const { cells, violations, cleared, hamsterCount, pulse, hitKey, shake, tapCell, reset } = useHamSudoku(stage.puzzle);
   const sec = useElapsed(!cleared);
 
   return (
@@ -39,6 +39,9 @@ export function GameScreen({ stage, onBack, onNextMap }: GameScreenProps) {
         cells={cells}
         violations={violations}
         cleared={cleared}
+        pulse={pulse}
+        hitKey={hitKey}
+        shake={shake}
         onCell={tapCell}
         onReset={reset}
         onNextMap={onNextMap}
