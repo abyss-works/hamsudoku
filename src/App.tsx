@@ -1,67 +1,55 @@
 import { useState } from 'react';
-import { Board } from './game/Board';
-import { useHamSudoku } from './game/useHamSudoku';
-import { PUZZLES, type Puzzle } from './game/puzzles';
-import { Button } from './ui/Button';
+import type { Stage } from './api/stagesApi';
+import { useStages } from './game/useStages';
+import { GameScreen } from './screens/GameScreen';
+import { HomeScreen } from './screens/HomeScreen';
+import { SelectScreen } from './screens/SelectScreen';
 
-interface GameProps {
-  puzzle: Puzzle;
-  puzzleIndex: number;
-  onSelectMap: (i: number) => void;
-  onNextMap: () => void;
-}
-
-function Game({ puzzle, puzzleIndex, onSelectMap, onNextMap }: GameProps) {
-  const { cells, violations, cleared, hamsterCount, cycleCell, reset } = useHamSudoku(puzzle);
-
-  return (
-    <>
-      <p className="map-line">
-        {puzzle.name} · 햄스터 {hamsterCount}/5
-      </p>
-      <div className="map-switch" role="group" aria-label="맵 선택">
-        {PUZZLES.map((p, i) => (
-          <Button
-            key={p.name}
-            variant="sticker"
-            disabled={i === puzzleIndex}
-            onClick={() => onSelectMap(i)}
-          >
-            {p.name}
-          </Button>
-        ))}
-        <Button variant="sticker" onClick={reset}>
-          리셋
-        </Button>
-      </div>
-      <Board
-        puzzle={puzzle}
-        cells={cells}
-        violations={violations}
-        cleared={cleared}
-        onCell={cycleCell}
-        onReset={reset}
-        onNextMap={onNextMap}
-      />
-    </>
-  );
-}
+export type Screen = 'home' | 'select' | 'game';
 
 function App() {
-  const [puzzleIndex, setPuzzleIndex] = useState(0);
+  const [screen, setScreen] = useState<Screen>('home');
+  const [stage, setStage] = useState<Stage | null>(null);
+  const { chapters, loading, error } = useStages();
+
+  const stages = chapters.flatMap((c) => c.stages);
+  const goNextMap = () => {
+    if (!stage) {
+      setScreen('select');
+      return;
+    }
+    const i = stages.findIndex((s) => s.id === stage.id);
+    const next = stages[i + 1];
+    if (next) {
+      setStage(next);
+    } else {
+      setScreen('select');
+    }
+  };
 
   return (
     <main className="app">
-      <header className="app-header">
-        <h1>🐹 hamsudoku</h1>
-      </header>
-      <Game
-        key={puzzleIndex}
-        puzzle={PUZZLES[puzzleIndex]}
-        puzzleIndex={puzzleIndex}
-        onSelectMap={setPuzzleIndex}
-        onNextMap={() => setPuzzleIndex((i) => (i + 1) % PUZZLES.length)}
-      />
+      {screen === 'home' && <HomeScreen onStart={() => setScreen('select')} />}
+      {screen === 'select' && (
+        <SelectScreen
+          chapters={chapters}
+          loading={loading}
+          error={error}
+          onSelect={(s) => {
+            setStage(s);
+            setScreen('game');
+          }}
+          onBack={() => setScreen('home')}
+        />
+      )}
+      {screen === 'game' && stage && (
+        <GameScreen
+          key={stage.id}
+          stage={stage}
+          onBack={() => setScreen('select')}
+          onNextMap={goNextMap}
+        />
+      )}
     </main>
   );
 }

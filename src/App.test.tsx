@@ -2,38 +2,80 @@
 import { afterEach, describe, expect, it } from 'vitest';
 import { cleanup, fireEvent, render, screen } from '@testing-library/react';
 import App from './App';
+import { SelectScreen } from './screens/SelectScreen';
+import { PUZZLES } from './game/puzzles';
 
 afterEach(cleanup);
 
-describe('클리어', () => {
-  it('정답 배치로 클리어 오버레이가 뜬다 (맵 1)', () => {
-    const { container } = render(<App />);
-    const cells = () => Array.from(container.querySelectorAll('.board .cell'));
-    [0, 8, 11, 19, 22].forEach((i) => fireEvent.click(cells()[i]));
-    expect(screen.getByRole('dialog', { name: '클리어' })).toBeTruthy();
+describe('화면 전환', () => {
+  it('시작 → 선택 → 게임 진입 → 뒤로가기로 선택에 돌아온다', async () => {
+    render(<App />);
+    fireEvent.click(screen.getByRole('button', { name: '시작하기' }));
+    expect(await screen.findByText('레벨 1')).toBeTruthy();
+    fireEvent.click(screen.getByRole('button', { name: '1 스테이지' }));
+    expect(screen.getByRole('grid', { name: '햄스터 마을 입구' })).toBeTruthy();
+    fireEvent.click(screen.getByRole('button', { name: '뒤로' }));
+    expect(await screen.findByText('레벨 2')).toBeTruthy();
   });
 
-  it('정답 배치로 클리어 오버레이가 뜬다 (맵 2)', () => {
+  it('마지막 스테이지 클리어 후 다음 맵은 선택화면으로 돌아간다', async () => {
     const { container } = render(<App />);
-    fireEvent.click(screen.getByRole('button', { name: '해바라기 밭' }));
+    fireEvent.click(screen.getByRole('button', { name: '시작하기' }));
+    await screen.findByText('레벨 2');
+    fireEvent.click(screen.getByRole('button', { name: '2-1 스테이지' }));
     const cells = () => Array.from(container.querySelectorAll('.board .cell'));
     [2, 5, 14, 16, 23].forEach((i) => fireEvent.click(cells()[i]));
-    expect(screen.getByRole('dialog', { name: '클리어' })).toBeTruthy();
+    fireEvent.click(screen.getByRole('button', { name: '다음 맵' }));
+    expect(await screen.findByText('레벨 1')).toBeTruthy();
+  });
+
+  it('게임 중 뒤로가기 후 재진입하면 빈판이다', async () => {
+    render(<App />);
+    fireEvent.click(screen.getByRole('button', { name: '시작하기' }));
+    await screen.findByText('레벨 1');
+    fireEvent.click(screen.getByRole('button', { name: '1 스테이지' }));
+    const line = () => screen.getByText((_, el) => el?.className === 'map-line');
+    const first = screen.getAllByRole('button', { name: /빈칸/ })[0];
+    fireEvent.click(first);
+    expect(line().textContent).toContain('햄스터 1/5');
+    fireEvent.click(screen.getByRole('button', { name: '뒤로' }));
+    await screen.findByText('레벨 1');
+    fireEvent.click(screen.getByRole('button', { name: '1 스테이지' }));
+    expect(line().textContent).toContain('햄스터 0/5');
   });
 });
 
-describe('맵 전환', () => {
-  it('맵을 바꾸면 빈판으로 시작한다', () => {
-    render(<App />);
-    const cells = screen.getAllByRole('button', { name: /빈칸/ });
-    expect(cells).toHaveLength(25);
+describe('SelectScreen', () => {
+  const noop = () => {};
+  it('locked 스테이지는 비활성화된다', () => {
+    render(
+      <SelectScreen
+        chapters={[
+          {
+            id: 'x',
+            title: '레벨 X',
+            stages: [{ id: 's', title: '잠긴 맵', puzzle: PUZZLES[0], locked: true }],
+          },
+        ]}
+        loading={false}
+        error={null}
+        onSelect={noop}
+        onBack={noop}
+      />,
+    );
+    expect((screen.getByRole('button', { name: '잠긴 맵' }) as HTMLButtonElement).disabled).toBe(true);
+  });
 
-    fireEvent.click(cells[0]);
-    const line = () => screen.getByText((_, el) => el?.className === 'map-line');
-    expect(line().textContent).toBe('햄스터 마을 입구 · 햄스터 1/5');
+  it('에러 상태에서는 에러 문구가 뜬다', () => {
+    render(
+      <SelectScreen chapters={[]} loading={false} error="스테이지 목록을 불러오지 못했다" onSelect={noop} onBack={noop} />,
+    );
+    expect(screen.getByText('스테이지 목록을 불러오지 못했다')).toBeTruthy();
+  });
 
-    fireEvent.click(screen.getByRole('button', { name: '해바라기 밭' }));
-    expect(line().textContent).toBe('해바라기 밭 · 햄스터 0/5');
-    expect(screen.getAllByRole('button', { name: /빈칸/ })).toHaveLength(25);
+  it('빈 카탈로그에서는 안내 문구가 뜬다', () => {
+    render(<SelectScreen chapters={[]} loading={false} error={null} onSelect={noop} onBack={noop} />,
+    );
+    expect(screen.getByText('스테이지가 없어요')).toBeTruthy();
   });
 });
