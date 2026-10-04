@@ -9,22 +9,31 @@ interface GameScreenProps {
   onNextMap: () => void;
 }
 
+function Dots({ count, total }: { count: number; total: number }) {
+  return (
+    <div className="dots" role="status" aria-label={`햄스터 ${count}/${total}`}>
+      {Array.from({ length: total }, (_, i) => (
+        <span key={i} className={i < count ? 'dot on' : 'dot'} aria-hidden="true" />
+      ))}
+    </div>
+  );
+}
+
 export function GameScreen({ stage, onBack, onNextMap }: GameScreenProps) {
   const { cells, violations, cleared, hamsterCount, cycleCell, reset } = useHamSudoku(stage.puzzle);
 
   return (
-    <>
-      <div className="game-head">
+    <div className="game">
+      <div className="hud">
         <Button variant="sticker" onClick={onBack}>
           뒤로
         </Button>
-        <p className="map-line">
-          {stage.code} · 햄스터 {hamsterCount}/5
-        </p>
+        <span className="hud-code">{stage.code}</span>
         <Button variant="sticker" onClick={reset}>
           리셋
         </Button>
       </div>
+      <Dots count={hamsterCount} total={5} />
       <Board
         puzzle={stage.puzzle}
         cells={cells}
@@ -34,6 +43,6 @@ export function GameScreen({ stage, onBack, onNextMap }: GameScreenProps) {
         onReset={reset}
         onNextMap={onNextMap}
       />
-    </>
+    </div>
   );
 }
