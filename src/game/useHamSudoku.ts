@@ -16,6 +16,7 @@ export interface HamSudoku {
   hitKey: string | null;
   shake: number;
   tapCell: (r: number, c: number, kind: TapKind) => void;
+  paintCell: (r: number, c: number, toMark: boolean) => void;
   reset: () => void;
 }
 
@@ -66,5 +67,19 @@ export function useHamSudoku(puzzle: Puzzle): HamSudoku {
     setHitKey(null);
   };
 
-  return { cells, violations, cleared, hamsterCount, pulse, hitKey, shake, tapCell, reset };
+  // 드래그 칠하기: 전제 상태가 아니면 무시하므로 같은 칸 반복 진입에 안전하다.
+  const paintCell = (r: number, c: number, toMark: boolean) => {
+    const prev = latest.current;
+    const want: CellState = toMark ? 'mark' : 'empty';
+    const cur = prev[r][c];
+    if (toMark ? cur !== 'empty' : cur !== 'mark') return;
+    const next = prev.map((line) => [...line]);
+    next[r][c] = want;
+    latest.current = next;
+    setCells(next);
+    setPulse(new Map());
+    setHitKey(null);
+  };
+
+  return { cells, violations, cleared, hamsterCount, pulse, hitKey, shake, tapCell, paintCell, reset };
 }

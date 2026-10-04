@@ -6,12 +6,15 @@ import type { CellState } from './puzzles';
 import type { TapKind } from './tap';
 
 interface CellProps {
+  row: number;
+  col: number;
   state: CellState;
   islandId: number;
   conflicted: boolean;
   hit?: boolean;
   pulseDelay?: number;
   onTap: (kind: TapKind) => void;
+  onPress: () => void;
 }
 
 const LABEL: Record<CellState, string> = {
@@ -24,7 +27,7 @@ const LABEL: Record<CellState, string> = {
 
 const SINGLE_TAP_MS = 180;
 
-export function Cell({ state, islandId, conflicted, hit, pulseDelay, onTap }: CellProps) {
+export function Cell({ row, col, state, islandId, conflicted, hit, pulseDelay, onTap, onPress }: CellProps) {
   const timer = useRef<number | null>(null);
 
   useEffect(
@@ -64,9 +67,12 @@ export function Cell({ state, islandId, conflicted, hit, pulseDelay, onTap }: Ce
       }`}
       data-island={islandId}
       data-state={state}
+      data-r={row}
+      data-c={col}
       aria-label={`${LABEL[state]} (색 ${islandId + 1})`}
       onClick={handleClick}
       onDoubleClick={handleDoubleClick}
+      onPointerDown={onPress}
       style={pulseDelay !== undefined ? ({ '--d': `${pulseDelay}ms` } as CSSProperties) : undefined}
     >
       <span key={state} className={`cell-glyph${state === 'hamster' ? ' pop' : ''}`} aria-hidden="true">

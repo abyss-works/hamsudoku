@@ -18,6 +18,7 @@ describe('Board', () => {
         violations={emptyViolations()}
         cleared={false}
         onCell={() => {}}
+        onPaint={() => {}}
         onReset={() => {}}
         onNextMap={() => {}}
       />,
