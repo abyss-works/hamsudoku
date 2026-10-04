@@ -22,6 +22,7 @@ describe('화면 전환', () => {
     const { container } = render(<App />);
     fireEvent.click(screen.getByRole('button', { name: '시작하기' }));
     await screen.findByText('레벨 2');
+    fireEvent.click(screen.getByRole('button', { name: '레벨 2' }));
     fireEvent.click(screen.getByRole('button', { name: '2-1' }));
     const cells = () => Array.from(container.querySelectorAll('.board .cell'));
     [2, 5, 14, 16, 23].forEach((i) => fireEvent.click(cells()[i]));
@@ -77,5 +78,17 @@ describe('SelectScreen', () => {
     render(<SelectScreen chapters={[]} loading={false} error={null} onSelect={noop} onBack={noop} />,
     );
     expect(screen.getByText('스테이지가 없어요')).toBeTruthy();
+  });
+
+  it('레벨 탭을 바꾸면 해당 장의 스테이지만 보인다', async () => {
+    const { fetchStages } = await import('./api/stagesApi');
+    const chapters = await fetchStages();
+    render(<SelectScreen chapters={chapters} loading={false} error={null} onSelect={noop} onBack={noop} />,
+    );
+    expect(screen.getByRole('button', { name: '1-1' })).toBeTruthy();
+    expect(screen.queryByRole('button', { name: '2-1' })).toBeNull();
+    fireEvent.click(screen.getByRole('button', { name: '레벨 2' }));
+    expect(screen.getByRole('button', { name: '2-1' })).toBeTruthy();
+    expect(screen.queryByRole('button', { name: '1-1' })).toBeNull();
   });
 });

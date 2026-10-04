@@ -176,17 +176,22 @@ button:disabled {
   padding: 12px 16px;
 }
 
-.chapter-title {
-  font-family: var(--font-display);
-  font-size: 22px;
-  font-weight: 400;
-  margin: 0 0 8px;
+.level-rail {
+  display: flex;
+  gap: 8px;
+  overflow-x: auto;
+  padding: 4px 2px 8px;
+  max-width: 100%;
+}
+
+.level-rail .btn-sticker {
+  flex: 0 0 auto;
 }
 
 .stage-list {
-  display: flex;
+  display: grid;
+  grid-template-columns: repeat(5, 1fr);
   gap: 8px;
-  flex-wrap: wrap;
 }
 
 .game-head {
