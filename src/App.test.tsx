@@ -187,16 +187,17 @@ describe('드래그 칠하기', () => {
     expect(await screen.findAllByRole('button', { name: /X 표시/ })).toHaveLength(2);
   });
 
-  it('같은 스트로크에서 되돌아가면 칠한 만큼 되돌린다', async () => {
+  it('되돌아가면 출발칸이 되돌려진다', async () => {
     const { cells, board } = await enterStage11();
     fireEvent.pointerDown(cells()[0]);
-    const restore = mockSpotSeq([cells()[1], cells()[2], cells()[1]]);
+    const restore = mockSpotSeq([cells()[1], cells()[2], cells()[3], cells()[2]]);
     fireEvent.pointerMove(board, { clientX: 10, clientY: 10 });
     fireEvent.pointerMove(board, { clientX: 11, clientY: 11 });
     fireEvent.pointerMove(board, { clientX: 12, clientY: 12 });
+    fireEvent.pointerMove(board, { clientX: 13, clientY: 13 });
     fireEvent.pointerUp(board);
     restore();
-    expect(screen.getAllByRole('button', { name: /X 표시/ })).toHaveLength(2);
+    expect(screen.getAllByRole('button', { name: /X 표시/ })).toHaveLength(3);
   });
 
   it('마커 시작 드래그는 빈칸을 건드리지 않고 마커만 지운다', async () => {
