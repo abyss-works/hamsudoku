@@ -178,12 +178,6 @@ button:disabled {
   padding: 12px 14px;
 }
 
-.home-foot {
-  margin: 0;
-  color: var(--ink-soft);
-  font-size: 13px;
-}
-
 .settings {
   display: flex;
   flex-direction: column;
