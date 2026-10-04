@@ -13,7 +13,7 @@ interface GameScreenProps {
 }
 
 export function GameScreen({ stage, onBack, onNextMap }: GameScreenProps) {
-  const { cells, violations, cleared, hamsterCount, pulse, hitKey, shake, tapCell, reset } = useHamSudoku(stage.puzzle);
+  const { cells, violations, cleared, hamsterCount, pulse, hitKey, shake, tapCell, beginStroke, strokeEnter, endStroke, reset } = useHamSudoku(stage.puzzle);
   const sec = useElapsed(!cleared);
 
   return (
@@ -44,6 +44,9 @@ export function GameScreen({ stage, onBack, onNextMap }: GameScreenProps) {
         hitKey={hitKey}
         shake={shake}
         onCell={tapCell}
+        onPress={beginStroke}
+        onEnter={strokeEnter}
+        onRelease={endStroke}
         onReset={reset}
         onNextMap={onNextMap}
       />

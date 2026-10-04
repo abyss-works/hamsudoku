@@ -25,10 +25,12 @@ describe('GameScreen', () => {
     expect(screen.getByRole('status').getAttribute('aria-label')).toBe('햄스터 0/6');
   });
 
-  it('규칙 3열과 조작 2열 도움말이 보인다', () => {
+  it('도움말 섹션마다 하나로 합쳐진다', () => {
     const { container } = render(<GameScreen stage={SIX} onBack={vi.fn()} onNextMap={vi.fn()} />);
-    expect(container.querySelectorAll('.rule-card')).toHaveLength(3);
-    expect(container.querySelectorAll('.control-card')).toHaveLength(2);
-    expect(screen.getByText('한 번 톡, 표시 남기기')).toBeTruthy();
+    expect(container.querySelectorAll('.help-card')).toHaveLength(2);
+    const rules = screen.getByLabelText('기본 규칙');
+    expect(rules.querySelectorAll('.help-row')).toHaveLength(3);
+    const controls = screen.getByLabelText('기본 조작');
+    expect(controls.querySelectorAll('.help-row')).toHaveLength(3);
   });
 });

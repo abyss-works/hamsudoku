@@ -51,24 +51,25 @@ function TouchFig() {
 function LineFig() {
   return (
     <MiniFrame>
-      <rect x="2" y="12" width="32" height="12" rx="3" fill="#e2eefc" stroke="#4a3128" strokeWidth="1.6" />
-      <Ham x={12} y={18} />
-      <Cross x={24} y={18} />
+      <rect x="2" y="11" width="32" height="14" rx="5" fill="#e2eefc" stroke="#4a3128" strokeWidth="1.6" />
+      <Ham x={8} y={18} />
+      <Cross x={18} y={18} />
+      <Cross x={28} y={18} />
     </MiniFrame>
   );
 }
 
 const RULES = [
-  { fig: <IslandFig />, text: '색깔당 햄스터 1마리' },
-  { fig: <TouchFig />, text: '주변 8칸 빈칸' },
+  { fig: <IslandFig />, text: '한 색상에 햄스터 1마리' },
+  { fig: <TouchFig />, text: '햄스터 주변 8칸 빈칸' },
   { fig: <LineFig />, text: '가로/세로 햄스터 1마리' },
 ];
 
 export function RulesHelp() {
   return (
-    <div className="rules-row" aria-label="기본 규칙">
+    <div className="help-card" aria-label="기본 규칙">
       {RULES.map((r) => (
-        <div key={r.text} className="rule-card">
+        <div key={r.text} className="help-row">
           {r.fig}
           <p>{r.text}</p>
         </div>

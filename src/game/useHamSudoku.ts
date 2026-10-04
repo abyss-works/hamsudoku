@@ -16,7 +16,24 @@ export interface HamSudoku {
   hitKey: string | null;
   shake: number;
   tapCell: (r: number, c: number, kind: TapKind) => void;
+  beginStroke: (r: number, c: number) => void;
+  strokeEnter: (r: number, c: number) => void;
+  endStroke: () => boolean;
   reset: () => void;
+}
+
+// 한 스트로크 동안 바뀐 칸 목록. 움직임 D→E마다:
+// - E가 바뀌었으면: D도 바뀌었으면 둘 다, 아니면 E만 되돌린다.
+// - E가 새 칸이면: D가 되돌려졌던 칸이면 D부터 다시 칠하고, E를 칠한다.
+// 건너뛴 칸은 손대지 않는다.
+interface Stroke {
+  sr: number;
+  sc: number;
+  toMark: boolean;
+  engaged: boolean;
+  lastR: number | null;
+  lastC: number | null;
+  trail: { r: number; c: number; prev: CellState }[];
 }
 
 export function useHamSudoku(puzzle: Puzzle): HamSudoku {
@@ -24,6 +41,8 @@ export function useHamSudoku(puzzle: Puzzle): HamSudoku {
   // 지연 탭(타이머 콜백)이 클릭 시점 스냅샷이 아닌 최신 판을 보도록 ref 미러를 둔다.
   // tapCell은 동기적으로 ref까지 갱신하므로 연타·더블클릭 경합에서도 덮어쓰기가 없다.
   const latest = useRef(cells);
+  // 진행 중 스트로크. 최신 판은 latest ref로만 읽어서 지연 이벤트 경합을 피한다.
+  const strokeRef = useRef<Stroke | null>(null);
   const [pulse, setPulse] = useState<ReadonlyMap<string, number>>(new Map());
   const [hitKey, setHitKey] = useState<string | null>(null);
   const [shake, setShake] = useState(0);
@@ -61,10 +80,78 @@ export function useHamSudoku(puzzle: Puzzle): HamSudoku {
   const reset = () => {
     const blank = blankBoard(puzzle.size);
     latest.current = blank;
+    strokeRef.current = null;
     setCells(blank);
     setPulse(new Map());
     setHitKey(null);
   };
 
-  return { cells, violations, cleared, hamsterCount, pulse, hitKey, shake, tapCell, reset };
+  const paintOne = (st: Stroke, r: number, c: number) => {
+    const cur = latest.current[r][c];
+    if (st.toMark ? cur !== 'empty' : cur !== 'mark') return;
+    const next = latest.current.map((line) => [...line]);
+    next[r][c] = st.toMark ? 'mark' : 'empty';
+    st.trail.push({ r, c, prev: cur });
+    latest.current = next;
+    setCells(next);
+    setPulse(new Map());
+    setHitKey(null);
+  };
+
+  const revertOne = (st: Stroke, r: number, c: number) => {
+    const at = st.trail.findIndex((t) => t.r === r && t.c === c);
+    if (at < 0) return;
+    const [t] = st.trail.splice(at, 1);
+    const next = latest.current.map((line) => [...line]);
+    next[t.r][t.c] = t.prev;
+    latest.current = next;
+    setCells(next);
+    setPulse(new Map());
+    setHitKey(null);
+  };
+
+  const inTrail = (st: Stroke, r: number, c: number) => st.trail.some((t) => t.r === r && t.c === c);
+
+  const beginStroke = (r: number, c: number) => {
+    const cur = latest.current[r][c];
+    if (cur !== 'empty' && cur !== 'mark') {
+      strokeRef.current = null;
+      return;
+    }
+    strokeRef.current = { sr: r, sc: c, toMark: cur === 'empty', engaged: false, lastR: null, lastC: null, trail: [] };
+  };
+
+  const strokeEnter = (r: number, c: number) => {
+    const st = strokeRef.current;
+    if (!st) return;
+    if (st.lastR === r && st.lastC === c) return;
+    const depR = st.lastR;
+    const depC = st.lastC;
+    st.lastR = r;
+    st.lastC = c;
+    if (!st.engaged) {
+      st.engaged = true;
+      paintOne(st, st.sr, st.sc);
+      if (r === st.sr && c === st.sc) return;
+    }
+    if (inTrail(st, r, c)) {
+      if (depR !== null && depC !== null && inTrail(st, depR, depC)) {
+        revertOne(st, depR, depC);
+        revertOne(st, r, c);
+      } else {
+        revertOne(st, r, c);
+      }
+    } else {
+      if (depR !== null && depC !== null && !inTrail(st, depR, depC)) paintOne(st, depR, depC);
+      paintOne(st, r, c);
+    }
+  };
+
+  const endStroke = () => {
+    const engaged = strokeRef.current?.engaged ?? false;
+    strokeRef.current = null;
+    return engaged;
+  };
+
+  return { cells, violations, cleared, hamsterCount, pulse, hitKey, shake, tapCell, beginStroke, strokeEnter, endStroke, reset };
 }

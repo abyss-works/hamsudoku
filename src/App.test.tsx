@@ -1,5 +1,5 @@
 // @vitest-environment jsdom
-import { afterEach, describe, expect, it } from 'vitest';
+import { afterEach, describe, expect, it, vi } from 'vitest';
 import { cleanup, fireEvent, render, screen } from '@testing-library/react';
 import App from './App';
 import { SelectScreen } from './screens/SelectScreen';
@@ -148,6 +148,70 @@ describe('탭 UX', () => {
     const wrong = await screen.findByRole('button', { name: /틀린 칸/ });
     fireEvent.click(wrong);
     expect(await screen.findByRole('button', { name: /틀린 칸/ })).toBeTruthy();
+  });
+});
+
+describe('드래그 칠하기', () => {
+  const mockSpot = (el: Element | null) => {
+    const orig = (document as any).elementFromPoint;
+    (document as any).elementFromPoint = vi.fn(() => el);
+    return () => {
+      (document as any).elementFromPoint = orig;
+    };
+  };
+  const mockSpotSeq = (els: (Element | null)[]) => {
+    const orig = (document as any).elementFromPoint;
+    let i = 0;
+    (document as any).elementFromPoint = vi.fn(() => els[Math.min(i++, els.length - 1)]);
+    return () => {
+      (document as any).elementFromPoint = orig;
+    };
+  };
+  const enterStage11 = async () => {
+    const { container } = render(<App />);
+    fireEvent.click(await screen.findByRole('button', { name: '스테이지' }));
+    await screen.findByText('레벨 선택');
+    fireEvent.click(screen.getByRole('button', { name: '1' }));
+    const cells = () => Array.from(container.querySelectorAll('.board .cell')) as HTMLElement[];
+    const board = container.querySelector('.board') as HTMLElement;
+    return { container, cells, board };
+  };
+
+  it('빈칸 시작 드래그는 빈칸만 마크로 칠한다', async () => {
+    const { cells, board } = await enterStage11();
+    fireEvent.pointerDown(cells()[0]);
+    const restore = mockSpot(cells()[1]);
+    fireEvent.pointerMove(board, { clientX: 10, clientY: 10 });
+    fireEvent.pointerUp(board);
+    restore();
+    expect(await screen.findAllByRole('button', { name: /X 표시/ })).toHaveLength(2);
+  });
+
+  it('되돌아가면 걸린 칸이 전부 되돌려진다', async () => {
+    const { cells, board } = await enterStage11();
+    fireEvent.pointerDown(cells()[0]);
+    const restore = mockSpotSeq([cells()[1], cells()[2], cells()[3], cells()[2]]);
+    fireEvent.pointerMove(board, { clientX: 10, clientY: 10 });
+    fireEvent.pointerMove(board, { clientX: 11, clientY: 11 });
+    fireEvent.pointerMove(board, { clientX: 12, clientY: 12 });
+    fireEvent.pointerMove(board, { clientX: 13, clientY: 13 });
+    fireEvent.pointerUp(board);
+    restore();
+    expect(screen.getAllByRole('button', { name: /X 표시/ })).toHaveLength(2);
+  });
+
+  it('마커 시작 드래그는 빈칸을 건드리지 않고 마커만 지운다', async () => {
+    const { cells, board } = await enterStage11();
+    fireEvent.click(cells()[0]);
+    await new Promise((r) => setTimeout(r, 300));
+    fireEvent.pointerDown(cells()[0]);
+    const restore = mockSpot(cells()[1]);
+    fireEvent.pointerMove(board, { clientX: 10, clientY: 10 });
+    fireEvent.pointerUp(board);
+    restore();
+    await new Promise((r) => setTimeout(r, 300));
+    expect(screen.queryAllByRole('button', { name: /X 표시/ })).toHaveLength(0);
+    expect(screen.getAllByRole('button', { name: /빈칸/ })).toHaveLength(25);
   });
 });
 
