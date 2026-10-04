@@ -1,7 +1,26 @@
 // @vitest-environment jsdom
-import { describe, expect, it } from 'vitest';
-import { fireEvent, render, screen } from '@testing-library/react';
+import { afterEach, describe, expect, it } from 'vitest';
+import { cleanup, fireEvent, render, screen } from '@testing-library/react';
 import App from './App';
+
+afterEach(cleanup);
+
+describe('클리어', () => {
+  it('정답 배치로 클리어 오버레이가 뜬다 (맵 1)', () => {
+    const { container } = render(<App />);
+    const cells = () => Array.from(container.querySelectorAll('.board .cell'));
+    [0, 8, 11, 19, 22].forEach((i) => fireEvent.click(cells()[i]));
+    expect(screen.getByRole('dialog', { name: '클리어' })).toBeTruthy();
+  });
+
+  it('정답 배치로 클리어 오버레이가 뜬다 (맵 2)', () => {
+    const { container } = render(<App />);
+    fireEvent.click(screen.getByRole('button', { name: '해바라기 밭' }));
+    const cells = () => Array.from(container.querySelectorAll('.board .cell'));
+    [2, 5, 14, 16, 23].forEach((i) => fireEvent.click(cells()[i]));
+    expect(screen.getByRole('dialog', { name: '클리어' })).toBeTruthy();
+  });
+});
 
 describe('맵 전환', () => {
   it('맵을 바꾸면 빈판으로 시작한다', () => {
