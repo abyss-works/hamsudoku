@@ -125,7 +125,7 @@ export function Board({
           }),
         )}
       </div>
-      {cleared && <ClearDialog onReset={onReset} onNextMap={onNextMap} />}
+      {cleared && <ClearDialog total={puzzle.size} onReset={onReset} onNextMap={onNextMap} />}
     </div>
   );
 }
