@@ -25,6 +25,11 @@
 .cell[data-island='2'] { background: #e4f5e1; }
 .cell[data-island='3'] { background: #e2eefc; }
 .cell[data-island='4'] { background: #f0e6fa; }
+.cell[data-island='5'] { background: #cdeee6; }
+.cell[data-island='6'] { background: #ffddc4; }
+.cell[data-island='7'] { background: #c9d8f2; }
+.cell[data-island='8'] { background: #f6cfd8; }
+.cell[data-island='9'] { background: #e3d9c2; }
 
 .cell[data-state='mark'] .mark-x,
 .cell[data-state='wrong'] .mark-x,
