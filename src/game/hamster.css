@@ -1,6 +1,13 @@
-/* 햄스터 팝 테마. 기본 레이아웃은 index.css, 색·애니메이션은 여기. */
+/* 보드와 셀은 게임 전용이라 여기 둔다. */
+
+.board-wrap {
+  position: relative;
+  width: 100%;
+}
 
 .board {
+  display: grid;
+  gap: 0;
   min-width: 280px;
   width: 100%;
   /* 좁은 화면에서도 헤더+버튼과 함께 한 화면에 들어오도록 높이 기준 상한 */
@@ -17,7 +24,21 @@
 }
 
 .cell {
+  aspect-ratio: 1;
+  min-width: 0;
+  border-radius: 0;
+  border: 1px solid #d9c7a8;
   border-color: rgb(74 49 40 / 0.25);
+  padding: 0;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  font-size: 32px;
+}
+
+.cell-conflict {
+  outline: 3px solid #e5484d;
+  outline-offset: -3px;
 }
 
 .cell[data-island='0'] { background: #ffe9ec; }

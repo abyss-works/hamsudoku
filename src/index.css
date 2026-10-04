@@ -30,53 +30,6 @@ body {
   gap: 12px;
 }
 
-.app-header {
-  text-align: center;
-}
-
-.app-header h1 {
-  margin: 8px 0 4px;
-  font-size: 32px;
-  font-family: var(--font-display);
-  font-weight: 400;
-  letter-spacing: 1px;
-}
-
-.map-switch {
-  display: flex;
-  gap: 8px;
-  justify-content: center;
-  flex-wrap: wrap;
-}
-
-.board-wrap {
-  position: relative;
-  width: 100%;
-}
-
-.board {
-  display: grid;
-  gap: 0;
-  width: 100%;
-}
-
-.cell {
-  aspect-ratio: 1;
-  min-width: 0;
-  border-radius: 0;
-  border: 1px solid #d9c7a8;
-  padding: 0;
-  display: flex;
-  align-items: center;
-  justify-content: center;
-  font-size: 32px;
-}
-
-.cell-conflict {
-  outline: 3px solid #e5484d;
-  outline-offset: -3px;
-}
-
 .clear-overlay {
   position: fixed;
   inset: 0;
