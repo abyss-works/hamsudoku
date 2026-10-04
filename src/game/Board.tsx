@@ -2,6 +2,7 @@ import { Cell } from './Cell';
 import { ClearDialog } from './ClearDialog';
 import type { Violations } from './rules';
 import type { CellState, Puzzle } from './puzzles';
+import './hamster.css';
 
 interface BoardProps {
   puzzle: Puzzle;
