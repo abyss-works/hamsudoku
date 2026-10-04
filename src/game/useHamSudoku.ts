@@ -1,27 +1,10 @@
 import { useState } from 'react';
 import { getViolations, isCleared, isSolutionCell, type Violations } from './rules';
 import type { CellState, Puzzle } from './puzzles';
-import { nextState, type TapKind } from './tap';
+import { nextState, spreadMarks, type TapKind } from './tap';
 
 function blankBoard(size: number): CellState[][] {
   return Array.from({ length: size }, () => Array<CellState>(size).fill('empty'));
-}
-
-function autoMark(board: CellState[][], r: number, c: number): void {
-  const size = board.length;
-  for (let i = 0; i < size; i += 1) {
-    if (board[r][i] === 'empty') board[r][i] = 'mark';
-    if (board[i][c] === 'empty') board[i][c] = 'mark';
-  }
-  for (let dr = -1; dr <= 1; dr += 1) {
-    for (let dc = -1; dc <= 1; dc += 1) {
-      const nr = r + dr;
-      const nc = c + dc;
-      if (nr >= 0 && nc >= 0 && nr < size && nc < size && board[nr][nc] === 'empty') {
-        board[nr][nc] = 'mark';
-      }
-    }
-  }
 }
 
 export interface HamSudoku {
@@ -29,12 +12,18 @@ export interface HamSudoku {
   violations: Violations;
   cleared: boolean;
   hamsterCount: number;
+  pulse: ReadonlyMap<string, number>;
+  hitKey: string | null;
+  shake: number;
   tapCell: (r: number, c: number, kind: TapKind) => void;
   reset: () => void;
 }
 
 export function useHamSudoku(puzzle: Puzzle): HamSudoku {
   const [cells, setCells] = useState<CellState[][]>(() => blankBoard(puzzle.size));
+  const [pulse, setPulse] = useState<ReadonlyMap<string, number>>(new Map());
+  const [hitKey, setHitKey] = useState<string | null>(null);
+  const [shake, setShake] = useState(0);
 
   const violations = getViolations(cells, puzzle.islands);
   const cleared = isCleared(cells, puzzle.islands);
@@ -42,16 +31,33 @@ export function useHamSudoku(puzzle: Puzzle): HamSudoku {
   for (const line of cells) for (const cell of line) if (cell === 'hamster') hamsterCount += 1;
 
   const tapCell = (r: number, c: number, kind: TapKind) => {
-    setCells((prev) => {
-      const next = prev.map((line) => [...line]);
-      const result = nextState(prev[r][c], kind, isSolutionCell(puzzle, r, c));
-      next[r][c] = result;
-      if (result === 'hamster') autoMark(next, r, c);
-      return next;
-    });
+    const result = nextState(cells[r][c], kind, isSolutionCell(puzzle, r, c));
+    if (result === cells[r][c]) return;
+    const next = cells.map((line) => [...line]);
+    next[r][c] = result;
+    if (result === 'hamster') {
+      const delays = new Map<string, number>();
+      for (const m of spreadMarks(cells.length, r, c)) {
+        if (next[m.r][m.c] === 'empty') {
+          next[m.r][m.c] = 'auto';
+          delays.set(`${m.r},${m.c}`, m.delayMs);
+        }
+      }
+      setPulse(delays);
+      setHitKey(`${r},${c}`);
+    } else {
+      setPulse(new Map());
+      setHitKey(null);
+      if (result === 'wrong' && kind === 'double') setShake((n) => n + 1);
+    }
+    setCells(next);
   };
 
-  const reset = () => setCells(blankBoard(puzzle.size));
+  const reset = () => {
+    setCells(blankBoard(puzzle.size));
+    setPulse(new Map());
+    setHitKey(null);
+  };
 
-  return { cells, violations, cleared, hamsterCount, tapCell, reset };
+  return { cells, violations, cleared, hamsterCount, pulse, hitKey, shake, tapCell, reset };
 }
