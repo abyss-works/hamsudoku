@@ -1,3 +1,4 @@
+import { useState } from 'react';
 import type { Chapter, Stage } from '../api/stagesApi';
 import { Button } from '../ui/Button';
 
@@ -10,6 +11,9 @@ interface SelectScreenProps {
 }
 
 export function SelectScreen({ chapters, loading, error, onSelect, onBack }: SelectScreenProps) {
+  const [selectedId, setSelectedId] = useState<string | null>(null);
+  const active = chapters.find((c) => c.id === selectedId) ?? chapters[0];
+
   return (
     <div className="select">
       <div className="select-head">
@@ -21,25 +25,37 @@ export function SelectScreen({ chapters, loading, error, onSelect, onBack }: Sel
       {loading && <p>불러오는 중…</p>}
       {!loading && error && <p role="alert">{error}</p>}
       {!loading && !error && chapters.length === 0 && <p>스테이지가 없어요</p>}
-      {!loading &&
-        !error &&
-        chapters.map((chapter) => (
-          <section key={chapter.id} className="chapter">
-            <h3 className="chapter-title">{chapter.title}</h3>
+      {!loading && !error && chapters.length > 0 && (
+        <>
+          <div className="level-rail" role="group" aria-label="레벨 목록">
+            {chapters.map((c) => (
+              <Button
+                key={c.id}
+                variant="sticker"
+                className={c.id === active.id ? 'btn-primary' : ''}
+                aria-pressed={c.id === active.id}
+                onClick={() => setSelectedId(c.id)}
+              >
+                {c.title}
+              </Button>
+            ))}
+          </div>
+          <section key={active.id} className="chapter">
             <div className="stage-list">
-              {chapter.stages.map((stage) => (
+              {active.stages.map((stage) => (
                 <Button
                   key={stage.id}
                   variant="sticker"
                   disabled={stage.locked}
                   onClick={() => onSelect(stage)}
                 >
-                  {stage.title}
+                  {stage.code}
                 </Button>
               ))}
             </div>
           </section>
-        ))}
+        </>
+      )}
     </div>
   );
 }

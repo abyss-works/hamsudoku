@@ -6,7 +6,7 @@ describe('fetchStages', () => {
     const chapters = await fetchStages();
     expect(chapters.map((c) => c.title)).toEqual(['레벨 1', '레벨 2']);
     const stages = chapters.flatMap((c) => c.stages);
-    expect(stages.map((s) => s.title)).toEqual(['1 스테이지', '2-1 스테이지']);
+    expect(stages.map((s) => s.code)).toEqual(['1-1', '2-1']);
     expect(stages.every((s) => s.locked === false)).toBe(true);
   });
 });
