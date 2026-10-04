@@ -40,7 +40,6 @@ export function HomeScreen({ loading, lastStage, onResume, onBrowse }: HomeScree
           스테이지
         </Button>
       </div>
-      <p className="home-foot">빈칸을 눌러 햄스터를 놓아보세요</p>
       {settingsOpen && <SettingsDialog onClose={() => setSettingsOpen(false)} />}
     </div>
   );
