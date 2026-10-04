@@ -82,6 +82,17 @@ describe('화면 전환', () => {
 });
 
 describe('탭 UX', () => {
+  it('빠르게 연달아 클릭해도 두 마커가 남는다', async () => {
+    render(<App />);
+    fireEvent.click(await screen.findByRole('button', { name: '스테이지' }));
+    await screen.findByText('레벨 선택');
+    fireEvent.click(screen.getByRole('button', { name: '1-1' }));
+    const marks = () => screen.queryAllByRole('button', { name: /X 표시|자동 표시/ });
+    fireEvent.click(screen.getAllByRole('button', { name: /빈칸/ })[0]);
+    fireEvent.click(screen.getAllByRole('button', { name: /빈칸/ })[1]);
+    await new Promise((r) => setTimeout(r, 500));
+    expect(marks()).toHaveLength(2);
+  });
   it('정답 더블클릭은 같은 줄 빈칸을 X로 채운다', async () => {
     const { container } = render(<App />);
     fireEvent.click(await screen.findByRole('button', { name: '스테이지' }));
