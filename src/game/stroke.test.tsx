@@ -78,17 +78,18 @@ describe('stroke', () => {
     expect(at(result.current.cells, 0, 1)).toBe('mark');
   });
 
-  it('되돌린 뒤 머물러도 바뀌지 않는다', () => {
+  it('되돌린 칸을 지나가면 다시 칠해진다', () => {
     const { result } = renderHook(() => useHamSudoku(PUZZLES[0]));
     act(() => {
       result.current.beginStroke(0, 0);
       result.current.strokeEnter(0, 1);
       result.current.strokeEnter(0, 2);
       result.current.strokeEnter(0, 1);
+      result.current.strokeEnter(0, 0);
       result.current.strokeEnter(0, 1);
     });
     expect(at(result.current.cells, 0, 0)).toBe('mark');
-    expect(at(result.current.cells, 0, 1)).toBe('empty');
+    expect(at(result.current.cells, 0, 1)).toBe('mark');
     expect(at(result.current.cells, 0, 2)).toBe('empty');
   });
 });
