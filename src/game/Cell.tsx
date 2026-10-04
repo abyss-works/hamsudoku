@@ -25,7 +25,7 @@ const LABEL: Record<CellState, string> = {
   wrong: '틀린 칸',
 };
 
-const SINGLE_TAP_MS = 180;
+const SINGLE_TAP_MS = 150;
 
 export function Cell({ row, col, state, islandId, conflicted, hit, pulseDelay, onTap, onPress }: CellProps) {
   const timer = useRef<number | null>(null);

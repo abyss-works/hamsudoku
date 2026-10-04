@@ -16,7 +16,7 @@ describe('Cell', () => {
     fireEvent.click(screen.getByRole('button', { name: /빈칸/ }));
     expect(onTap).not.toHaveBeenCalled();
     act(() => {
-      vi.advanceTimersByTime(180);
+      vi.advanceTimersByTime(150);
     });
     expect(onTap).toHaveBeenCalledWith('single');
   });
