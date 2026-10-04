@@ -51,9 +51,15 @@ function TouchFig() {
 function LineFig() {
   return (
     <MiniFrame>
-      <rect x="2" y="12" width="32" height="12" rx="3" fill="#e2eefc" stroke="#4a3128" strokeWidth="1.6" />
-      <Ham x={12} y={18} />
-      <Cross x={24} y={18} />
+      <path
+        d="M2 2 H34 V34 H24 V12 H2 Z"
+        fill="#e2eefc"
+        stroke="#4a3128"
+        strokeWidth="1.6"
+        strokeLinejoin="round"
+      />
+      <Ham x={10} y={7} />
+      <Cross x={29} y={25} />
     </MiniFrame>
   );
 }
