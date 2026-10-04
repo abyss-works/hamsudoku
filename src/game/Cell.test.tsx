@@ -9,14 +9,14 @@ afterEach(() => {
 });
 
 describe('Cell', () => {
-  it('싱글클릭은 250ms 뒤에 전달된다', () => {
+  it('싱글클릭은 대기 뒤에 전달된다', () => {
     vi.useFakeTimers();
     const onTap = vi.fn();
     render(<Cell state="empty" islandId={0} conflicted={false} onTap={onTap} />);
     fireEvent.click(screen.getByRole('button', { name: /빈칸/ }));
     expect(onTap).not.toHaveBeenCalled();
     act(() => {
-      vi.advanceTimersByTime(250);
+      vi.advanceTimersByTime(180);
     });
     expect(onTap).toHaveBeenCalledWith('single');
   });
@@ -33,5 +33,20 @@ describe('Cell', () => {
     });
     expect(onTap).toHaveBeenCalledTimes(1);
     expect(onTap).toHaveBeenCalledWith('double');
+  });
+
+  it('빠른 두 클릭은 dblclick 없이 더블로 확정된다', () => {
+    vi.useFakeTimers();
+    const onTap = vi.fn();
+    render(<Cell state="empty" islandId={0} conflicted={false} onTap={onTap} />);
+    const btn = screen.getByRole('button', { name: /빈칸/ });
+    fireEvent.click(btn);
+    fireEvent.click(btn);
+    expect(onTap).toHaveBeenCalledTimes(1);
+    expect(onTap).toHaveBeenCalledWith('double');
+    act(() => {
+      vi.advanceTimersByTime(1000);
+    });
+    expect(onTap).toHaveBeenCalledTimes(1);
   });
 });

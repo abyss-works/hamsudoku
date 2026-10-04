@@ -23,14 +23,14 @@ describe('화면 전환', () => {
     expect((screen.getByRole('button', { name: '이어하기' }) as HTMLButtonElement).disabled).toBe(true);
     fireEvent.click(await screen.findByRole('button', { name: '스테이지' }));
     expect(await screen.findByText('레벨 선택')).toBeTruthy();
-    expect(screen.getByRole('button', { name: '1-1' })).toBeTruthy();
+    expect(screen.getByRole('button', { name: '1' })).toBeTruthy();
   });
 
   it('1-1 정답 클릭으로 클리어된다', async () => {
     const { container } = render(<App />);
     fireEvent.click(await screen.findByRole('button', { name: '스테이지' }));
     await screen.findByText('레벨 선택');
-    fireEvent.click(screen.getByRole('button', { name: '1-1' }));
+    fireEvent.click(screen.getByRole('button', { name: '1' }));
     const cells = () => Array.from(container.querySelectorAll('.board .cell'));
     solutionOf('1-1').forEach((i) => fireEvent.dblClick(cells()[i]));
     expect(screen.getByRole('dialog', { name: '클리어' })).toBeTruthy();
@@ -41,7 +41,7 @@ describe('화면 전환', () => {
     fireEvent.click(await screen.findByRole('button', { name: '스테이지' }));
     await screen.findByText('레벨 선택');
     fireEvent.click(screen.getByRole('button', { name: '레벨 3' }));
-    fireEvent.click(screen.getByRole('button', { name: '3-10' }));
+    fireEvent.click(screen.getByRole('button', { name: '10' }));
     const cells = () => Array.from(container.querySelectorAll('.board .cell'));
     solutionOf('3-10').forEach((i) => fireEvent.dblClick(cells()[i]));
     fireEvent.click(screen.getByRole('button', { name: '다음 맵' }));
@@ -69,14 +69,14 @@ describe('화면 전환', () => {
     const { container } = render(<App />);
     fireEvent.click(await screen.findByRole('button', { name: '스테이지' }));
     await screen.findByText('레벨 선택');
-    fireEvent.click(screen.getByRole('button', { name: '1-1' }));
+    fireEvent.click(screen.getByRole('button', { name: '1' }));
     const line = () => screen.getByRole('status').getAttribute('aria-label') ?? '';
     const idx = solutionOf('1-1')[0];
     fireEvent.dblClick(container.querySelectorAll('.board .cell')[idx]);
     expect(line()).toContain('햄스터 1/5');
     fireEvent.click(screen.getByRole('button', { name: '뒤로' }));
     await screen.findByText('레벨 1');
-    fireEvent.click(screen.getByRole('button', { name: '1-1' }));
+    fireEvent.click(screen.getByRole('button', { name: '1' }));
     expect(line()).toContain('햄스터 0/5');
   });
 });
@@ -86,7 +86,7 @@ describe('탭 UX', () => {
     render(<App />);
     fireEvent.click(await screen.findByRole('button', { name: '스테이지' }));
     await screen.findByText('레벨 선택');
-    fireEvent.click(screen.getByRole('button', { name: '1-1' }));
+    fireEvent.click(screen.getByRole('button', { name: '1' }));
     const marks = () => screen.queryAllByRole('button', { name: /X 표시|자동 표시/ });
     fireEvent.click(screen.getAllByRole('button', { name: /빈칸/ })[0]);
     fireEvent.click(screen.getAllByRole('button', { name: /빈칸/ })[1]);
@@ -97,7 +97,7 @@ describe('탭 UX', () => {
     const { container } = render(<App />);
     fireEvent.click(await screen.findByRole('button', { name: '스테이지' }));
     await screen.findByText('레벨 선택');
-    fireEvent.click(screen.getByRole('button', { name: '1-1' }));
+    fireEvent.click(screen.getByRole('button', { name: '1' }));
     const cells = () => Array.from(container.querySelectorAll('.board .cell'));
     fireEvent.dblClick(cells()[solutionOf('1-1')[0]]);
     expect((await screen.findAllByRole('button', { name: /자동 표시/ })).length).toBeGreaterThan(0);
@@ -107,7 +107,7 @@ describe('탭 UX', () => {
     const { container } = render(<App />);
     fireEvent.click(await screen.findByRole('button', { name: '스테이지' }));
     await screen.findByText('레벨 선택');
-    fireEvent.click(screen.getByRole('button', { name: '1-1' }));
+    fireEvent.click(screen.getByRole('button', { name: '1' }));
     const cells = () => Array.from(container.querySelectorAll('.board .cell'));
     fireEvent.dblClick(cells()[solutionOf('1-1')[0]]);
     expect(container.querySelector('.cell-hit')).toBeTruthy();
@@ -117,7 +117,7 @@ describe('탭 UX', () => {
     render(<App />);
     fireEvent.click(await screen.findByRole('button', { name: '스테이지' }));
     await screen.findByText('레벨 선택');
-    fireEvent.click(screen.getByRole('button', { name: '1-1' }));
+    fireEvent.click(screen.getByRole('button', { name: '1' }));
     const cells = () => Array.from(document.querySelectorAll('.board .cell'));
     fireEvent.dblClick(cells()[solutionOf('1-1')[0]]);
     const auto = await screen.findAllByRole('button', { name: /자동 표시/ });
@@ -129,7 +129,7 @@ describe('탭 UX', () => {
     const { container } = render(<App />);
     fireEvent.click(await screen.findByRole('button', { name: '스테이지' }));
     await screen.findByText('레벨 선택');
-    fireEvent.click(screen.getByRole('button', { name: '1-1' }));
+    fireEvent.click(screen.getByRole('button', { name: '1' }));
     const cells = () => Array.from(container.querySelectorAll('.board .cell'));
     const sol = new Set(solutionOf('1-1'));
     const wrongIdx = Array.from({ length: 25 }, (_, i) => i).find((i) => !sol.has(i)) as number;
@@ -141,7 +141,7 @@ describe('탭 UX', () => {
     const { container } = render(<App />);
     fireEvent.click(await screen.findByRole('button', { name: '스테이지' }));
     await screen.findByText('레벨 선택');
-    fireEvent.click(screen.getByRole('button', { name: '1-1' }));
+    fireEvent.click(screen.getByRole('button', { name: '1' }));
     const sol = new Set(solutionOf('1-1'));
     const wrongIdx = Array.from({ length: 25 }, (_, i) => i).find((i) => !sol.has(i)) as number;
     fireEvent.dblClick(container.querySelectorAll('.board .cell')[wrongIdx]);
@@ -169,7 +169,7 @@ describe('SelectScreen', () => {
         onBack={noop}
       />,
     );
-    expect((screen.getByRole('button', { name: 'X-1' }) as HTMLButtonElement).disabled).toBe(true);
+    expect((screen.getByRole('button', { name: '1' }) as HTMLButtonElement).disabled).toBe(true);
   });
 
   it('에러 상태에서는 에러 문구가 뜬다', () => {
@@ -185,15 +185,24 @@ describe('SelectScreen', () => {
     expect(screen.getByText('스테이지가 없어요')).toBeTruthy();
   });
 
-  it('레벨 탭을 바꾸면 해당 장의 스테이지만 보인다', async () => {
-    const { fetchStages } = await import('./api/stagesApi');
-    const chapters = await fetchStages();
-    render(<SelectScreen chapters={chapters} loading={false} error={null} onSelect={noop} onBack={noop} />,
+  it('레벨 탭을 바꾸면 해당 장의 스테이지만 보인다', () => {
+    const mk = (id: string, n: number) => ({
+      id,
+      title: `레벨 ${id}`,
+      stages: Array.from({ length: n }, (_, i) => ({
+        id: `${id}-s${i + 1}`,
+        code: `${id}-${i + 1}`,
+        title: `${id}-${i + 1} 스테이지`,
+        puzzle: PUZZLES[0],
+        locked: false,
+      })),
+    });
+    const { container } = render(
+      <SelectScreen chapters={[mk('A', 1), mk('B', 2)]} loading={false} error={null} onSelect={noop} onBack={noop} />,
     );
-    expect(screen.getByRole('button', { name: '1-1' })).toBeTruthy();
-    expect(screen.queryByRole('button', { name: '2-1' })).toBeNull();
-    fireEvent.click(screen.getByRole('button', { name: '레벨 2' }));
-    expect(screen.getByRole('button', { name: '2-1' })).toBeTruthy();
-    expect(screen.queryByRole('button', { name: '1-1' })).toBeNull();
+    const stageCount = () => container.querySelectorAll('.stage-list button').length;
+    expect(stageCount()).toBe(1);
+    fireEvent.click(screen.getByRole('button', { name: '레벨 B' }));
+    expect(stageCount()).toBe(2);
   });
 });
