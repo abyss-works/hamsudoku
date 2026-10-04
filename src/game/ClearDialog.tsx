@@ -5,11 +5,12 @@ import { HamsterFace } from '../ui/HamsterFace';
 import { Overlay } from '../ui/Overlay';
 
 interface ClearDialogProps {
+  total: number;
   onReset: () => void;
   onNextMap: () => void;
 }
 
-export function ClearDialog({ onReset, onNextMap }: ClearDialogProps) {
+export function ClearDialog({ total, onReset, onNextMap }: ClearDialogProps) {
   return (
     <Overlay label="클리어">
       <Confetti />
@@ -21,7 +22,7 @@ export function ClearDialog({ onReset, onNextMap }: ClearDialogProps) {
         <HamsterFace />
       </div>
       <p className="clear-title">
-        <PartyPopper size={26} aria-hidden="true" /> 햄스터 5마리를 다 찾았다!
+        <PartyPopper size={26} aria-hidden="true" /> 햄스터 {total}마리를 다 찾았다!
       </p>
       <div className="clear-actions">
         <Button variant="sticker" onClick={onReset}>

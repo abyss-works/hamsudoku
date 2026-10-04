@@ -8,15 +8,15 @@ export function SettingsDialog({ onClose }: { onClose(): void }) {
         <h2 className="settings-title">설정</h2>
         <label className="setting-row">
           <span>효과음</span>
-          <button type="button" role="switch" aria-checked="false" disabled>
+          <Button role="switch" aria-checked="false" disabled>
             준비중
-          </button>
+          </Button>
         </label>
         <label className="setting-row">
           <span>진동</span>
-          <button type="button" role="switch" aria-checked="false" disabled>
+          <Button role="switch" aria-checked="false" disabled>
             준비중
-          </button>
+          </Button>
         </label>
         <Button variant="sticker" onClick={onClose}>
           닫기
