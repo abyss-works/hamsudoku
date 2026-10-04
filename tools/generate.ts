@@ -177,7 +177,7 @@ function parseArgs(argv: string[]): { seed: number; levels: number[]; out: strin
 export function renderModule(levels: GeneratedLevel[], seed: number): string {
   const lines = [
     `// 생성 산출물. 직접 수정 금지 — npx tsx tools/generate.ts --seed ${seed} 로 재생성한다.`,
-    `// 일시: ${new Date().toISOString()}, 개수: ${levels.length}`,
+    `// 개수: ${levels.length}`,
     `import type { Puzzle } from './puzzles';`,
     ``,
     `export interface GeneratedLevel {`,
@@ -193,15 +193,37 @@ export function renderModule(levels: GeneratedLevel[], seed: number): string {
   return lines.join('\n');
 }
 
+export interface RunResult {
+  levels: GeneratedLevel[];
+  failures: number[];
+  elapsedMs: number;
+}
+
+export function runLevels(seed: number, levels: number[]): RunResult {
+  const started = Date.now();
+  const out: GeneratedLevel[] = [];
+  const failures: number[] = [];
+  for (const level of levels) {
+    try {
+      out.push(...generateLevels(level, seed));
+    } catch (e) {
+      console.error(`레벨 ${level} 실패: ${(e as Error).message}`);
+      failures.push(level);
+    }
+  }
+  const elapsedMs = Date.now() - started;
+  console.error(`생성 ${out.length}개, 소요 ${elapsedMs / 1000}s`);
+  return { levels: out, failures, elapsedMs };
+}
+
 const invoked = process.argv[1]?.endsWith('generate.ts');
 if (invoked) {
   const { seed, levels, out } = parseArgs(process.argv);
-  const started = Date.now();
-  const all = levels.flatMap((level) => generateLevels(level, seed));
-  console.error(`생성 ${all.length}개, 소요 ${(Date.now() - started) / 1000}s`);
+  const { levels: all, failures } = runLevels(seed, levels);
   if (out) {
     fs.writeFileSync(out, renderModule(all, seed));
   } else {
     console.log(JSON.stringify(all));
   }
+  if (failures.length > 0) process.exitCode = 1;
 }
