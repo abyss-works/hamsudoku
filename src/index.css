@@ -269,6 +269,7 @@ button:disabled {
   margin: 0;
   text-align: center;
   color: var(--ink-soft);
+  font-family: var(--font-help);
   font-size: 14px;
 }
 
@@ -277,23 +278,25 @@ button:disabled {
   border-radius: var(--radius-md);
   background: var(--card);
   box-shadow: var(--shadow-hard-sm);
-  padding: 8px 6px;
+  padding: 8px;
   display: flex;
-  flex-direction: column;
+  flex-direction: row;
   align-items: center;
-  gap: 6px;
-  text-align: center;
+  gap: 8px;
+  text-align: left;
 }
 
 .rule-card p {
   margin: 0;
+  font-family: var(--font-help);
   font-size: 13px;
-  line-height: 1.3;
+  line-height: 1.4;
 }
 
 .mini-fig {
   width: 44px;
   height: 44px;
+  flex: 0 0 auto;
 }
 
 .controls-row {
@@ -315,6 +318,7 @@ button:disabled {
 
 .control-card p {
   margin: 0;
+  font-family: var(--font-help);
   font-size: 14px;
 }
 
