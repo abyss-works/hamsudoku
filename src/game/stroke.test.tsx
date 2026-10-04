@@ -27,7 +27,7 @@ describe('stroke', () => {
     expect(at(result.current.cells, 2, 4)).toBe('mark');
   });
 
-  it('되돌아가면 출발칸이 되돌려진다', () => {
+  it('되돌아가면 걸린 칸이 전부 되돌려진다', () => {
     const { result } = renderHook(() => useHamSudoku(PUZZLES[0]));
     act(() => {
       result.current.beginStroke(0, 0);
@@ -36,7 +36,7 @@ describe('stroke', () => {
       result.current.strokeEnter(0, 1);
     });
     expect(at(result.current.cells, 0, 0)).toBe('mark');
-    expect(at(result.current.cells, 0, 1)).toBe('mark');
+    expect(at(result.current.cells, 0, 1)).toBe('empty');
     expect(at(result.current.cells, 0, 2)).toBe('empty');
   });
 
@@ -50,7 +50,7 @@ describe('stroke', () => {
       result.current.strokeEnter(0, 1);
     });
     expect(at(result.current.cells, 0, 0)).toBe('mark');
-    expect(at(result.current.cells, 0, 1)).toBe('mark');
+    expect(at(result.current.cells, 0, 1)).toBe('empty');
     expect(at(result.current.cells, 0, 2)).toBe('mark');
     expect(at(result.current.cells, 0, 3)).toBe('empty');
   });
@@ -88,7 +88,7 @@ describe('stroke', () => {
       result.current.strokeEnter(0, 1);
     });
     expect(at(result.current.cells, 0, 0)).toBe('mark');
-    expect(at(result.current.cells, 0, 1)).toBe('mark');
+    expect(at(result.current.cells, 0, 1)).toBe('empty');
     expect(at(result.current.cells, 0, 2)).toBe('empty');
   });
 });
