@@ -2,6 +2,7 @@ import { Cell } from './Cell';
 import { ClearDialog } from './ClearDialog';
 import type { Violations } from './rules';
 import type { CellState, Puzzle } from './puzzles';
+import type { TapKind } from './tap';
 import './hamster.css';
 
 interface BoardProps {
@@ -9,7 +10,7 @@ interface BoardProps {
   cells: CellState[][];
   violations: Violations;
   cleared: boolean;
-  onCell: (r: number, c: number) => void;
+  onCell: (r: number, c: number, kind: TapKind) => void;
   onReset: () => void;
   onNextMap: () => void;
 }
@@ -36,7 +37,7 @@ export function Board({ puzzle, cells, violations, cleared, onCell, onReset, onN
                 state={state}
                 islandId={puzzle.islands[r][c]}
                 conflicted={conflicted}
-                onTap={() => onCell(r, c)}
+                onTap={(kind) => onCell(r, c, kind)}
               />
             );
           }),

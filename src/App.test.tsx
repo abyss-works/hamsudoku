@@ -32,7 +32,7 @@ describe('화면 전환', () => {
     await screen.findByText('레벨 선택');
     fireEvent.click(screen.getByRole('button', { name: '1-1' }));
     const cells = () => Array.from(container.querySelectorAll('.board .cell'));
-    solutionOf('1-1').forEach((i) => fireEvent.click(cells()[i]));
+    solutionOf('1-1').forEach((i) => fireEvent.dblClick(cells()[i]));
     expect(screen.getByRole('dialog', { name: '클리어' })).toBeTruthy();
   });
 
@@ -43,7 +43,7 @@ describe('화면 전환', () => {
     fireEvent.click(screen.getByRole('button', { name: '레벨 3' }));
     fireEvent.click(screen.getByRole('button', { name: '3-10' }));
     const cells = () => Array.from(container.querySelectorAll('.board .cell'));
-    solutionOf('3-10').forEach((i) => fireEvent.click(cells()[i]));
+    solutionOf('3-10').forEach((i) => fireEvent.dblClick(cells()[i]));
     fireEvent.click(screen.getByRole('button', { name: '다음 맵' }));
     expect(await screen.findByRole('button', { name: '이어하기' })).toBeTruthy();
   });
@@ -66,18 +66,43 @@ describe('화면 전환', () => {
   });
 
   it('게임 중 뒤로가기 후 재진입하면 빈판이다', async () => {
-    render(<App />);
+    const { container } = render(<App />);
     fireEvent.click(await screen.findByRole('button', { name: '스테이지' }));
     await screen.findByText('레벨 선택');
     fireEvent.click(screen.getByRole('button', { name: '1-1' }));
     const line = () => screen.getByRole('status').getAttribute('aria-label') ?? '';
-    const first = screen.getAllByRole('button', { name: /빈칸/ })[0];
-    fireEvent.click(first);
+    const idx = solutionOf('1-1')[0];
+    fireEvent.dblClick(container.querySelectorAll('.board .cell')[idx]);
     expect(line()).toContain('햄스터 1/5');
     fireEvent.click(screen.getByRole('button', { name: '뒤로' }));
     await screen.findByText('레벨 1');
     fireEvent.click(screen.getByRole('button', { name: '1-1' }));
     expect(line()).toContain('햄스터 0/5');
+  });
+});
+
+describe('탭 UX', () => {
+  it('정답 더블클릭은 같은 줄 빈칸을 X로 채운다', async () => {
+    const { container } = render(<App />);
+    fireEvent.click(await screen.findByRole('button', { name: '스테이지' }));
+    await screen.findByText('레벨 선택');
+    fireEvent.click(screen.getByRole('button', { name: '1-1' }));
+    const cells = () => Array.from(container.querySelectorAll('.board .cell'));
+    fireEvent.dblClick(cells()[solutionOf('1-1')[0]]);
+    expect((await screen.findAllByRole('button', { name: /X 표시/ })).length).toBeGreaterThan(0);
+  });
+
+  it('오답 더블클릭은 빨간 고정 마커가 되고 토글 안 된다', async () => {
+    const { container } = render(<App />);
+    fireEvent.click(await screen.findByRole('button', { name: '스테이지' }));
+    await screen.findByText('레벨 선택');
+    fireEvent.click(screen.getByRole('button', { name: '1-1' }));
+    const sol = new Set(solutionOf('1-1'));
+    const wrongIdx = Array.from({ length: 25 }, (_, i) => i).find((i) => !sol.has(i)) as number;
+    fireEvent.dblClick(container.querySelectorAll('.board .cell')[wrongIdx]);
+    const wrong = await screen.findByRole('button', { name: /틀린 칸/ });
+    fireEvent.click(wrong);
+    expect(await screen.findByRole('button', { name: /틀린 칸/ })).toBeTruthy();
   });
 });
 

@@ -1,4 +1,4 @@
-import type { CellState } from './puzzles';
+import type { CellState, Puzzle } from './puzzles';
 
 export type { CellState };
 
@@ -60,6 +60,10 @@ export function getViolations(cells: CellState[][], islands: number[][]): Violat
   }
 
   return { rows, cols, islands: overfilled, touch };
+}
+
+export function isSolutionCell(puzzle: Puzzle, r: number, c: number): boolean {
+  return puzzle.solution.some(([sr, sc]) => sr === r && sc === c);
 }
 
 export function isCleared(cells: CellState[][], islands: number[][]): boolean {

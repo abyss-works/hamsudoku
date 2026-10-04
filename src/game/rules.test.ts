@@ -1,6 +1,6 @@
 import { describe, expect, it } from 'vitest';
 import { PUZZLES } from './puzzles';
-import { getViolations, isCleared, type CellState } from './rules';
+import { getViolations, isCleared, isSolutionCell, type CellState } from './rules';
 import { countSolutions } from './solver';
 
 const blank = (): CellState[][] => Array.from({ length: 5 }, () => Array(5).fill('empty'));
@@ -20,11 +20,11 @@ describe('getViolations', () => {
     const c = blank(); c[0][0] = 'hamster'; c[3][0] = 'hamster';
     expect(getViolations(c, PUZZLES[0].islands).cols.has(0)).toBe(true);
   });
-  it('한 섬 2마리는 해당 섬 위반, 씨앗은 무시', () => {
-    const c = blank(); c[2][3] = 'hamster'; c[3][3] = 'hamster'; c[0][0] = 'seed';
+  it('한 섬 2마리는 해당 섬 위반, 마커는 무시', () => {
+    const c = blank(); c[2][3] = 'hamster'; c[3][3] = 'hamster'; c[0][0] = 'mark';
     const v = getViolations(c, PUZZLES[0].islands);
     expect(v.islands.has(3)).toBe(true);
-    // 빈 섬은 충돌이 아니므로 씨앗만 있는 섬 0은 집합에 없음
+    // 빈 섬은 충돌이 아니므로 마커만 있는 섬 0은 집합에 없음
     expect(v.islands.has(0)).toBe(false);
   });
   it('인접한 2마리는 두 셀 모두 인접 위반', () => {
@@ -41,6 +41,14 @@ describe('getViolations', () => {
     const c = blank(); c[0][0] = 'hamster'; c[2][4] = 'hamster';
     const v = getViolations(c, PUZZLES[0].islands);
     expect(v.touch.size).toBe(0);
+  });
+});
+
+describe('isSolutionCell', () => {
+  it('정답 좌표만 true다', () => {
+    const [r, c] = PUZZLES[0].solution[0];
+    expect(isSolutionCell(PUZZLES[0], r, c)).toBe(true);
+    expect(isSolutionCell(PUZZLES[0], 4, 4)).toBe(false);
   });
 });
 
