@@ -4,6 +4,7 @@ import { ClearDialog } from './ClearDialog';
 import type { Violations } from './rules';
 import type { CellState, Puzzle } from './puzzles';
 import type { TapKind } from './tap';
+import type { PaintPatch } from './useHamSudoku';
 import './hamster.css';
 
 interface BoardProps {
@@ -16,6 +17,7 @@ interface BoardProps {
   shake?: number;
   onCell: (r: number, c: number, kind: TapKind) => void;
   onPaint: (r: number, c: number, toMark: boolean) => void;
+  onRevert: (patches: PaintPatch[]) => void;
   onReset: () => void;
   onNextMap: () => void;
 }
@@ -25,6 +27,7 @@ interface Drag {
   sc: number;
   toMark: boolean;
   engaged: boolean;
+  trail: PaintPatch[];
 }
 
 export function Board({
@@ -37,6 +40,7 @@ export function Board({
   shake = 0,
   onCell,
   onPaint,
+  onRevert,
   onReset,
   onNextMap,
 }: BoardProps) {
@@ -72,7 +76,14 @@ export function Board({
       dragRef.current = null;
       return;
     }
-    dragRef.current = { sr: r, sc: c, toMark: state === 'empty', engaged: false };
+    dragRef.current = { sr: r, sc: c, toMark: state === 'empty', engaged: false, trail: [] };
+  };
+
+  const paint = (drag: Drag, r: number, c: number) => {
+    const cur = cells[r][c];
+    if (drag.toMark ? cur !== 'empty' : cur !== 'mark') return;
+    onPaint(r, c, drag.toMark);
+    drag.trail.push({ r, c, prev: cur });
   };
 
   const handleMove = (e: React.PointerEvent) => {
@@ -86,9 +97,15 @@ export function Board({
     if (!hit || (hit[0] === drag.sr && hit[1] === drag.sc)) return;
     if (!drag.engaged) {
       drag.engaged = true;
-      onPaint(drag.sr, drag.sc, drag.toMark);
+      paint(drag, drag.sr, drag.sc);
     }
-    onPaint(hit[0], hit[1], drag.toMark);
+    const back = drag.trail.findIndex((t) => t.r === hit[0] && t.c === hit[1]);
+    if (back >= 0) {
+      const undone = drag.trail.splice(back + 1);
+      if (undone.length > 0) onRevert(undone);
+      return;
+    }
+    paint(drag, hit[0], hit[1]);
   };
 
   const handleUp = () => {

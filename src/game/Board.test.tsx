@@ -19,6 +19,7 @@ describe('Board', () => {
         cleared={false}
         onCell={() => {}}
         onPaint={() => {}}
+        onRevert={() => {}}
         onReset={() => {}}
         onNextMap={() => {}}
       />,

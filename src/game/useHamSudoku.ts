@@ -7,6 +7,12 @@ function blankBoard(size: number): CellState[][] {
   return Array.from({ length: size }, () => Array<CellState>(size).fill('empty'));
 }
 
+export interface PaintPatch {
+  r: number;
+  c: number;
+  prev: CellState;
+}
+
 export interface HamSudoku {
   cells: CellState[][];
   violations: Violations;
@@ -17,6 +23,7 @@ export interface HamSudoku {
   shake: number;
   tapCell: (r: number, c: number, kind: TapKind) => void;
   paintCell: (r: number, c: number, toMark: boolean) => void;
+  revertPaint: (patches: PaintPatch[]) => void;
   reset: () => void;
 }
 
@@ -67,6 +74,17 @@ export function useHamSudoku(puzzle: Puzzle): HamSudoku {
     setHitKey(null);
   };
 
+  // 같은 스트로크에서 되돌아가면 trail 이후 칠분을 칠하기 전 상태로 되돌린다.
+  const revertPaint = (patches: PaintPatch[]) => {
+    if (patches.length === 0) return;
+    const next = latest.current.map((line) => [...line]);
+    for (const p of patches) next[p.r][p.c] = p.prev;
+    latest.current = next;
+    setCells(next);
+    setPulse(new Map());
+    setHitKey(null);
+  };
+
   // 드래그 칠하기: 전제 상태가 아니면 무시하므로 같은 칸 반복 진입에 안전하다.
   const paintCell = (r: number, c: number, toMark: boolean) => {
     const prev = latest.current;
@@ -81,5 +99,5 @@ export function useHamSudoku(puzzle: Puzzle): HamSudoku {
     setHitKey(null);
   };
 
-  return { cells, violations, cleared, hamsterCount, pulse, hitKey, shake, tapCell, paintCell, reset };
+  return { cells, violations, cleared, hamsterCount, pulse, hitKey, shake, tapCell, paintCell, revertPaint, reset };
 }
