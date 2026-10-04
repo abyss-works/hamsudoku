@@ -143,6 +143,51 @@ button:disabled {
   color: var(--ink-soft);
 }
 
+.home-top {
+  width: 100%;
+  display: flex;
+  justify-content: flex-end;
+}
+
+.home-actions {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+  width: min(100%, 280px);
+}
+
+.settings {
+  display: flex;
+  flex-direction: column;
+  gap: 12px;
+  min-width: min(78vw, 300px);
+}
+
+.settings-title {
+  font-family: var(--font-display);
+  font-size: 24px;
+  font-weight: 400;
+  margin: 0;
+  text-align: center;
+}
+
+.setting-row {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 12px;
+}
+
+.rules {
+  margin: 4px 0 0;
+  padding-left: 20px;
+  color: var(--ink-soft);
+  font-size: 14px;
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+}
+
 .select {
   width: 100%;
   display: flex;
