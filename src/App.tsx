@@ -1,6 +1,6 @@
 import { useState } from 'react';
 import type { Stage } from './api/stagesApi';
-import { loadLastStageId, saveLastStageId } from './game/progress';
+import { useLastStage } from './game/useLastStage';
 import { useStages } from './game/useStages';
 import { GameScreen } from './screens/GameScreen';
 import { HomeScreen } from './screens/HomeScreen';
@@ -11,7 +11,7 @@ export type Screen = 'home' | 'select' | 'game';
 function App() {
   const [screen, setScreen] = useState<Screen>('home');
   const [stageId, setStageId] = useState<string | null>(null);
-  const [lastId, setLastId] = useState<string | null>(loadLastStageId);
+  const [lastId, saveLastId] = useLastStage();
   const { chapters, loading, error } = useStages();
 
   const stages = chapters.flatMap((c) => c.stages);
@@ -19,8 +19,7 @@ function App() {
   const lastStage = stages.find((s) => s.id === lastId) ?? null;
 
   const enter = (s: Stage) => {
-    saveLastStageId(s.id);
-    setLastId(s.id);
+    saveLastId(s.id);
     setStageId(s.id);
     setScreen('game');
   };
