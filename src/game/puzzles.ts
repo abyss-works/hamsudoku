@@ -1,4 +1,4 @@
-export type CellState = 'empty' | 'hamster' | 'seed';
+export type CellState = 'empty' | 'mark' | 'hamster' | 'wrong';
 
 export interface Puzzle {
   name: string;

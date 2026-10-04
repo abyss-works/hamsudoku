@@ -26,8 +26,25 @@
 .cell[data-island='3'] { background: #e2eefc; }
 .cell[data-island='4'] { background: #f0e6fa; }
 
-.cell[data-state='seed'] {
-  font-size: 20px;
+.cell[data-state='mark'] .mark-x,
+.cell[data-state='wrong'] .mark-x {
+  width: 30px;
+  height: 30px;
+  max-width: 65%;
+  max-height: 65%;
+}
+
+.cell[data-state='mark'] .mark-x {
+  color: var(--ink);
+}
+
+.cell[data-state='wrong'] {
+  outline: 3px solid #e5484d;
+  outline-offset: -3px;
+}
+
+.cell[data-state='wrong'] .mark-x {
+  color: #e5484d;
 }
 
 .cell-glyph {
@@ -60,14 +77,6 @@
   top: -8px;
   color: #d96a6a;
   animation: ham-heart 0.6s ease-out;
-}
-
-.seed-mark {
-  width: 30px;
-  height: 30px;
-  max-width: 65%;
-  max-height: 65%;
-  color: var(--leaf);
 }
 
 @keyframes ham-heart {
