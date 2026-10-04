@@ -159,6 +159,14 @@ describe('드래그 칠하기', () => {
       (document as any).elementFromPoint = orig;
     };
   };
+  const mockSpotSeq = (els: (Element | null)[]) => {
+    const orig = (document as any).elementFromPoint;
+    let i = 0;
+    (document as any).elementFromPoint = vi.fn(() => els[Math.min(i++, els.length - 1)]);
+    return () => {
+      (document as any).elementFromPoint = orig;
+    };
+  };
   const enterStage11 = async () => {
     const { container } = render(<App />);
     fireEvent.click(await screen.findByRole('button', { name: '스테이지' }));
@@ -177,6 +185,18 @@ describe('드래그 칠하기', () => {
     fireEvent.pointerUp(board);
     restore();
     expect(await screen.findAllByRole('button', { name: /X 표시/ })).toHaveLength(2);
+  });
+
+  it('같은 스트로크에서 되돌아가면 칠한 만큼 되돌린다', async () => {
+    const { cells, board } = await enterStage11();
+    fireEvent.pointerDown(cells()[0]);
+    const restore = mockSpotSeq([cells()[1], cells()[2], cells()[1]]);
+    fireEvent.pointerMove(board, { clientX: 10, clientY: 10 });
+    fireEvent.pointerMove(board, { clientX: 11, clientY: 11 });
+    fireEvent.pointerMove(board, { clientX: 12, clientY: 12 });
+    fireEvent.pointerUp(board);
+    restore();
+    expect(screen.getAllByRole('button', { name: /X 표시/ })).toHaveLength(2);
   });
 
   it('마커 시작 드래그는 빈칸을 건드리지 않고 마커만 지운다', async () => {
