@@ -63,4 +63,30 @@ describe('stroke', () => {
     expect(engaged).toBe(false);
     expect(at(result.current.cells, 0, 0)).toBe('empty');
   });
+
+  it('같은 칸에서 맴돌아도 한 번만 바뀐다', () => {
+    const { result } = renderHook(() => useHamSudoku(PUZZLES[0]));
+    act(() => {
+      result.current.beginStroke(0, 0);
+      result.current.strokeEnter(0, 1);
+      result.current.strokeEnter(0, 1);
+      result.current.strokeEnter(0, 1);
+    });
+    expect(at(result.current.cells, 0, 0)).toBe('mark');
+    expect(at(result.current.cells, 0, 1)).toBe('mark');
+  });
+
+  it('되돌린 칸에 머물러도 다시 칠해지지 않는다', () => {
+    const { result } = renderHook(() => useHamSudoku(PUZZLES[0]));
+    act(() => {
+      result.current.beginStroke(0, 0);
+      result.current.strokeEnter(0, 1);
+      result.current.strokeEnter(0, 2);
+      result.current.strokeEnter(0, 1);
+      result.current.strokeEnter(0, 1);
+    });
+    expect(at(result.current.cells, 0, 0)).toBe('mark');
+    expect(at(result.current.cells, 0, 1)).toBe('empty');
+    expect(at(result.current.cells, 0, 2)).toBe('mark');
+  });
 });
