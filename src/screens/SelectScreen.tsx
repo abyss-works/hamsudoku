@@ -43,14 +43,14 @@ export function SelectScreen({ chapters, loading, error, initialChapterId, onSel
           </div>
           <section key={active.id} className="chapter">
             <div className="stage-list">
-              {active.stages.map((stage) => (
+              {active.stages.map((stage, i) => (
                 <Button
                   key={stage.id}
                   variant="sticker"
                   disabled={stage.locked}
                   onClick={() => onSelect(stage)}
                 >
-                  {stage.code}
+                  {i + 1}
                 </Button>
               ))}
             </div>
