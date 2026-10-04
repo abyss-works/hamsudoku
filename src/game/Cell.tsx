@@ -22,6 +22,8 @@ const LABEL: Record<CellState, string> = {
   wrong: '틀린 칸',
 };
 
+const SINGLE_TAP_MS = 180;
+
 export function Cell({ state, islandId, conflicted, hit, pulseDelay, onTap }: CellProps) {
   const timer = useRef<number | null>(null);
 
@@ -37,7 +39,7 @@ export function Cell({ state, islandId, conflicted, hit, pulseDelay, onTap }: Ce
     timer.current = window.setTimeout(() => {
       timer.current = null;
       onTap('single');
-    }, 250);
+    }, SINGLE_TAP_MS);
   };
 
   const handleDoubleClick = () => {
