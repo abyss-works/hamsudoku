@@ -2,12 +2,18 @@
 
 .board {
   min-width: 280px;
-  max-width: 480px;
+  width: 100%;
+  /* 좁은 화면에서도 헤더+버튼과 함께 한 화면에 들어오도록 높이 기준 상한 */
+  max-width: min(480px, calc(100dvh - 300px));
   margin: 0 auto;
   border: 3px solid var(--ink);
   border-radius: var(--radius-lg);
   overflow: hidden;
   box-shadow: var(--shadow-hard);
+  touch-action: manipulation;
+  user-select: none;
+  -webkit-user-select: none;
+  -webkit-tap-highlight-color: transparent;
 }
 
 .cell {
