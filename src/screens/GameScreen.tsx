@@ -1,7 +1,9 @@
 import type { Stage } from '../api/stagesApi';
 import { Board } from '../game/Board';
+import { ControlsHelp } from '../game/ControlsHelp';
 import { formatElapsed, useElapsed } from '../game/useElapsed';
 import { useHamSudoku } from '../game/useHamSudoku';
+import { RulesHelp } from '../game/RulesHelp';
 import { Button } from '../ui/Button';
 
 interface GameScreenProps {
@@ -9,8 +11,6 @@ interface GameScreenProps {
   onBack: () => void;
   onNextMap: () => void;
 }
-
-const RULES = ['색 섬마다 햄스터 1마리', '주변 8칸에 다른 햄스터 금지', '가로·세로줄에 1마리씩'];
 
 export function GameScreen({ stage, onBack, onNextMap }: GameScreenProps) {
   const { cells, violations, cleared, hamsterCount, pulse, hitKey, shake, tapCell, reset } = useHamSudoku(stage.puzzle);
@@ -34,6 +34,7 @@ export function GameScreen({ stage, onBack, onNextMap }: GameScreenProps) {
           <span key={i} className={i < hamsterCount ? 'dot on' : 'dot'} aria-hidden="true" />
         ))}
       </div>
+      <RulesHelp />
       <Board
         puzzle={stage.puzzle}
         cells={cells}
@@ -46,11 +47,7 @@ export function GameScreen({ stage, onBack, onNextMap }: GameScreenProps) {
         onReset={reset}
         onNextMap={onNextMap}
       />
-      <ol className="rules">
-        {RULES.map((r) => (
-          <li key={r}>{r}</li>
-        ))}
-      </ol>
+      <ControlsHelp />
     </div>
   );
 }

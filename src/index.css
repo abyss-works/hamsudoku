@@ -94,9 +94,10 @@ button:disabled {
 }
 
 .clear-overlay {
-  position: absolute;
+  position: fixed;
   inset: 0;
-  background: rgb(255 248 239 / 0.92);
+  z-index: 50;
+  background: rgb(255 248 239 / 0.94);
   display: flex;
   flex-direction: column;
   align-items: center;
@@ -205,16 +206,6 @@ button:disabled {
   gap: 12px;
 }
 
-.rules {
-  margin: 4px 0 0;
-  padding-left: 20px;
-  color: var(--ink-soft);
-  font-size: 14px;
-  display: flex;
-  flex-direction: column;
-  gap: 2px;
-}
-
 .select {
   width: 100%;
   display: flex;
@@ -266,6 +257,61 @@ button:disabled {
   display: flex;
   flex-direction: column;
   gap: 12px;
+}
+
+.rules-row {
+  display: grid;
+  grid-template-columns: repeat(3, 1fr);
+  gap: 8px;
+}
+
+.rule-card {
+  border: 3px solid var(--ink);
+  border-radius: var(--radius-md);
+  background: var(--card);
+  box-shadow: var(--shadow-hard-sm);
+  padding: 8px;
+  display: flex;
+  flex-direction: row;
+  align-items: center;
+  gap: 8px;
+  text-align: left;
+}
+
+.rule-card p {
+  margin: 0;
+  font-family: var(--font-help);
+  font-size: 13px;
+  line-height: 1.4;
+}
+
+.mini-fig {
+  width: 44px;
+  height: 44px;
+  flex: 0 0 auto;
+}
+
+.controls-row {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 8px;
+}
+
+.control-card {
+  border: 3px solid var(--ink);
+  border-radius: var(--radius-md);
+  background: var(--card);
+  padding: 8px 6px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 6px;
+}
+
+.control-card p {
+  margin: 0;
+  font-family: var(--font-help);
+  font-size: 14px;
 }
 
 .hud {
