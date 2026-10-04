@@ -27,7 +27,7 @@ describe('stroke', () => {
     expect(at(result.current.cells, 2, 4)).toBe('mark');
   });
 
-  it('되돌아가면 닿은 칸만 되돌려진다', () => {
+  it('되돌아가면 출발칸이 되돌려진다', () => {
     const { result } = renderHook(() => useHamSudoku(PUZZLES[0]));
     act(() => {
       result.current.beginStroke(0, 0);
@@ -36,8 +36,8 @@ describe('stroke', () => {
       result.current.strokeEnter(0, 1);
     });
     expect(at(result.current.cells, 0, 0)).toBe('mark');
-    expect(at(result.current.cells, 0, 1)).toBe('empty');
-    expect(at(result.current.cells, 0, 2)).toBe('mark');
+    expect(at(result.current.cells, 0, 1)).toBe('mark');
+    expect(at(result.current.cells, 0, 2)).toBe('empty');
   });
 
   it('뛰어넘은 칸은 손대지 않는다', () => {
@@ -46,11 +46,13 @@ describe('stroke', () => {
       result.current.beginStroke(0, 0);
       result.current.strokeEnter(0, 1);
       result.current.strokeEnter(0, 2);
-      result.current.strokeEnter(0, 0);
+      result.current.strokeEnter(0, 3);
+      result.current.strokeEnter(0, 1);
     });
-    expect(at(result.current.cells, 0, 0)).toBe('empty');
+    expect(at(result.current.cells, 0, 0)).toBe('mark');
     expect(at(result.current.cells, 0, 1)).toBe('mark');
     expect(at(result.current.cells, 0, 2)).toBe('mark');
+    expect(at(result.current.cells, 0, 3)).toBe('empty');
   });
 
   it('움직임 없이 끝나면 탭으로 취급한다', () => {
@@ -76,7 +78,7 @@ describe('stroke', () => {
     expect(at(result.current.cells, 0, 1)).toBe('mark');
   });
 
-  it('되돌린 칸에 머물러도 다시 칠해지지 않는다', () => {
+  it('되돌린 뒤 머물러도 바뀌지 않는다', () => {
     const { result } = renderHook(() => useHamSudoku(PUZZLES[0]));
     act(() => {
       result.current.beginStroke(0, 0);
@@ -86,7 +88,7 @@ describe('stroke', () => {
       result.current.strokeEnter(0, 1);
     });
     expect(at(result.current.cells, 0, 0)).toBe('mark');
-    expect(at(result.current.cells, 0, 1)).toBe('empty');
-    expect(at(result.current.cells, 0, 2)).toBe('mark');
+    expect(at(result.current.cells, 0, 1)).toBe('mark');
+    expect(at(result.current.cells, 0, 2)).toBe('empty');
   });
 });

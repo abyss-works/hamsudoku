@@ -22,8 +22,8 @@ export interface HamSudoku {
   reset: () => void;
 }
 
-// 한 스트로크 동안 바뀐 칸 목록. 닿은 칸만 바뀌고, 다시 닿으면 그 칸만 되돌린다.
-// 같은 칸 연발 진입은 무시한다 (pointermove가 셀 안에서 계속 들어오기 때문).
+// 한 스트로크 동안 바뀐 칸 목록. 들어간 칸이 이미 바뀌었으면,
+// 출발한 칸(바로 전에 있던 칸)이 바뀌었으면 출발칸을 되돌린다. 건너뛴 칸은 손대지 않는다.
 interface Stroke {
   sr: number;
   sc: number;
@@ -84,23 +84,31 @@ export function useHamSudoku(puzzle: Puzzle): HamSudoku {
     setHitKey(null);
   };
 
-  const applyStrokeCell = (st: Stroke, r: number, c: number) => {
+  const paintOne = (st: Stroke, r: number, c: number) => {
     const cur = latest.current[r][c];
+    if (st.toMark ? cur !== 'empty' : cur !== 'mark') return;
     const next = latest.current.map((line) => [...line]);
-    const at = st.trail.findIndex((t) => t.r === r && t.c === c);
-    if (at >= 0) {
-      const [t] = st.trail.splice(at, 1);
-      next[t.r][t.c] = t.prev;
-    } else {
-      if (st.toMark ? cur !== 'empty' : cur !== 'mark') return;
-      next[r][c] = st.toMark ? 'mark' : 'empty';
-      st.trail.push({ r, c, prev: cur });
-    }
+    next[r][c] = st.toMark ? 'mark' : 'empty';
+    st.trail.push({ r, c, prev: cur });
     latest.current = next;
     setCells(next);
     setPulse(new Map());
     setHitKey(null);
   };
+
+  const revertOne = (st: Stroke, r: number, c: number) => {
+    const at = st.trail.findIndex((t) => t.r === r && t.c === c);
+    if (at < 0) return;
+    const [t] = st.trail.splice(at, 1);
+    const next = latest.current.map((line) => [...line]);
+    next[t.r][t.c] = t.prev;
+    latest.current = next;
+    setCells(next);
+    setPulse(new Map());
+    setHitKey(null);
+  };
+
+  const inTrail = (st: Stroke, r: number, c: number) => st.trail.some((t) => t.r === r && t.c === c);
 
   const beginStroke = (r: number, c: number) => {
     const cur = latest.current[r][c];
@@ -115,14 +123,21 @@ export function useHamSudoku(puzzle: Puzzle): HamSudoku {
     const st = strokeRef.current;
     if (!st) return;
     if (st.lastR === r && st.lastC === c) return;
+    const depR = st.lastR;
+    const depC = st.lastC;
     st.lastR = r;
     st.lastC = c;
     if (!st.engaged) {
       st.engaged = true;
-      applyStrokeCell(st, st.sr, st.sc);
+      paintOne(st, st.sr, st.sc);
       if (r === st.sr && c === st.sc) return;
     }
-    applyStrokeCell(st, r, c);
+    if (inTrail(st, r, c)) {
+      if (depR !== null && depC !== null && inTrail(st, depR, depC)) revertOne(st, depR, depC);
+      else revertOne(st, r, c);
+    } else {
+      paintOne(st, r, c);
+    }
   };
 
   const endStroke = () => {
