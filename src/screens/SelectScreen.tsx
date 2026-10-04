@@ -6,12 +6,13 @@ interface SelectScreenProps {
   chapters: Chapter[];
   loading: boolean;
   error: string | null;
+  initialChapterId?: string | null;
   onSelect: (stage: Stage) => void;
   onBack: () => void;
 }
 
-export function SelectScreen({ chapters, loading, error, onSelect, onBack }: SelectScreenProps) {
-  const [selectedId, setSelectedId] = useState<string | null>(null);
+export function SelectScreen({ chapters, loading, error, initialChapterId, onSelect, onBack }: SelectScreenProps) {
+  const [selectedId, setSelectedId] = useState<string | null>(initialChapterId ?? null);
   const active = chapters.find((c) => c.id === selectedId) ?? chapters[0];
 
   return (

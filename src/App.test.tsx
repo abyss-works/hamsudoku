@@ -5,35 +5,53 @@ import App from './App';
 import { SelectScreen } from './screens/SelectScreen';
 import { PUZZLES } from './game/puzzles';
 
-afterEach(cleanup);
+afterEach(() => {
+  cleanup();
+  localStorage.clear();
+});
 
 describe('화면 전환', () => {
-  it('시작 → 선택 → 게임 진입 → 뒤로가기로 선택에 돌아온다', async () => {
+  it('홈 스테이지 버튼은 해당 장이 열린 선택화면으로 간다', async () => {
     render(<App />);
-    fireEvent.click(screen.getByRole('button', { name: '시작하기' }));
-    expect(await screen.findByText('레벨 1')).toBeTruthy();
-    fireEvent.click(screen.getByRole('button', { name: '1-1' }));
-    expect(screen.getByRole('grid', { name: '햄스터 마을 입구' })).toBeTruthy();
-    fireEvent.click(screen.getByRole('button', { name: '뒤로' }));
-    expect(await screen.findByText('레벨 2')).toBeTruthy();
+    expect((screen.getByRole('button', { name: '이어하기' }) as HTMLButtonElement).disabled).toBe(true);
+    fireEvent.click(await screen.findByRole('button', { name: '2-1' }));
+    expect(await screen.findByText('레벨 선택')).toBeTruthy();
+    expect(screen.getByRole('button', { name: '레벨 2' }).getAttribute('aria-pressed')).toBe('true');
   });
 
-  it('마지막 스테이지 클리어 후 다음 맵은 선택화면으로 돌아간다', async () => {
+  it('마지막 스테이지 클리어 후 다음 맵은 홈으로 돌아간다', async () => {
     const { container } = render(<App />);
-    fireEvent.click(screen.getByRole('button', { name: '시작하기' }));
-    await screen.findByText('레벨 2');
+    fireEvent.click(await screen.findByRole('button', { name: '2-1' }));
+    await screen.findByText('레벨 선택');
     fireEvent.click(screen.getByRole('button', { name: '레벨 2' }));
     fireEvent.click(screen.getByRole('button', { name: '2-1' }));
     const cells = () => Array.from(container.querySelectorAll('.board .cell'));
     [2, 5, 14, 16, 23].forEach((i) => fireEvent.click(cells()[i]));
     fireEvent.click(screen.getByRole('button', { name: '다음 맵' }));
-    expect(await screen.findByText('레벨 1')).toBeTruthy();
+    expect(await screen.findByRole('button', { name: '이어하기' })).toBeTruthy();
+  });
+
+  it('이어하기는 마지막 플레이로 바로 진입한다', async () => {
+    localStorage.setItem('hamsudoku:last-stage', 'lv2-s1');
+    const { container } = render(<App />);
+    fireEvent.click(await screen.findByRole('button', { name: '이어하기' }));
+    expect(container.querySelector('.board')).toBeTruthy();
+    expect(screen.getByRole('grid', { name: '해바라기 밭' })).toBeTruthy();
+  });
+
+  it('기어는 설정 껍데기를 열고 닫는다', () => {
+    render(<App />);
+    fireEvent.click(screen.getByRole('button', { name: '설정' }));
+    expect(screen.getByRole('dialog', { name: '설정' })).toBeTruthy();
+    expect(screen.getAllByText('준비중')).toHaveLength(2);
+    fireEvent.click(screen.getByRole('button', { name: '닫기' }));
+    expect(screen.queryByRole('dialog', { name: '설정' })).toBeNull();
   });
 
   it('게임 중 뒤로가기 후 재진입하면 빈판이다', async () => {
     render(<App />);
-    fireEvent.click(screen.getByRole('button', { name: '시작하기' }));
-    await screen.findByText('레벨 1');
+    fireEvent.click(await screen.findByRole('button', { name: '1-1' }));
+    await screen.findByText('레벨 선택');
     fireEvent.click(screen.getByRole('button', { name: '1-1' }));
     const line = () => screen.getByRole('status').getAttribute('aria-label') ?? '';
     const first = screen.getAllByRole('button', { name: /빈칸/ })[0];
