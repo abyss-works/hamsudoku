@@ -1,3 +1,4 @@
+import fs from 'node:fs';
 import type { Puzzle } from '../src/game/puzzles';
 import type { Pos } from '../src/game/solver';
 import { checkIslands, countSolutions } from '../src/game/solver';
@@ -162,17 +163,45 @@ export function generateLevels(level: number, seed: number): GeneratedLevel[] {
   return out;
 }
 
-function parseArgs(argv: string[]): { seed: number; level: number } {
+function parseArgs(argv: string[]): { seed: number; levels: number[]; out: string | null } {
   const seed = Number(argv[argv.indexOf('--seed') + 1]);
-  const lv = Number(argv[argv.indexOf('--level') + 1]);
-  if (!Number.isInteger(seed) || ![1, 2, 3].includes(lv)) {
-    throw new Error('사용법: generate.ts --seed <n> --level <1|2|3>');
+  const lvRaw = argv[argv.indexOf('--level') + 1];
+  const levels = lvRaw === 'all' ? [1, 2, 3] : [Number(lvRaw)];
+  const outIdx = argv.indexOf('--out');
+  if (!Number.isInteger(seed) || levels.some((n) => ![1, 2, 3].includes(n))) {
+    throw new Error('사용법: generate.ts --seed <n> --level <1|2|3|all> [--out <file>]');
   }
-  return { seed, level: lv };
+  return { seed, levels, out: outIdx >= 0 ? argv[outIdx + 1] : null };
+}
+
+export function renderModule(levels: GeneratedLevel[], seed: number): string {
+  const lines = [
+    `// 생성 산출물. 직접 수정 금지 — npx tsx tools/generate.ts --seed ${seed} 로 재생성한다.`,
+    `// 일시: ${new Date().toISOString()}, 개수: ${levels.length}`,
+    `import type { Puzzle } from './puzzles';`,
+    ``,
+    `export interface GeneratedLevel {`,
+    `  level: number;`,
+    `  no: number;`,
+    `  code: string;`,
+    `  puzzle: Puzzle;`,
+    `}`,
+    ``,
+    `export const LEVELS: GeneratedLevel[] = ${JSON.stringify(levels)};`,
+    ``,
+  ];
+  return lines.join('\n');
 }
 
 const invoked = process.argv[1]?.endsWith('generate.ts');
 if (invoked) {
-  const { seed, level } = parseArgs(process.argv);
-  console.log(JSON.stringify(generateLevels(level, seed)));
+  const { seed, levels, out } = parseArgs(process.argv);
+  const started = Date.now();
+  const all = levels.flatMap((level) => generateLevels(level, seed));
+  console.error(`생성 ${all.length}개, 소요 ${(Date.now() - started) / 1000}s`);
+  if (out) {
+    fs.writeFileSync(out, renderModule(all, seed));
+  } else {
+    console.log(JSON.stringify(all));
+  }
 }
