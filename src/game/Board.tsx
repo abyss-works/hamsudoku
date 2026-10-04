@@ -17,7 +17,12 @@ interface BoardProps {
 export function Board({ puzzle, cells, violations, cleared, onCell, onReset, onNextMap }: BoardProps) {
   return (
     <div className="board-wrap">
-      <div className="board" role="grid" aria-label={puzzle.name}>
+      <div
+        className="board"
+        role="grid"
+        aria-label={puzzle.name}
+        style={{ gridTemplateColumns: `repeat(${puzzle.size}, 1fr)` }}
+      >
         {cells.map((line, r) =>
           line.map((state, c) => {
             const conflicted =

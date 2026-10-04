@@ -29,8 +29,8 @@ export function GameScreen({ stage, onBack, onNextMap }: GameScreenProps) {
           리셋
         </Button>
       </div>
-      <div className="dots" role="status" aria-label={`햄스터 ${hamsterCount}/5`}>
-        {Array.from({ length: 5 }, (_, i) => (
+      <div className="dots" role="status" aria-label={`햄스터 ${hamsterCount}/${stage.puzzle.size}`}>
+        {Array.from({ length: stage.puzzle.size }, (_, i) => (
           <span key={i} className={i < hamsterCount ? 'dot on' : 'dot'} aria-hidden="true" />
         ))}
       </div>

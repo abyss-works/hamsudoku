@@ -65,8 +65,8 @@ export function getViolations(cells: CellState[][], islands: number[][]): Violat
 export function isCleared(cells: CellState[][], islands: number[][]): boolean {
   let total = 0;
   for (const line of cells) for (const cell of line) if (cell === 'hamster') total += 1;
-  // 섬 5개에 햄스터 5마리, 위반 없음 → 각 섬 정확히 1마리, 행·열 중복 없음, 인접 없음
-  if (total !== 5) return false;
+  // 섬 N개에 햄스터 N마리, 위반 없음 → 각 섬 정확히 1마리, 행·열 중복 없음, 인접 없음
+  if (total !== islands.length) return false;
   const v = getViolations(cells, islands);
   return v.rows.size === 0 && v.cols.size === 0 && v.islands.size === 0 && v.touch.size === 0;
 }
