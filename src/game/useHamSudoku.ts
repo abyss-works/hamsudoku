@@ -22,8 +22,10 @@ export interface HamSudoku {
   reset: () => void;
 }
 
-// 한 스트로크 동안 바뀐 칸 목록. 이번 움직임에 걸린 바뀌었던 칸(출발칸·도착칸)은
-// 전부 원래대로 되돌린다. 건너뛴 칸은 손대지 않는다.
+// 한 스트로크 동안 바뀐 칸 목록. 움직임 D→E마다:
+// - E가 바뀌었으면: D도 바뀌었으면 둘 다, 아니면 E만 되돌린다.
+// - E가 새 칸이면: D가 되돌려졌던 칸이면 D부터 다시 칠하고, E를 칠한다.
+// 건너뛴 칸은 손대지 않는다.
 interface Stroke {
   sr: number;
   sc: number;
@@ -140,6 +142,7 @@ export function useHamSudoku(puzzle: Puzzle): HamSudoku {
         revertOne(st, r, c);
       }
     } else {
+      if (depR !== null && depC !== null && !inTrail(st, depR, depC)) paintOne(st, depR, depC);
       paintOne(st, r, c);
     }
   };
