@@ -31,6 +31,6 @@ describe('GameScreen', () => {
     const rules = screen.getByLabelText('기본 규칙');
     expect(rules.querySelectorAll('.help-row')).toHaveLength(3);
     const controls = screen.getByLabelText('기본 조작');
-    expect(controls.querySelectorAll('.help-row')).toHaveLength(2);
+    expect(controls.querySelectorAll('.help-row')).toHaveLength(3);
   });
 });
