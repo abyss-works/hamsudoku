@@ -66,9 +66,9 @@ const RULES = [
 
 export function RulesHelp() {
   return (
-    <div className="rules-row" aria-label="기본 규칙">
+    <div className="help-card" aria-label="기본 규칙">
       {RULES.map((r) => (
-        <div key={r.text} className="rule-card">
+        <div key={r.text} className="help-row">
           {r.fig}
           <p>{r.text}</p>
         </div>

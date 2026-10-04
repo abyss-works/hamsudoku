@@ -7,9 +7,9 @@ const CONTROLS = [
 
 export function ControlsHelp() {
   return (
-    <div className="controls-row" aria-label="기본 조작">
+    <div className="help-card" aria-label="기본 조작">
       {CONTROLS.map((c) => (
-        <div key={c.text} className="control-card">
+        <div key={c.text} className="help-row">
           {c.icon}
           <p>{c.text}</p>
         </div>
