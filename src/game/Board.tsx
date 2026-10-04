@@ -4,7 +4,6 @@ import { ClearDialog } from './ClearDialog';
 import type { Violations } from './rules';
 import type { CellState, Puzzle } from './puzzles';
 import type { TapKind } from './tap';
-import type { PaintPatch } from './useHamSudoku';
 import './hamster.css';
 
 interface BoardProps {
@@ -16,18 +15,11 @@ interface BoardProps {
   hitKey?: string | null;
   shake?: number;
   onCell: (r: number, c: number, kind: TapKind) => void;
-  onPaint: (r: number, c: number, toMark: boolean) => void;
-  onRevert: (patches: PaintPatch[]) => void;
+  onPress: (r: number, c: number) => void;
+  onEnter: (r: number, c: number) => void;
+  onRelease: () => boolean;
   onReset: () => void;
   onNextMap: () => void;
-}
-
-interface Drag {
-  sr: number;
-  sc: number;
-  toMark: boolean;
-  engaged: boolean;
-  trail: PaintPatch[];
 }
 
 export function Board({
@@ -39,13 +31,13 @@ export function Board({
   hitKey = null,
   shake = 0,
   onCell,
-  onPaint,
-  onRevert,
+  onPress,
+  onEnter,
+  onRelease,
   onReset,
   onNextMap,
 }: BoardProps) {
   const wrapRef = useRef<HTMLDivElement>(null);
-  const dragRef = useRef<Drag | null>(null);
   const suppressClick = useRef(false);
   const first = useRef(true);
 
@@ -71,46 +63,21 @@ export function Board({
   };
 
   const handlePress = (r: number, c: number) => {
-    const state = cells[r][c];
-    if (state !== 'empty' && state !== 'mark') {
-      dragRef.current = null;
-      return;
-    }
-    dragRef.current = { sr: r, sc: c, toMark: state === 'empty', engaged: false, trail: [] };
-  };
-
-  const paint = (drag: Drag, r: number, c: number) => {
-    const cur = cells[r][c];
-    if (drag.toMark ? cur !== 'empty' : cur !== 'mark') return;
-    onPaint(r, c, drag.toMark);
-    drag.trail.push({ r, c, prev: cur });
+    onPress(r, c);
   };
 
   const handleMove = (e: React.PointerEvent) => {
-    const drag = dragRef.current;
-    if (!drag) return;
     if (e.pointerType === 'mouse' && e.buttons === 0) {
-      dragRef.current = null;
+      onRelease();
       return;
     }
     const hit = cellFromPoint(e.clientX, e.clientY);
-    if (!hit || (hit[0] === drag.sr && hit[1] === drag.sc)) return;
-    if (!drag.engaged) {
-      drag.engaged = true;
-      paint(drag, drag.sr, drag.sc);
-    }
-    const back = drag.trail.findIndex((t) => t.r === hit[0] && t.c === hit[1]);
-    if (back >= 0) {
-      const undone = drag.trail.splice(back + 1);
-      if (undone.length > 0) onRevert(undone);
-      return;
-    }
-    paint(drag, hit[0], hit[1]);
+    if (!hit) return;
+    onEnter(hit[0], hit[1]);
   };
 
   const handleUp = () => {
-    if (dragRef.current?.engaged) suppressClick.current = true;
-    dragRef.current = null;
+    if (onRelease()) suppressClick.current = true;
   };
 
   const handleClickCapture = (e: React.SyntheticEvent) => {
@@ -129,7 +96,7 @@ export function Board({
         onPointerMove={handleMove}
         onPointerUp={handleUp}
         onPointerCancel={() => {
-          dragRef.current = null;
+          onRelease();
         }}
         onClickCapture={handleClickCapture}
       >
