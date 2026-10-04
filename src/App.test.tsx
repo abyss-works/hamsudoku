@@ -3,12 +3,19 @@ import { afterEach, describe, expect, it } from 'vitest';
 import { cleanup, fireEvent, render, screen } from '@testing-library/react';
 import App from './App';
 import { SelectScreen } from './screens/SelectScreen';
+import { LEVELS } from './game/levels.generated';
 import { PUZZLES } from './game/puzzles';
 
 afterEach(() => {
   cleanup();
   localStorage.clear();
 });
+
+const solutionOf = (code: string): number[] => {
+  const lv = LEVELS.find((l) => l.code === code);
+  if (!lv) throw new Error(`no level ${code}`);
+  return lv.puzzle.solution.map(([r, c]) => r * lv.puzzle.size + c);
+};
 
 describe('화면 전환', () => {
   it('홈 스테이지 버튼은 선택화면으로 간다', async () => {
@@ -19,14 +26,24 @@ describe('화면 전환', () => {
     expect(screen.getByRole('button', { name: '1-1' })).toBeTruthy();
   });
 
+  it('1-1 정답 클릭으로 클리어된다', async () => {
+    const { container } = render(<App />);
+    fireEvent.click(await screen.findByRole('button', { name: '스테이지' }));
+    await screen.findByText('레벨 선택');
+    fireEvent.click(screen.getByRole('button', { name: '1-1' }));
+    const cells = () => Array.from(container.querySelectorAll('.board .cell'));
+    solutionOf('1-1').forEach((i) => fireEvent.click(cells()[i]));
+    expect(screen.getByRole('dialog', { name: '클리어' })).toBeTruthy();
+  });
+
   it('마지막 스테이지 클리어 후 다음 맵은 홈으로 돌아간다', async () => {
     const { container } = render(<App />);
     fireEvent.click(await screen.findByRole('button', { name: '스테이지' }));
     await screen.findByText('레벨 선택');
-    fireEvent.click(screen.getByRole('button', { name: '레벨 2' }));
-    fireEvent.click(screen.getByRole('button', { name: '2-1' }));
+    fireEvent.click(screen.getByRole('button', { name: '레벨 3' }));
+    fireEvent.click(screen.getByRole('button', { name: '3-10' }));
     const cells = () => Array.from(container.querySelectorAll('.board .cell'));
-    [2, 5, 14, 16, 23].forEach((i) => fireEvent.click(cells()[i]));
+    solutionOf('3-10').forEach((i) => fireEvent.click(cells()[i]));
     fireEvent.click(screen.getByRole('button', { name: '다음 맵' }));
     expect(await screen.findByRole('button', { name: '이어하기' })).toBeTruthy();
   });
@@ -36,7 +53,7 @@ describe('화면 전환', () => {
     const { container } = render(<App />);
     fireEvent.click(await screen.findByRole('button', { name: '이어하기' }));
     expect(container.querySelector('.board')).toBeTruthy();
-    expect(screen.getByRole('grid', { name: '해바라기 밭' })).toBeTruthy();
+    expect(container.querySelectorAll('.board .cell')).toHaveLength(36);
   });
 
   it('기어는 설정 껍데기를 열고 닫는다', () => {
