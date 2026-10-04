@@ -94,9 +94,10 @@ button:disabled {
 }
 
 .clear-overlay {
-  position: absolute;
+  position: fixed;
   inset: 0;
-  background: rgb(255 248 239 / 0.92);
+  z-index: 50;
+  background: rgb(255 248 239 / 0.94);
   display: flex;
   flex-direction: column;
   align-items: center;
