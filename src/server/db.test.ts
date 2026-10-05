@@ -24,4 +24,15 @@ describe('DbPort', () => {
     await db.recordVerified('u1', '1-1', 60, 't2');
     expect((await db.listRecords('u1')).clears[0]).toMatchObject({ bestElapsedSec: 60, attempts: 2 });
   });
+  it('ensureUser는 유저와 프로필 자리를 만든다', async () => {
+    const db = createMemoryDb();
+    await db.ensureUser('u1', 'e@x.y');
+    expect(await db.listUsers()).toEqual([{ userId: 'u1', email: 'e@x.y', hasProfile: true }]);
+  });
+  it('ensureUser는 이메일 null로 기존 메일을 지우지 않는다', async () => {
+    const db = createMemoryDb();
+    await db.ensureUser('u1', 'e@x.y');
+    await db.ensureUser('u1', null);
+    expect(await db.listUsers()).toEqual([{ userId: 'u1', email: 'e@x.y', hasProfile: true }]);
+  });
 });

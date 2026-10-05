@@ -4,8 +4,10 @@ import { createPrismaDb } from '../../../server/db';
 import { fetchRecords } from '../../../server/records';
 
 export async function GET() {
-  const { uid } = await getSessionUser();
-  const result = await fetchRecords(createPrismaDb(), uid);
+  const { uid, email } = await getSessionUser();
+  const db = createPrismaDb();
+  if (uid) await db.ensureUser(uid, email);
+  const result = await fetchRecords(db, uid);
   if (result.status === 401) return NextResponse.json({ ok: false, msg: '로그인이 필요해요.' }, { status: 401 });
   return NextResponse.json({ ok: true, clears: result.clears });
 }
