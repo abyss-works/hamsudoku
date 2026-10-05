@@ -4,7 +4,6 @@ import { ClearDialog } from './ClearDialog';
 import { cellConflicted, type Violations } from './rules';
 import type { CellState, Puzzle } from './puzzles';
 import type { TapKind } from './tap';
-import './hamster.css';
 
 interface BoardProps {
   puzzle: Puzzle;
