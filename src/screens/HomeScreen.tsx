@@ -8,11 +8,14 @@ import { SettingsDialog } from './SettingsDialog';
 interface HomeScreenProps {
   loading: boolean;
   lastStage: Stage | null;
+  email: string | null;
   onResume: (stage: Stage | null) => void;
   onBrowse: () => void;
+  onLogin: () => void;
+  onLogout: () => void;
 }
 
-export function HomeScreen({ loading, lastStage, onResume, onBrowse }: HomeScreenProps) {
+export function HomeScreen({ loading, lastStage, email, onResume, onBrowse, onLogin, onLogout }: HomeScreenProps) {
   const [settingsOpen, setSettingsOpen] = useState(false);
 
   return (
@@ -42,7 +45,7 @@ export function HomeScreen({ loading, lastStage, onResume, onBrowse }: HomeScree
           스테이지
         </Button>
       </div>
-      {settingsOpen && <SettingsDialog onClose={() => setSettingsOpen(false)} />}
+      {settingsOpen && <SettingsDialog email={email} onLogin={onLogin} onLogout={onLogout} onClose={() => setSettingsOpen(false)} />}
     </div>
   );
 }

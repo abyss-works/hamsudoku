@@ -97,6 +97,15 @@ describe('화면 전환', () => {
     expect(screen.queryByRole('dialog', { name: '설정' })).toBeNull();
   });
 
+  it('로그인 화면이 열리고 닫힌다', async () => {
+    render(<App />);
+    fireEvent.click(screen.getByRole('button', { name: '설정' }));
+    fireEvent.click(screen.getByRole('button', { name: '로그인' }));
+    expect(await screen.findByRole('button', { name: '가입하기' })).toBeTruthy();
+    fireEvent.click(screen.getByRole('button', { name: '뒤로' }));
+    expect(await screen.findByRole('button', { name: '이어하기' })).toBeTruthy();
+  });
+
   it('게임 중 뒤로가기 후 재진입하면 빈판이다', async () => {
     const { container } = render(<App />);
     fireEvent.click(await screen.findByRole('button', { name: '스테이지' }));
