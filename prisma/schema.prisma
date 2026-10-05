@@ -1,0 +1,55 @@
+generator client {
+  provider = "prisma-client-js"
+}
+
+datasource db {
+  provider = "postgresql"
+  url      = env("DATABASE_URL")
+}
+
+model User {
+  id        String   @id
+  email     String?
+  createdAt DateTime @default(now())
+}
+
+model Profile {
+  userId    String   @id
+  nickname  String?
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+}
+
+model ClearRecord {
+  userId          String
+  stageCode       String
+  bestElapsedSec  Int?
+  attempts        Int      @default(0)
+  lastClearedAt   DateTime
+  updatedAt       DateTime @updatedAt
+
+  @@id([userId, stageCode])
+  @@index([userId])
+}
+
+model ClearEvent {
+  id         String   @id @default(uuid())
+  userId     String
+  stageCode  String
+  elapsedSec Int
+  verified   Boolean  @default(true)
+  clearedAt  DateTime
+  createdAt  DateTime @default(now())
+
+  @@index([userId, stageCode])
+}
+
+model Attempt {
+  id        String    @id @default(uuid())
+  userId    String
+  stageCode String
+  issuedAt  DateTime  @default(now())
+  usedAt    DateTime?
+
+  @@index([userId])
+}
