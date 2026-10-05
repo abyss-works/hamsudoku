@@ -16,7 +16,7 @@ export function Confetti({ count = 24 }: { count?: number }) {
           key={i}
           style={{ left: p.x, background: p.c } as CSSProperties}
           initial={{ y: -12, rotate: 0 }}
-          animate={{ y: 420, rotate: 540 }}
+          animate={{ y: '110vh', rotate: 540 }}
           transition={{ duration: p.d, repeat: Infinity, ease: 'linear' }}
         />
       ))}
