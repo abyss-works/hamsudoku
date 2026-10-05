@@ -3,33 +3,57 @@ import { ChevronLeft } from 'lucide-react';
 import { Button } from '../ui/Button';
 import { HamsterFace } from '../ui/HamsterFace';
 
-interface LoginScreenProps {
-  signup: (email: string, password: string) => Promise<{ ok: boolean; msg?: string }>;
-  signin: (email: string, password: string) => Promise<{ ok: boolean; msg?: string }>;
-  onBack: () => void;
-  onDone: () => void;
+interface AuthFn {
+  (email: string, password: string): Promise<{ ok: boolean; msg?: string; code?: string }>;
 }
 
+interface LoginScreenProps {
+  signup: AuthFn;
+  signin: AuthFn;
+  onBack: () => void;
+  onDone: (switched: boolean) => void;
+}
+
+// 통합 계정 폼 — 가입·로그인 구분 없이 "이메일로 계속하기" 하나로.
+// 승격(signup) 먼저 시도하고, 이미 가입된 이메일이면 확인 후 로그인(signin)으로 전환한다.
 export function LoginScreen({ signup, signin, onBack, onDone }: LoginScreenProps) {
-  const [mode, setMode] = useState<'signin' | 'signup'>('signin');
   const [email, setEmail] = useState('');
   const [password, setPassword] = useState('');
   const [error, setError] = useState<string | null>(null);
+  const [confirmLogin, setConfirmLogin] = useState(false);
   const [busy, setBusy] = useState(false);
-
-  const switchMode = () => {
-    setMode((m) => (m === 'signin' ? 'signup' : 'signin'));
-    setError(null);
-  };
 
   const submit = async (e: FormEvent) => {
     e.preventDefault();
+    if (!email.trim() || password.length < 6) {
+      setError('이메일과 6자 이상 비밀번호를 입력하세요.');
+      return;
+    }
     setBusy(true);
     setError(null);
     try {
-      const r = mode === 'signup' ? await signup(email, password) : await signin(email, password);
+      const r = await signup(email.trim(), password);
       if (r.ok) {
-        onDone();
+        onDone(false);
+        return;
+      }
+      if (r.code === 'email_exists' || r.code === 'user_already_exists') {
+        setConfirmLogin(true);
+        return;
+      }
+      setError(r.msg ?? '실패했어요.');
+    } finally {
+      setBusy(false);
+    }
+  };
+
+  const login = async () => {
+    setBusy(true);
+    setError(null);
+    try {
+      const r = await signin(email.trim(), password);
+      if (r.ok) {
+        onDone(true);
       } else {
         setError(r.msg ?? '실패했어요.');
       }
@@ -45,7 +69,7 @@ export function LoginScreen({ signup, signin, onBack, onDone }: LoginScreenProps
           <Button variant="sticker" className="btn-icon" aria-label="뒤로" onClick={onBack}>
             <ChevronLeft size={20} aria-hidden="true" />
           </Button>
-          <h2 className="login-title">{mode === 'signup' ? '가입하기' : '로그인'}</h2>
+          <h2 className="login-title">계정</h2>
           <span className="login-mascot" aria-hidden="true">
             <HamsterFace />
           </span>
@@ -67,7 +91,7 @@ export function LoginScreen({ signup, signin, onBack, onDone }: LoginScreenProps
               type="password"
               value={password}
               onChange={(e) => setPassword(e.target.value)}
-              autoComplete={mode === 'signup' ? 'new-password' : 'current-password'}
+              autoComplete="current-password"
               disabled={busy}
             />
           </label>
@@ -76,14 +100,26 @@ export function LoginScreen({ signup, signin, onBack, onDone }: LoginScreenProps
               {error}
             </p>
           )}
-          <Button variant="sticker" className="btn-primary" type="submit" disabled={busy}>
-            {mode === 'signup' ? '가입하기' : '로그인하기'}
-          </Button>
+          {confirmLogin ? (
+            <div className="login-confirm">
+              <p>이미 가입된 이메일이에요. 이 계정으로 로그인할까요?</p>
+              <p>로그인하면 이 기기의 게스트 기록 대신 계정 기록으로 바뀝니다.</p>
+              <div className="login-confirm-actions">
+                <Button variant="sticker" className="btn-primary" onClick={() => void login()} disabled={busy}>
+                  로그인하기
+                </Button>
+                <Button variant="sticker" onClick={() => setConfirmLogin(false)} disabled={busy}>
+                  취소
+                </Button>
+              </div>
+            </div>
+          ) : (
+            <Button variant="sticker" className="btn-primary" type="submit" disabled={busy}>
+              이메일로 계속하기
+            </Button>
+          )}
         </form>
-        <button type="button" className="login-switch" onClick={switchMode} disabled={busy}>
-          {mode === 'signup' ? '이미 계정이 있나요? 로그인하기' : '처음 오셨나요? 계정 만들기'}
-        </button>
-        <p className="login-note">로그인하면 게스트 기록 대신 계정 기록으로 바뀝니다.</p>
+        <p className="login-note">처음이면 계정이 만들어지고 지금 기록이 그대로 이어져요.</p>
       </div>
     </div>
   );

@@ -148,8 +148,8 @@ function App() {
           signup={account.signup}
           signin={account.signin}
           onBack={() => setScreen('home')}
-          onDone={() => {
-            switchedRef.current = true;
+          onDone={(switched) => {
+            if (switched) switchedRef.current = true;
             setScreen('home');
           }}
         />
