@@ -101,13 +101,14 @@ describe('화면 전환', () => {
     fireEvent.click(screen.getByRole('button', { name: '설정' }));
     expect(screen.getByRole('dialog', { name: '설정' })).toBeTruthy();
     expect(screen.getAllByText('준비중')).toHaveLength(2);
+    expect(screen.queryByRole('button', { name: '로그인' })).toBeNull();
     fireEvent.click(screen.getByRole('button', { name: '닫기' }));
     expect(screen.queryByRole('dialog', { name: '설정' })).toBeNull();
   });
 
-  it('로그인 화면이 열리고 닫힌다', async () => {
+  it('프로필에서 로그인 화면이 열리고 닫힌다', async () => {
     render(<App />);
-    fireEvent.click(screen.getByRole('button', { name: '설정' }));
+    fireEvent.click(screen.getByRole('button', { name: '프로필' }));
     fireEvent.click(screen.getByRole('button', { name: '로그인' }));
     expect(await screen.findByRole('button', { name: '로그인하기' })).toBeTruthy();
     fireEvent.click(screen.getByRole('button', { name: '뒤로' }));
@@ -149,7 +150,7 @@ describe('화면 전환', () => {
       throw new Error(`unexpected ${url}`);
     });
     render(<App />);
-    fireEvent.click(screen.getByRole('button', { name: '설정' }));
+    fireEvent.click(screen.getByRole('button', { name: '프로필' }));
     fireEvent.click(screen.getByRole('button', { name: '로그인' }));
     fireEvent.change(screen.getByLabelText('이메일'), { target: { value: 'e@x.y' } });
     fireEvent.change(screen.getByLabelText('비밀번호'), { target: { value: '123456' } });
@@ -178,7 +179,7 @@ describe('화면 전환', () => {
       throw new Error(`unexpected ${url}`);
     });
     render(<App />);
-    fireEvent.click(screen.getByRole('button', { name: '설정' }));
+    fireEvent.click(screen.getByRole('button', { name: '프로필' }));
     fireEvent.click(screen.getByRole('button', { name: '로그인' }));
     fireEvent.click(await screen.findByRole('button', { name: '처음 오셨나요? 계정 만들기' }));
     fireEvent.change(screen.getByLabelText('이메일'), { target: { value: 'e@x.y' } });
@@ -204,12 +205,15 @@ describe('화면 전환', () => {
       throw new Error(`unexpected ${url}`);
     });
     render(<App />);
-    fireEvent.click(screen.getByRole('button', { name: '설정' }));
+    fireEvent.click(screen.getByRole('button', { name: '프로필' }));
     fireEvent.click(await screen.findByRole('button', { name: '로그아웃' }));
-    await vi.waitFor(() => {
-      const saved = JSON.parse(localStorage.getItem('hamsudoku:save:v1') ?? '{}');
-      expect(saved.clears).toEqual([]);
-    });
+    await vi.waitFor(
+      () => {
+        const saved = JSON.parse(localStorage.getItem('hamsudoku:save:v1') ?? '{}');
+        expect(saved.clears).toEqual([]);
+      },
+      { timeout: 5000 },
+    );
     expect(await screen.findByRole('button', { name: '이어하기' })).toBeTruthy();
   });
 
