@@ -1,23 +1,31 @@
 import { useState } from 'react';
-import { PawPrint, Settings } from 'lucide-react';
+import { PawPrint, Settings, User } from 'lucide-react';
 import type { Stage } from '../api/stagesApi';
 import { Button } from '../ui/Button';
 import { HamsterFace } from '../ui/HamsterFace';
+import { ProfileDialog } from './ProfileDialog';
 import { SettingsDialog } from './SettingsDialog';
 
 interface HomeScreenProps {
   loading: boolean;
   lastStage: Stage | null;
-  onResume: (stage: Stage) => void;
+  email: string | null;
+  onResume: (stage: Stage | null) => void;
   onBrowse: () => void;
+  onLogin: () => void;
+  onLogout: () => void;
 }
 
-export function HomeScreen({ loading, lastStage, onResume, onBrowse }: HomeScreenProps) {
+export function HomeScreen({ loading, lastStage, email, onResume, onBrowse, onLogin, onLogout }: HomeScreenProps) {
   const [settingsOpen, setSettingsOpen] = useState(false);
+  const [profileOpen, setProfileOpen] = useState(false);
 
   return (
     <div className="home">
       <div className="home-top">
+        <Button variant="sticker" aria-label="프로필" onClick={() => setProfileOpen(true)}>
+          <User size={22} aria-hidden="true" />
+        </Button>
         <Button variant="sticker" aria-label="설정" onClick={() => setSettingsOpen(true)}>
           <Settings size={22} aria-hidden="true" />
         </Button>
@@ -34,8 +42,7 @@ export function HomeScreen({ loading, lastStage, onResume, onBrowse }: HomeScree
         <Button
           variant="sticker"
           className="btn-primary"
-          disabled={!lastStage}
-          onClick={() => lastStage && onResume(lastStage)}
+          onClick={() => onResume(lastStage)}
         >
           이어하기
         </Button>
@@ -44,6 +51,17 @@ export function HomeScreen({ loading, lastStage, onResume, onBrowse }: HomeScree
         </Button>
       </div>
       {settingsOpen && <SettingsDialog onClose={() => setSettingsOpen(false)} />}
+      {profileOpen && (
+        <ProfileDialog
+          email={email}
+          onLogin={() => {
+            setProfileOpen(false);
+            onLogin();
+          }}
+          onLogout={onLogout}
+          onClose={() => setProfileOpen(false)}
+        />
+      )}
     </div>
   );
 }

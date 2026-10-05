@@ -1,6 +1,6 @@
 import { describe, expect, it } from 'vitest';
 import { PUZZLES } from './puzzles';
-import { getViolations, isCleared, isSolutionCell, type CellState } from './rules';
+import { cellConflicted, countHamsters, getViolations, isCleared, isSolutionCell, type CellState } from './rules';
 import { countSolutions } from './solver';
 
 const blank = (): CellState[][] => Array.from({ length: 5 }, () => Array(5).fill('empty'));
@@ -49,6 +49,23 @@ describe('isSolutionCell', () => {
     const [r, c] = PUZZLES[0].solution[0];
     expect(isSolutionCell(PUZZLES[0], r, c)).toBe(true);
     expect(isSolutionCell(PUZZLES[0], 4, 4)).toBe(false);
+  });
+});
+
+describe('countHamsters', () => {
+  it('햄스터만 센다', () => {
+    const c = blank();
+    c[0][0] = 'hamster'; c[0][1] = 'mark'; c[1][1] = 'hamster'; c[2][2] = 'wrong';
+    expect(countHamsters(c)).toBe(2);
+  });
+});
+
+describe('cellConflicted', () => {
+  it('행과 열, 섬, 인접 위반을 합친다', () => {
+    const c = blank(); c[0][0] = 'hamster'; c[0][2] = 'hamster';
+    const v = getViolations(c, PUZZLES[0].islands);
+    expect(cellConflicted(v, PUZZLES[0].islands, 0, 0)).toBe(true);
+    expect(cellConflicted(v, PUZZLES[0].islands, 4, 4)).toBe(false);
   });
 });
 

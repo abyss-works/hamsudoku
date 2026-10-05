@@ -20,13 +20,13 @@ const SIX = {
 
 describe('GameScreen', () => {
   it('보드 크기에 맞춰 진행 도트를 찍는다', () => {
-    const { container } = render(<GameScreen stage={SIX} onBack={vi.fn()} onNextMap={vi.fn()} />);
+    const { container } = render(<GameScreen stage={SIX} onBack={vi.fn()} onNextMap={vi.fn()} onRecord={vi.fn()} />);
     expect(container.querySelectorAll('.dot')).toHaveLength(6);
     expect(screen.getByRole('status').getAttribute('aria-label')).toBe('햄스터 0/6');
   });
 
   it('도움말 섹션마다 한 장에 3열로 합쳐진다', () => {
-    const { container } = render(<GameScreen stage={SIX} onBack={vi.fn()} onNextMap={vi.fn()} />);
+    const { container } = render(<GameScreen stage={SIX} onBack={vi.fn()} onNextMap={vi.fn()} onRecord={vi.fn()} />);
     expect(container.querySelectorAll('.help-card')).toHaveLength(2);
     const rules = screen.getByLabelText('기본 규칙');
     expect(rules.querySelectorAll('.help-col')).toHaveLength(3);

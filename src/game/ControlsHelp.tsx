@@ -1,4 +1,5 @@
 import { MousePointerClick, Move, Pointer } from 'lucide-react';
+import { HelpCard, HelpCol } from '../ui/HelpCard';
 
 const CONTROLS = [
   { icon: <Pointer size={20} aria-hidden="true" />, text: '한 번 톡, 표시 남기기' },
@@ -8,13 +9,13 @@ const CONTROLS = [
 
 export function ControlsHelp() {
   return (
-    <div className="help-card" aria-label="기본 조작">
+    <HelpCard label="기본 조작">
       {CONTROLS.map((c) => (
-        <div key={c.text} className="help-col">
+        <HelpCol key={c.text}>
           {c.icon}
           <p>{c.text}</p>
-        </div>
+        </HelpCol>
       ))}
-    </div>
+    </HelpCard>
   );
 }

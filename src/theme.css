@@ -23,6 +23,22 @@ body {
   color: var(--ink);
 }
 
+.btn {
+  font: inherit;
+  min-height: 48px;
+  padding: 8px 14px;
+  border-radius: 12px;
+  border: 2px solid #e5d5bd;
+  background: #fff;
+  color: inherit;
+  cursor: pointer;
+}
+
+.btn:disabled {
+  opacity: 0.5;
+  cursor: default;
+}
+
 .btn-sticker {
   border: 3px solid var(--ink);
   border-radius: var(--radius-md);

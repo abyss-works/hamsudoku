@@ -23,6 +23,7 @@ describe('Board', () => {
         onRelease={() => false}
         onReset={() => {}}
         onNextMap={() => {}}
+        onBrowse={() => {}}
       />,
     );
     expect(screen.getAllByRole('button', { name: /빈칸/ })).toHaveLength(36);

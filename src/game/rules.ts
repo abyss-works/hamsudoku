@@ -62,15 +62,21 @@ export function getViolations(cells: CellState[][], islands: number[][]): Violat
   return { rows, cols, islands: overfilled, touch };
 }
 
+export function countHamsters(cells: CellState[][]): number {
+  let total = 0;
+  for (const line of cells) for (const cell of line) if (cell === 'hamster') total += 1;
+  return total;
+}
+
+export function cellConflicted(v: Violations, islands: number[][], r: number, c: number): boolean {
+  return v.rows.has(r) || v.cols.has(c) || v.islands.has(islands[r][c]) || v.touch.has(`${r},${c}`);
+}
 export function isSolutionCell(puzzle: Puzzle, r: number, c: number): boolean {
   return puzzle.solution.some(([sr, sc]) => sr === r && sc === c);
 }
 
 export function isCleared(cells: CellState[][], islands: number[][]): boolean {
-  let total = 0;
-  for (const line of cells) for (const cell of line) if (cell === 'hamster') total += 1;
-  // 섬 N개에 햄스터 N마리, 위반 없음 → 각 섬 정확히 1마리, 행·열 중복 없음, 인접 없음
-  if (total !== islands.length) return false;
+  if (countHamsters(cells) !== islands.length) return false;
   const v = getViolations(cells, islands);
   return v.rows.size === 0 && v.cols.size === 0 && v.islands.size === 0 && v.touch.size === 0;
 }

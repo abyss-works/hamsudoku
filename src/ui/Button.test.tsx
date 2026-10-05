@@ -13,6 +13,7 @@ describe('Button', () => {
     );
     const btn = screen.getByRole('button', { name: '표시' });
     expect(btn.className).toContain('cell');
+    expect(btn.className).toContain('btn');
     expect(btn.getAttribute('data-island')).toBe('1');
     fireEvent.click(btn);
     expect(onClick).toHaveBeenCalledTimes(1);

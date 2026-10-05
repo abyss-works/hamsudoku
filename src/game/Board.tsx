@@ -1,10 +1,10 @@
 import { useEffect, useRef } from 'react';
+import { motion, useAnimationControls } from 'framer-motion';
 import { Cell } from './Cell';
 import { ClearDialog } from './ClearDialog';
-import type { Violations } from './rules';
+import { cellConflicted, type Violations } from './rules';
 import type { CellState, Puzzle } from './puzzles';
 import type { TapKind } from './tap';
-import './hamster.css';
 
 interface BoardProps {
   puzzle: Puzzle;
@@ -20,6 +20,7 @@ interface BoardProps {
   onRelease: () => boolean;
   onReset: () => void;
   onNextMap: () => void;
+  onBrowse: () => void;
 }
 
 export function Board({
@@ -36,22 +37,19 @@ export function Board({
   onRelease,
   onReset,
   onNextMap,
+  onBrowse,
 }: BoardProps) {
-  const wrapRef = useRef<HTMLDivElement>(null);
   const suppressClick = useRef(false);
   const first = useRef(true);
+  const controls = useAnimationControls();
 
   useEffect(() => {
     if (first.current) {
       first.current = false;
       return;
     }
-    const el = wrapRef.current;
-    if (!el) return;
-    el.classList.remove('shake');
-    void el.offsetWidth;
-    el.classList.add('shake');
-  }, [shake]);
+    void controls.start({ x: [0, -6, 6, -4, 4, 0], transition: { duration: 0.4, ease: 'easeOut' } });
+  }, [shake, controls]);
 
   const cellFromPoint = (x: number, y: number): [number, number] | null => {
     const el = document.elementFromPoint(x, y)?.closest?.('.cell');
@@ -87,7 +85,7 @@ export function Board({
   };
 
   return (
-    <div className="board-wrap" ref={wrapRef}>
+    <motion.div className={`board-wrap${shake > 0 ? ' shake' : ''}`} animate={controls}>
       <div
         className="board"
         role="grid"
@@ -103,11 +101,6 @@ export function Board({
         {cells.map((line, r) =>
           line.map((state, c) => {
             const key = `${r},${c}`;
-            const conflicted =
-              violations.rows.has(r) ||
-              violations.cols.has(c) ||
-              violations.islands.has(puzzle.islands[r][c]) ||
-              violations.touch.has(key);
             return (
               <Cell
                 key={`${r}-${c}`}
@@ -115,7 +108,7 @@ export function Board({
                 col={c}
                 state={state}
                 islandId={puzzle.islands[r][c]}
-                conflicted={conflicted}
+                conflicted={cellConflicted(violations, puzzle.islands, r, c)}
                 hit={hitKey === key}
                 pulseDelay={pulse.get(key)}
                 onTap={(kind) => onCell(r, c, kind)}
@@ -125,7 +118,7 @@ export function Board({
           }),
         )}
       </div>
-      {cleared && <ClearDialog onReset={onReset} onNextMap={onNextMap} />}
-    </div>
+      {cleared && <ClearDialog total={puzzle.size} onReset={onReset} onNextMap={onNextMap} onBrowse={onBrowse} />}
+    </motion.div>
   );
 }
