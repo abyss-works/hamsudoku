@@ -10,6 +10,8 @@ export interface Attempt {
 }
 
 export interface DbPort {
+  ensureUser(userId: string, email: string | null): Promise<void>;
+  listUsers(): Promise<{ userId: string; email: string | null; hasProfile: boolean }[]>;
   issueAttempt(userId: string, stageCode: string): Promise<Attempt>;
   findAttempt(key: string): Promise<Attempt | null>;
   useAttempt(userId: string, key: string, stageCode: string, nowIso: string): Promise<Attempt | null>;
@@ -23,11 +25,19 @@ export interface DbPort {
 let nextId = 0;
 
 export function createMemoryDb(): DbPort {
+  const users = new Map<string, { email: string | null; hasProfile: boolean }>();
   const attempts = new Map<string, Attempt>();
   const records = new Map<string, ClearRecord & { updatedAt: string }>();
   const events: { userId: string; stageCode: string; elapsedSec: number; verified: boolean; clearedAt: string }[] = [];
 
   return {
+    async ensureUser(userId: string, email: string | null) {
+      const prev = users.get(userId);
+      users.set(userId, { email: email ?? prev?.email ?? null, hasProfile: true });
+    },
+    async listUsers() {
+      return [...users.entries()].map(([userId, u]) => ({ userId, email: u.email, hasProfile: u.hasProfile }));
+    },
     async issueAttempt(userId: string, stageCode: string) {
       const a: Attempt = {
         id: `att-${Date.now()}-${(nextId += 1)}`,
@@ -79,6 +89,23 @@ const prisma = new PrismaClient();
 
 export function createPrismaDb(): DbPort {
   return {
+    async ensureUser(userId: string, email: string | null) {
+      await prisma.user.upsert({
+        where: { id: userId },
+        create: { id: userId, email },
+        update: email ? { email } : {},
+      });
+      await prisma.profile.upsert({
+        where: { userId },
+        create: { userId },
+        update: {},
+      });
+    },
+    async listUsers() {
+      const [all, profiles] = await Promise.all([prisma.user.findMany(), prisma.profile.findMany()]);
+      const withProfile = new Set(profiles.map((p) => p.userId));
+      return all.map((r) => ({ userId: r.id, email: r.email, hasProfile: withProfile.has(r.id) }));
+    },
     async issueAttempt(userId: string, stageCode: string) {
       const a = await prisma.attempt.create({ data: { userId, stageCode } });
       return {
