@@ -37,14 +37,14 @@ export function ClearDialog({ total, onReset, onNextMap, onBrowse }: ClearDialog
         <PartyPopper size={26} aria-hidden="true" /> 햄스터 {total}마리를 다 찾았다!
       </p>
       <div className="clear-actions">
+        <Button variant="sticker" className="btn-primary" onClick={onNextMap}>
+          다음 스테이지
+        </Button>
         <Button variant="sticker" onClick={onReset}>
           다시하기
         </Button>
-        <Button variant="sticker" className="btn-primary" onClick={onNextMap}>
-          다음 맵
-        </Button>
         <Button variant="sticker" onClick={onBrowse}>
-          스테이지로
+          스테이지 목록
         </Button>
       </div>
     </Overlay>

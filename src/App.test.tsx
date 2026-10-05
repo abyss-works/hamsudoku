@@ -65,8 +65,8 @@ describe('화면 전환', () => {
     fireEvent.click(screen.getByRole('button', { name: '1' }));
     const cells = () => Array.from(container.querySelectorAll('.board .cell'));
     solutionOf('1-1').forEach((i) => fireEvent.dblClick(cells()[i]));
-    fireEvent.click(screen.getByRole('button', { name: '스테이지로' }));
-    const btn = await screen.findByRole('button', { name: '1' });
+    fireEvent.click(screen.getByRole('button', { name: '스테이지 목록' }));
+    const btn = await screen.findByRole('button', { name: /^1, 베스트/ });
     expect(btn.textContent).toMatch(/\d+:\d\d/);
   });
 
@@ -78,7 +78,7 @@ describe('화면 전환', () => {
     fireEvent.click(screen.getByRole('button', { name: '10' }));
     const cells = () => Array.from(container.querySelectorAll('.board .cell'));
     solutionOf('3-10').forEach((i) => fireEvent.dblClick(cells()[i]));
-    fireEvent.click(screen.getByRole('button', { name: '다음 맵' }));
+    fireEvent.click(screen.getByRole('button', { name: '다음 스테이지' }));
     expect(await screen.findByRole('button', { name: '이어하기' })).toBeTruthy();
   });
 

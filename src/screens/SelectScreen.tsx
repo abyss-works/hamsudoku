@@ -52,12 +52,17 @@ export function SelectScreen({ chapters, loading, error, clears, initialChapterI
                   <Button
                     key={stage.id}
                     variant="sticker"
+                    className="stage-btn"
                     disabled={stage.locked}
                     onClick={() => onSelect(stage)}
-                    aria-label={String(i + 1)}
+                    aria-label={entry ? `${i + 1}, 베스트 ${formatElapsed(entry.elapsedSec)}` : String(i + 1)}
                   >
-                    {i + 1}
-                    {entry && <span> ✓ {formatElapsed(entry.elapsedSec)}</span>}
+                    <span className="stage-num" aria-hidden="true">
+                      {i + 1}
+                    </span>
+                    <span className="stage-best" aria-hidden="true">
+                      {entry ? formatElapsed(entry.elapsedSec) : '-'}
+                    </span>
                   </Button>
                 );
               })}
