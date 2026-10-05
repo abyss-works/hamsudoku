@@ -1,8 +1,9 @@
 import { useState } from 'react';
-import { PawPrint, Settings } from 'lucide-react';
+import { PawPrint, Settings, User } from 'lucide-react';
 import type { Stage } from '../api/stagesApi';
 import { Button } from '../ui/Button';
 import { HamsterFace } from '../ui/HamsterFace';
+import { ProfileDialog } from './ProfileDialog';
 import { SettingsDialog } from './SettingsDialog';
 
 interface HomeScreenProps {
@@ -17,10 +18,14 @@ interface HomeScreenProps {
 
 export function HomeScreen({ loading, lastStage, email, onResume, onBrowse, onLogin, onLogout }: HomeScreenProps) {
   const [settingsOpen, setSettingsOpen] = useState(false);
+  const [profileOpen, setProfileOpen] = useState(false);
 
   return (
     <div className="home">
       <div className="home-top">
+        <Button variant="sticker" aria-label="프로필" onClick={() => setProfileOpen(true)}>
+          <User size={22} aria-hidden="true" />
+        </Button>
         <Button variant="sticker" aria-label="설정" onClick={() => setSettingsOpen(true)}>
           <Settings size={22} aria-hidden="true" />
         </Button>
@@ -45,7 +50,18 @@ export function HomeScreen({ loading, lastStage, email, onResume, onBrowse, onLo
           스테이지
         </Button>
       </div>
-      {settingsOpen && <SettingsDialog email={email} onLogin={onLogin} onLogout={onLogout} onClose={() => setSettingsOpen(false)} />}
+      {settingsOpen && <SettingsDialog onClose={() => setSettingsOpen(false)} />}
+      {profileOpen && (
+        <ProfileDialog
+          email={email}
+          onLogin={() => {
+            setProfileOpen(false);
+            onLogin();
+          }}
+          onLogout={onLogout}
+          onClose={() => setProfileOpen(false)}
+        />
+      )}
     </div>
   );
 }
