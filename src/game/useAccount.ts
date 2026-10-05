@@ -14,11 +14,18 @@ export function useAccount(): {
   const [loading, setLoading] = useState(true);
 
   useEffect(() => {
-    authApi.me().then(({ uid: id, email: mail }) => {
-      setUid(id);
-      setEmail(mail);
-      setLoading(false);
-    });
+    authApi
+      .me()
+      .then(async ({ uid: id, email: mail }) => {
+        if (id) return { uid: id, email: mail };
+        await authApi.session();
+        return authApi.me();
+      })
+      .then(({ uid: id, email: mail }) => {
+        setUid(id);
+        setEmail(mail);
+        setLoading(false);
+      });
   }, []);
 
   const refresh = async () => {

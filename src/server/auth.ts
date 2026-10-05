@@ -52,9 +52,9 @@ export async function ensureSession(): Promise<string | null> {
   const supabase = await userClient();
   if (!supabase) return null;
   const {
-    data: { session },
-  } = await supabase.auth.getSession();
-  if (session) return session.user.id;
+    data: { user },
+  } = await supabase.auth.getUser();
+  if (user) return user.id;
   const { data, error } = await supabase.auth.signInAnonymously();
   if (error) return null;
   return data.user?.id ?? null;
@@ -64,11 +64,10 @@ export async function getSessionUser(): Promise<{ uid: string | null; email: str
   const supabase = await userClient();
   if (!supabase) return { uid: null, email: null };
   const {
-    data: { session },
-  } = await supabase.auth.getSession();
-  const u = session?.user;
-  if (!u) return { uid: null, email: null };
-  return { uid: u.id, email: !u.is_anonymous && u.email ? u.email : null };
+    data: { user },
+  } = await supabase.auth.getUser();
+  if (!user) return { uid: null, email: null };
+  return { uid: user.id, email: !user.is_anonymous && user.email ? user.email : null };
 }
 
 export async function currentAccount(): Promise<string | null> {

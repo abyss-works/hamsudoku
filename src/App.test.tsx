@@ -9,7 +9,15 @@ import { PUZZLES } from './game/puzzles';
 afterEach(() => {
   cleanup();
   localStorage.clear();
+  vi.unstubAllGlobals();
 });
+
+const stubFetch = (handler: (url: string) => Promise<Response>) => {
+  vi.stubGlobal(
+    'fetch',
+    vi.fn(async (url: string) => handler(url)),
+  );
+};
 
 const solutionOf = (code: string): number[] => {
   const lv = LEVELS.find((l) => l.code === code);
@@ -103,6 +111,80 @@ describe('화면 전환', () => {
     fireEvent.click(screen.getByRole('button', { name: '로그인' }));
     expect(await screen.findByRole('button', { name: '가입하기' })).toBeTruthy();
     fireEvent.click(screen.getByRole('button', { name: '뒤로' }));
+    expect(await screen.findByRole('button', { name: '이어하기' })).toBeTruthy();
+  });
+
+  it('세션 만료 때 로그인 화면으로 간다', async () => {
+    stubFetch(async (url: string) => {
+      if (url.endsWith('/api/auth/me')) return Response.json({ uid: 'u1', email: 'e@x.y' });
+      if (url.endsWith('/api/records')) return new Response(null, { status: 401 });
+      throw new Error(`unexpected ${url}`);
+    });
+    render(<App />);
+    expect(await screen.findByRole('button', { name: '가입하기' })).toBeTruthy();
+  });
+
+  it('로그인하면 게스트 기록 대신 계정 기록으로 바뀐다', async () => {
+    localStorage.setItem(
+      'hamsudoku:save:v1',
+      JSON.stringify({
+        v: 1,
+        clears: [{ stageCode: '2-1', clearedAt: 't0', elapsedSec: 10, attempts: 1 }],
+        settings: { sound: true, vibration: true },
+        updatedAt: 't0',
+      }),
+    );
+    let signedIn = false;
+    stubFetch(async (url: string) => {
+      if (url.endsWith('/api/auth/me')) {
+        return Response.json(signedIn ? { uid: 'uB', email: 'e@x.y' } : { uid: null, email: null });
+      }
+      if (url.endsWith('/api/auth/signin')) {
+        signedIn = true;
+        return Response.json({ ok: true });
+      }
+      if (url.endsWith('/api/records'))
+        return Response.json({ clears: [{ stageCode: '1-1', bestElapsedSec: 70, attempts: 2, lastClearedAt: 't9' }] });
+      if (url.endsWith('/api/auth/signout')) return Response.json({ ok: true });
+      throw new Error(`unexpected ${url}`);
+    });
+    render(<App />);
+    fireEvent.click(screen.getByRole('button', { name: '설정' }));
+    fireEvent.click(screen.getByRole('button', { name: '로그인' }));
+    fireEvent.change(screen.getByLabelText('이메일'), { target: { value: 'e@x.y' } });
+    fireEvent.change(screen.getByLabelText('비밀번호'), { target: { value: '123456' } });
+    fireEvent.click(screen.getByRole('button', { name: '로그인하기' }));
+    await screen.findByRole('button', { name: '이어하기' });
+    await vi.waitFor(() => {
+      const saved = JSON.parse(localStorage.getItem('hamsudoku:save:v1') ?? '{}');
+      expect(saved.clears).toEqual([
+        { stageCode: '1-1', clearedAt: 't9', elapsedSec: 70, attempts: 2 },
+      ]);
+    });
+  });
+
+  it('로그아웃하면 로컬 기록이 비워진다', async () => {
+    localStorage.setItem(
+      'hamsudoku:save:v1',
+      JSON.stringify({
+        v: 1,
+        clears: [{ stageCode: '1-1', clearedAt: 't0', elapsedSec: 10, attempts: 1 }],
+        settings: { sound: true, vibration: true },
+        updatedAt: 't0',
+      }),
+    );
+    stubFetch(async (url: string) => {
+      if (url.endsWith('/api/auth/me')) return Response.json({ uid: 'u1', email: 'e@x.y' });
+      if (url.endsWith('/api/records')) return Response.json({ clears: [] });
+      throw new Error(`unexpected ${url}`);
+    });
+    render(<App />);
+    fireEvent.click(screen.getByRole('button', { name: '설정' }));
+    fireEvent.click(await screen.findByRole('button', { name: '로그아웃' }));
+    await vi.waitFor(() => {
+      const saved = JSON.parse(localStorage.getItem('hamsudoku:save:v1') ?? '{}');
+      expect(saved.clears).toEqual([]);
+    });
     expect(await screen.findByRole('button', { name: '이어하기' })).toBeTruthy();
   });
 

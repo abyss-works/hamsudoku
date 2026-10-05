@@ -2,7 +2,7 @@ import { useEffect, useRef, useState } from 'react';
 import type { Stage } from './api/stagesApi';
 import { useClears } from './game/useClears';
 import { useAccount } from './game/useAccount';
-import { pull, pushClear } from './game/sync';
+import { fetchAttemptKey, pull, pushClear, reconcile } from './game/sync';
 import type { ClearEntry } from './game/save';
 import { useStages } from './game/useStages';
 import { GameScreen } from './screens/GameScreen';
@@ -15,40 +15,61 @@ export type Screen = 'home' | 'select' | 'game' | 'login';
 function App() {
   const [screen, setScreen] = useState<Screen>('home');
   const [stageId, setStageId] = useState<string | null>(null);
-  const { clears, record, replace, resumeId } = useClears();
+  const { clears, record, replace, mergeIn, reset, resumeId } = useClears();
   const account = useAccount();
   const { chapters, loading, error } = useStages();
   const attemptKeys = useRef(new Map<string, string>());
   const clearsRef = useRef<ClearEntry[]>([]);
   clearsRef.current = [...clears.values()];
-  const pulled = useRef(false);
+  const uidRef = useRef<string | null | undefined>(undefined);
+  const switchedRef = useRef(false);
 
   const stages = chapters.flatMap((c) => c.stages);
   const stage = stages.find((s) => s.id === stageId) ?? null;
   const resumeCode = resumeId(stages.map((s) => s.code));
   const resumeStage = stages.find((s) => s.code === resumeCode) ?? null;
 
+  const goLoginExpired = () => {
+    void account.signout();
+    setScreen('login');
+  };
+
   useEffect(() => {
-    if (!account.uid || pulled.current) return;
-    pulled.current = true;
-    pull(clearsRef.current)
-      .then((merged) => replace(merged))
-      .catch(() => {});
-  }, [account.uid, replace]);
+    if (account.loading) return;
+    const prev = uidRef.current;
+    uidRef.current = account.uid;
+    if (!account.uid) return;
+    if (switchedRef.current) {
+      switchedRef.current = false;
+      pull([])
+        .then(({ clears: merged, unauthorized }) => {
+          if (unauthorized) {
+            goLoginExpired();
+            return;
+          }
+          replace(merged);
+        })
+        .catch(() => {});
+      return;
+    }
+    if (prev === undefined || prev === null) {
+      reconcile(clearsRef.current).then(({ clears: merged, unauthorized }) => {
+        if (unauthorized) {
+          if (account.email) goLoginExpired();
+          return;
+        }
+        mergeIn(merged);
+      });
+    }
+  // mergeIn/replace는 함수형 setState라 클로저가 항상 최신이다. uid 변화에만 반응한다.
+  }, [account.uid, account.loading]);
 
   const enter = (s: Stage) => {
     setStageId(s.id);
     setScreen('game');
-    fetch('/api/attempts', {
-      method: 'POST',
-      headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({ stageCode: s.code }),
-    })
-      .then((res) => (res.ok ? res.json() : null))
-      .then((data) => {
-        if (data?.attemptKey) attemptKeys.current.set(s.id, data.attemptKey);
-      })
-      .catch(() => {});
+    void fetchAttemptKey(s.code).then((key) => {
+      if (key) attemptKeys.current.set(s.id, key);
+    });
   };
 
   const resume = (s: Stage | null) => {
@@ -61,9 +82,19 @@ function App() {
 
   const handleRecord = (code: string, elapsedSec: number) => {
     record(code, elapsedSec);
+    if (!account.uid) return;
     const key = stage ? attemptKeys.current.get(stage.id) : undefined;
     if (stage) attemptKeys.current.delete(stage.id);
-    void pushClear(code, elapsedSec, key);
+    void pushClear(code, elapsedSec, key).then((r) => {
+      if (r === 'unauthorized' && account.email) goLoginExpired();
+    });
+  };
+
+  const handleLogout = () => {
+    void account.signout().then(() => {
+      reset();
+      setScreen('home');
+    });
   };
 
   const goNextMap = () => {
@@ -90,7 +121,7 @@ function App() {
           onBrowse={() => setScreen('select')}
           email={account.email}
           onLogin={() => setScreen('login')}
-          onLogout={() => void account.signout()}
+          onLogout={handleLogout}
         />
       )}
       {screen === 'select' && (
@@ -112,7 +143,17 @@ function App() {
           onRecord={handleRecord}
         />
       )}
-      {screen === 'login' && <LoginScreen onBack={() => setScreen('home')} onDone={() => setScreen('home')} />}
+      {screen === 'login' && (
+        <LoginScreen
+          signup={account.signup}
+          signin={account.signin}
+          onBack={() => setScreen('home')}
+          onDone={() => {
+            switchedRef.current = true;
+            setScreen('home');
+          }}
+        />
+      )}
     </main>
   );
 }

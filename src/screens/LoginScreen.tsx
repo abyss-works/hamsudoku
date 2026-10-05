@@ -1,9 +1,14 @@
 import { useState } from 'react';
 import { Button } from '../ui/Button';
-import { useAccount } from '../game/useAccount';
 
-export function LoginScreen({ onBack, onDone }: { onBack: () => void; onDone: () => void }) {
-  const { signup, signin } = useAccount();
+interface LoginScreenProps {
+  signup: (email: string, password: string) => Promise<{ ok: boolean; msg?: string }>;
+  signin: (email: string, password: string) => Promise<{ ok: boolean; msg?: string }>;
+  onBack: () => void;
+  onDone: () => void;
+}
+
+export function LoginScreen({ signup, signin, onBack, onDone }: LoginScreenProps) {
   const [email, setEmail] = useState('');
   const [password, setPassword] = useState('');
   const [error, setError] = useState<string | null>(null);
@@ -45,6 +50,7 @@ export function LoginScreen({ onBack, onDone }: { onBack: () => void; onDone: ()
           뒤로
         </Button>
       </div>
+      <p className="login-note">로그인하면 이 기기의 게스트 기록 대신 계정 기록으로 바뀝니다.</p>
     </div>
   );
 }

@@ -6,6 +6,6 @@ import { fetchRecords } from '../../../server/records';
 export async function GET() {
   const { uid } = await getSessionUser();
   const result = await fetchRecords(createPrismaDb(), uid);
-  if (result.status === 401) return NextResponse.json({ ok: false }, { status: 401 });
+  if (result.status === 401) return NextResponse.json({ ok: false, msg: '로그인이 필요해요.' }, { status: 401 });
   return NextResponse.json({ ok: true, clears: result.clears });
 }

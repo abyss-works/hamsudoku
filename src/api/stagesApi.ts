@@ -34,6 +34,7 @@ export type AuthResult = { ok: true } | { ok: false; msg: string };
 
 export interface AuthApi {
   me(): Promise<{ uid: string | null; email: string | null }>;
+  session(): Promise<{ uid: string | null }>;
   signup(email: string, password: string): Promise<AuthResult>;
   signin(email: string, password: string): Promise<AuthResult>;
   signout(): Promise<void>;
@@ -59,6 +60,15 @@ export const authApi: AuthApi = {
       return (await res.json()) as { uid: string | null; email: string | null };
     } catch {
       return { uid: null, email: null };
+    }
+  },
+  async session() {
+    try {
+      const res = await fetch('/api/auth/session', { method: 'POST' });
+      if (!res.ok) return { uid: null };
+      return (await res.json()) as { uid: string | null };
+    } catch {
+      return { uid: null };
     }
   },
   signup: (email, password) => postJson('/api/auth/signup', { email, password }),

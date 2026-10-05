@@ -34,6 +34,10 @@ function fresh(): SaveV1 {
   return { v: 1, clears: [], settings: { sound: true, vibration: true }, updatedAt: new Date(0).toISOString() };
 }
 
+export function newSave(): SaveV1 {
+  return fresh();
+}
+
 export function loadSave(): SaveV1 {
   try {
     const raw = localStorage.getItem(SAVE_KEY);
