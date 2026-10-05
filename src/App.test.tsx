@@ -109,7 +109,7 @@ describe('화면 전환', () => {
     render(<App />);
     fireEvent.click(screen.getByRole('button', { name: '설정' }));
     fireEvent.click(screen.getByRole('button', { name: '로그인' }));
-    expect(await screen.findByRole('button', { name: '가입하기' })).toBeTruthy();
+    expect(await screen.findByRole('button', { name: '로그인하기' })).toBeTruthy();
     fireEvent.click(screen.getByRole('button', { name: '뒤로' }));
     expect(await screen.findByRole('button', { name: '이어하기' })).toBeTruthy();
   });
@@ -121,7 +121,7 @@ describe('화면 전환', () => {
       throw new Error(`unexpected ${url}`);
     });
     render(<App />);
-    expect(await screen.findByRole('button', { name: '가입하기' })).toBeTruthy();
+    expect(await screen.findByRole('button', { name: '로그인하기' })).toBeTruthy();
   });
 
   it('로그인하면 게스트 기록 대신 계정 기록으로 바뀐다', async () => {
@@ -161,6 +161,31 @@ describe('화면 전환', () => {
         { stageCode: '1-1', clearedAt: 't9', elapsedSec: 70, attempts: 2 },
       ]);
     });
+  });
+
+  it('모드를 바꾸면 가입하기로 제출된다', async () => {
+    let signedUp = false;
+    stubFetch(async (url: string) => {
+      if (url.endsWith('/api/auth/me')) {
+        return Response.json(signedUp ? { uid: 'uC', email: 'e@x.y' } : { uid: null, email: null });
+      }
+      if (url.endsWith('/api/auth/signup')) {
+        signedUp = true;
+        return Response.json({ ok: true });
+      }
+      if (url.endsWith('/api/records')) return Response.json({ clears: [] });
+      if (url.endsWith('/api/auth/signout')) return Response.json({ ok: true });
+      throw new Error(`unexpected ${url}`);
+    });
+    render(<App />);
+    fireEvent.click(screen.getByRole('button', { name: '설정' }));
+    fireEvent.click(screen.getByRole('button', { name: '로그인' }));
+    fireEvent.click(await screen.findByRole('button', { name: '처음 오셨나요? 계정 만들기' }));
+    fireEvent.change(screen.getByLabelText('이메일'), { target: { value: 'e@x.y' } });
+    fireEvent.change(screen.getByLabelText('비밀번호'), { target: { value: '123456' } });
+    fireEvent.click(screen.getByRole('button', { name: '가입하기' }));
+    expect(await screen.findByRole('button', { name: '이어하기' })).toBeTruthy();
+    expect(signedUp).toBe(true);
   });
 
   it('로그아웃하면 로컬 기록이 비워진다', async () => {
