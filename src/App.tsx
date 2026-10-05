@@ -9,11 +9,18 @@ import { GameScreen } from './screens/GameScreen';
 import { HomeScreen } from './screens/HomeScreen';
 import { LoginScreen } from './screens/LoginScreen';
 import { SelectScreen } from './screens/SelectScreen';
+import { SetPasswordScreen } from './screens/SetPasswordScreen';
 
-export type Screen = 'home' | 'select' | 'game' | 'login';
+export type Screen = 'home' | 'select' | 'game' | 'login' | 'recovery';
+
+function initialScreen(): Screen {
+  if (typeof window === 'undefined') return 'home';
+  const q = new URLSearchParams(window.location.search);
+  return q.has('recovery') ? 'recovery' : 'home';
+}
 
 function App() {
-  const [screen, setScreen] = useState<Screen>('home');
+  const [screen, setScreen] = useState<Screen>(initialScreen);
   const [stageId, setStageId] = useState<string | null>(null);
   const { clears, record, replace, mergeIn, reset, resumeId } = useClears();
   const account = useAccount();
@@ -107,6 +114,11 @@ function App() {
     });
   };
 
+  const goHome = () => {
+    window.history.replaceState({}, '', window.location.pathname);
+    setScreen('home');
+  };
+
   const goNextMap = () => {
     if (!stage) {
       setScreen('home');
@@ -157,8 +169,17 @@ function App() {
         <LoginScreen
           signup={account.signup}
           signin={signinThenSwitch}
+          reset={account.reset}
+          cloud={account.cloud}
           onBack={() => setScreen('home')}
           onDone={() => setScreen('home')}
+        />
+      )}
+      {screen === 'recovery' && (
+        <SetPasswordScreen
+          setPassword={account.setPassword}
+          linkError={new URLSearchParams(window.location.search).get('recovery') === 'error'}
+          onDone={goHome}
         />
       )}
     </main>

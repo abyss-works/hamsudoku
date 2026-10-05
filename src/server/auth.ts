@@ -96,3 +96,17 @@ export async function signOutAccount(): Promise<void> {
   if (!supabase) return;
   await supabase.auth.signOut();
 }
+
+export async function requestPasswordReset(email: string, redirectTo: string): Promise<AuthResult> {
+  const supabase = await userClient();
+  if (!supabase) return { ok: false, msg: '클라우드 미설정' };
+  const { error } = await supabase.auth.resetPasswordForEmail(email, { redirectTo });
+  return error ? authErr(error) : { ok: true };
+}
+
+export async function applyNewPassword(password: string): Promise<AuthResult> {
+  const supabase = await userClient();
+  if (!supabase) return { ok: false, msg: '클라우드 미설정' };
+  const { error } = await supabase.auth.updateUser({ password });
+  return error ? authErr(error) : { ok: true };
+}

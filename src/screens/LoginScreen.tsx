@@ -10,13 +10,15 @@ interface AuthFn {
 interface LoginScreenProps {
   signup: AuthFn;
   signin: AuthFn;
+  reset: (email: string) => Promise<{ ok: boolean; msg?: string }>;
+  cloud: boolean;
   onBack: () => void;
   onDone: () => void;
 }
 
 // 통합 계정 폼 — 가입·로그인 구분 없이 "이메일로 계속하기" 하나로.
 // 승격(signup) 먼저 시도하고, 이미 가입된 이메일이면 확인 후 로그인(signin)으로 전환한다.
-export function LoginScreen({ signup, signin, onBack, onDone }: LoginScreenProps) {
+export function LoginScreen({ signup, signin, reset, cloud, onBack, onDone }: LoginScreenProps) {
   const [email, setEmail] = useState('');
   const [password, setPassword] = useState('');
   const [error, setError] = useState<string | null>(null);
@@ -61,6 +63,24 @@ export function LoginScreen({ signup, signin, onBack, onDone }: LoginScreenProps
     }
   };
 
+  const forgot = async () => {
+    if (!email.trim()) {
+      setError('재설정 메일을 받을 이메일을 입력하세요.');
+      return;
+    }
+    setBusy(true);
+    setError(null);
+    try {
+      const r = await reset(email.trim());
+      if (r.ok) {
+        setOkMessage('재설정 메일을 보냈어요. 받은편지함을 확인하세요.');
+      } else {
+        setError(r.msg ?? '실패했어요.');
+      }
+    } finally {
+      setBusy(false);
+    }
+  };
   const login = async () => {
     setBusy(true);
     setError(null);
@@ -134,6 +154,11 @@ export function LoginScreen({ signup, signin, onBack, onDone }: LoginScreenProps
             </Button>
           )}
         </form>
+        {cloud && (
+          <button type="button" className="login-switch" onClick={() => void forgot()} disabled={busy}>
+            비밀번호를 잊었어요
+          </button>
+        )}
         <p className="login-note">처음이면 계정이 만들어지고 지금 기록이 그대로 이어져요.</p>
       </div>
     </div>

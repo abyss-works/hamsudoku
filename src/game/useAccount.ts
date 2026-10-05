@@ -9,6 +9,8 @@ export function useAccount(): {
   signup: (email: string, password: string) => Promise<{ ok: boolean; msg?: string; code?: string }>;
   signin: (email: string, password: string) => Promise<{ ok: boolean; msg?: string; code?: string }>;
   signout: () => Promise<void>;
+  reset: (email: string) => Promise<{ ok: boolean; msg?: string }>;
+  setPassword: (password: string) => Promise<{ ok: boolean; msg?: string }>;
 } {
   const [uid, setUid] = useState<string | null>(null);
   const [email, setEmail] = useState<string | null>(null);
@@ -59,5 +61,7 @@ export function useAccount(): {
       setUid(null);
       setEmail(null);
     },
+    reset: (email: string) => authApi.reset(email),
+    setPassword: (password: string) => authApi.setPassword(password),
   };
 }

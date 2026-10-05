@@ -244,6 +244,44 @@ describe('화면 전환', () => {
     expect(account.uid).toMatch(/^local-/);
   });
 
+  it('비밀번호를 잊었어요를 누르면 재설정 메일이 간다', async () => {
+    let resetTo = '';
+    stubFetch(async (url: string) => {
+      if (url.endsWith('/api/auth/me')) return Response.json({ uid: null, email: null });
+      if (url.endsWith('/api/auth/reset')) {
+        resetTo = url;
+        return Response.json({ ok: true });
+      }
+      throw new Error(`unexpected ${url}`);
+    });
+    render(<App />);
+    fireEvent.click(screen.getByRole('button', { name: '프로필' }));
+    fireEvent.click(screen.getByRole('button', { name: '로그인' }));
+    fireEvent.change(screen.getByLabelText('이메일'), { target: { value: 'e@x.y' } });
+    fireEvent.click(screen.getByRole('button', { name: '비밀번호를 잊었어요' }));
+    expect(await screen.findByText('재설정 메일을 보냈어요. 받은편지함을 확인하세요.')).toBeTruthy();
+    expect(resetTo).toContain('/api/auth/reset');
+  });
+
+  it('recovery로 열면 새 비밀번호를 정하고 홈으로 간다', async () => {
+    window.history.pushState({}, '', '/?recovery=1');
+    try {
+      stubFetch(async (url: string) => {
+        if (url.endsWith('/api/auth/me')) return Response.json({ uid: null, email: null });
+        if (url.endsWith('/api/auth/password')) return Response.json({ ok: true });
+        throw new Error(`unexpected ${url}`);
+      });
+      render(<App />);
+      fireEvent.change(screen.getByLabelText('새 비밀번호'), { target: { value: 'abcdef' } });
+      fireEvent.change(screen.getByLabelText('새 비밀번호 확인'), { target: { value: 'abcdef' } });
+      fireEvent.click(screen.getByRole('button', { name: '비밀번호 바꾸기' }));
+      expect(await screen.findByText('비밀번호를 바꿨어요!')).toBeTruthy();
+      expect(await screen.findByRole('button', { name: '이어하기' }, { timeout: 5000 })).toBeTruthy();
+    } finally {
+      window.history.pushState({}, '', '/');
+    }
+  });
+
   it('로그아웃하면 로컬 기록이 비워진다', async () => {
     localStorage.setItem(
       'hamsudoku:save:v1',
