@@ -8,7 +8,7 @@ import { SettingsDialog } from './SettingsDialog';
 interface HomeScreenProps {
   loading: boolean;
   lastStage: Stage | null;
-  onResume: (stage: Stage) => void;
+  onResume: (stage: Stage | null) => void;
   onBrowse: () => void;
 }
 
@@ -34,8 +34,7 @@ export function HomeScreen({ loading, lastStage, onResume, onBrowse }: HomeScree
         <Button
           variant="sticker"
           className="btn-primary"
-          disabled={!lastStage}
-          onClick={() => lastStage && onResume(lastStage)}
+          onClick={() => onResume(lastStage)}
         >
           이어하기
         </Button>

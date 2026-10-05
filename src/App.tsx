@@ -1,6 +1,6 @@
 import { useState } from 'react';
 import type { Stage } from './api/stagesApi';
-import { useLastStage } from './game/useLastStage';
+import { useClears } from './game/useClears';
 import { useStages } from './game/useStages';
 import { GameScreen } from './screens/GameScreen';
 import { HomeScreen } from './screens/HomeScreen';
@@ -11,17 +11,25 @@ export type Screen = 'home' | 'select' | 'game';
 function App() {
   const [screen, setScreen] = useState<Screen>('home');
   const [stageId, setStageId] = useState<string | null>(null);
-  const [lastId, saveLastId] = useLastStage();
+  const { clears, record, resumeId } = useClears();
   const { chapters, loading, error } = useStages();
 
   const stages = chapters.flatMap((c) => c.stages);
   const stage = stages.find((s) => s.id === stageId) ?? null;
-  const lastStage = stages.find((s) => s.id === lastId) ?? null;
+  const resumeCode = resumeId(stages.map((s) => s.code));
+  const resumeStage = stages.find((s) => s.code === resumeCode) ?? null;
 
   const enter = (s: Stage) => {
-    saveLastId(s.id);
     setStageId(s.id);
     setScreen('game');
+  };
+
+  const resume = (s: Stage | null) => {
+    if (s) {
+      enter(s);
+    } else {
+      setScreen('select');
+    }
   };
 
   const goNextMap = () => {
@@ -41,19 +49,20 @@ function App() {
   return (
     <main className="app">
       {screen === 'home' && (
-        <HomeScreen loading={loading} lastStage={lastStage} onResume={enter} onBrowse={() => setScreen('select')} />
+        <HomeScreen loading={loading} lastStage={resumeStage} onResume={resume} onBrowse={() => setScreen('select')} />
       )}
       {screen === 'select' && (
         <SelectScreen
           chapters={chapters}
           loading={loading}
           error={error}
+          clears={clears}
           onSelect={enter}
           onBack={() => setScreen('home')}
         />
       )}
       {screen === 'game' && stage && (
-        <GameScreen key={stage.id} stage={stage} onBack={() => setScreen('select')} onNextMap={goNextMap} />
+        <GameScreen key={stage.id} stage={stage} onBack={() => setScreen('select')} onNextMap={goNextMap} onRecord={record} />
       )}
     </main>
   );
