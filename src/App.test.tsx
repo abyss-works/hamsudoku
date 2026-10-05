@@ -2,6 +2,7 @@
 import { afterEach, describe, expect, it, vi } from 'vitest';
 import { cleanup, fireEvent, render, screen } from '@testing-library/react';
 import App from './App';
+import { resetAuthApi } from './api/stagesApi';
 import { SelectScreen } from './screens/SelectScreen';
 import { LEVELS } from './game/levels.generated';
 import { PUZZLES } from './game/puzzles';
@@ -10,6 +11,7 @@ afterEach(() => {
   cleanup();
   localStorage.clear();
   vi.unstubAllGlobals();
+  resetAuthApi();
 });
 
 const stubFetch = (handler: (url: string) => Promise<Response>) => {
@@ -215,6 +217,29 @@ describe('화면 전환', () => {
         { stageCode: '1-1', clearedAt: 't9', elapsedSec: 70, attempts: 2 },
       ]);
     });
+  });
+
+  it('클라우드 미설정이어도 같은 화면에서 가입이 되고 동기화는 생략된다', async () => {
+    const urls: string[] = [];
+    vi.stubGlobal(
+      'fetch',
+      vi.fn(async (url: string) => {
+        urls.push(url);
+        if (url.endsWith('/api/auth/me')) return Response.json({ uid: null, email: null, cloud: false });
+        throw new Error(`unexpected ${url}`);
+      }),
+    );
+    render(<App />);
+    fireEvent.click(screen.getByRole('button', { name: '프로필' }));
+    fireEvent.click(screen.getByRole('button', { name: '로그인' }));
+    fireEvent.change(screen.getByLabelText('이메일'), { target: { value: 'e@x.y' } });
+    fireEvent.change(screen.getByLabelText('비밀번호'), { target: { value: '123456' } });
+    fireEvent.click(screen.getByRole('button', { name: '이메일로 계속하기' }));
+    expect(await screen.findByRole('button', { name: '이어하기' })).toBeTruthy();
+    expect(urls.filter((u) => u.includes('/api/records') || u.includes('/api/clear') || u.includes('/api/attempts'))).toEqual([]);
+    const account = JSON.parse(localStorage.getItem('hamsudoku:account:v1') ?? '{}');
+    expect(account.email).toBe('e@x.y');
+    expect(account.uid).toMatch(/^local-/);
   });
 
   it('로그아웃하면 로컬 기록이 비워진다', async () => {
