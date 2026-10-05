@@ -91,6 +91,15 @@ function App() {
     });
   };
 
+  // signin은 항상 계정 교체다. 성공 피드백 지연과 무관하게 uid가 바뀌기 전에
+  // 교체 의도를 먼저 세워야 화해가 아니라 갈아끼우기가 탄다.
+  const signinThenSwitch = (email: string, password: string) => {
+    switchedRef.current = true;
+    return account.signin(email, password).then((r) => {
+      if (!r.ok) switchedRef.current = false;
+      return r;
+    });
+  };
   const handleLogout = () => {
     void account.signout().then(() => {
       reset();
@@ -147,12 +156,9 @@ function App() {
       {screen === 'login' && (
         <LoginScreen
           signup={account.signup}
-          signin={account.signin}
+          signin={signinThenSwitch}
           onBack={() => setScreen('home')}
-          onDone={(switched) => {
-            if (switched) switchedRef.current = true;
-            setScreen('home');
-          }}
+          onDone={() => setScreen('home')}
         />
       )}
     </main>

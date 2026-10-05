@@ -168,7 +168,8 @@ describe('화면 전환', () => {
     fireEvent.change(screen.getByLabelText('이메일'), { target: { value: 'e@x.y' } });
     fireEvent.change(screen.getByLabelText('비밀번호'), { target: { value: '123456' } });
     fireEvent.click(screen.getByRole('button', { name: '이메일로 계속하기' }));
-    expect(await screen.findByRole('button', { name: '이어하기' })).toBeTruthy();
+    expect(await screen.findByText('계정이 만들어졌다!')).toBeTruthy();
+    expect(await screen.findByRole('button', { name: '이어하기' }, { timeout: 5000 })).toBeTruthy();
     expect(promoted).toBe(true);
     const saved = JSON.parse(localStorage.getItem('hamsudoku:save:v1') ?? '{}');
     expect(saved.clears).toEqual([
@@ -210,7 +211,8 @@ describe('화면 전환', () => {
     fireEvent.change(screen.getByLabelText('비밀번호'), { target: { value: '123456' } });
     fireEvent.click(screen.getByRole('button', { name: '이메일로 계속하기' }));
     fireEvent.click(await screen.findByRole('button', { name: '로그인하기' }));
-    await screen.findByRole('button', { name: '이어하기' });
+    expect(await screen.findByText('로그인됐다!')).toBeTruthy();
+    await screen.findByRole('button', { name: '이어하기' }, { timeout: 5000 });
     await vi.waitFor(() => {
       const saved = JSON.parse(localStorage.getItem('hamsudoku:save:v1') ?? '{}');
       expect(saved.clears).toEqual([
@@ -235,7 +237,7 @@ describe('화면 전환', () => {
     fireEvent.change(screen.getByLabelText('이메일'), { target: { value: 'e@x.y' } });
     fireEvent.change(screen.getByLabelText('비밀번호'), { target: { value: '123456' } });
     fireEvent.click(screen.getByRole('button', { name: '이메일로 계속하기' }));
-    expect(await screen.findByRole('button', { name: '이어하기' })).toBeTruthy();
+    expect(await screen.findByRole('button', { name: '이어하기' }, { timeout: 5000 })).toBeTruthy();
     expect(urls.filter((u) => u.includes('/api/records') || u.includes('/api/clear') || u.includes('/api/attempts'))).toEqual([]);
     const account = JSON.parse(localStorage.getItem('hamsudoku:account:v1') ?? '{}');
     expect(account.email).toBe('e@x.y');

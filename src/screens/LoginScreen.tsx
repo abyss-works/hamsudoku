@@ -1,4 +1,4 @@
-import { useState, type FormEvent } from 'react';
+import { useEffect, useRef, useState, type FormEvent } from 'react';
 import { ChevronLeft } from 'lucide-react';
 import { Button } from '../ui/Button';
 import { HamsterFace } from '../ui/HamsterFace';
@@ -11,7 +11,7 @@ interface LoginScreenProps {
   signup: AuthFn;
   signin: AuthFn;
   onBack: () => void;
-  onDone: (switched: boolean) => void;
+  onDone: () => void;
 }
 
 // 통합 계정 폼 — 가입·로그인 구분 없이 "이메일로 계속하기" 하나로.
@@ -20,8 +20,22 @@ export function LoginScreen({ signup, signin, onBack, onDone }: LoginScreenProps
   const [email, setEmail] = useState('');
   const [password, setPassword] = useState('');
   const [error, setError] = useState<string | null>(null);
+  const [okMessage, setOkMessage] = useState<string | null>(null);
   const [confirmLogin, setConfirmLogin] = useState(false);
   const [busy, setBusy] = useState(false);
+  const timer = useRef<ReturnType<typeof setTimeout> | null>(null);
+
+  useEffect(
+    () => () => {
+      if (timer.current) clearTimeout(timer.current);
+    },
+    [],
+  );
+
+  const doneLater = (message: string) => {
+    setOkMessage(message);
+    timer.current = setTimeout(() => onDone(), 700);
+  };
 
   const submit = async (e: FormEvent) => {
     e.preventDefault();
@@ -34,7 +48,7 @@ export function LoginScreen({ signup, signin, onBack, onDone }: LoginScreenProps
     try {
       const r = await signup(email.trim(), password);
       if (r.ok) {
-        onDone(false);
+        doneLater('계정이 만들어졌다!');
         return;
       }
       if (r.code === 'email_exists' || r.code === 'user_already_exists') {
@@ -53,7 +67,7 @@ export function LoginScreen({ signup, signin, onBack, onDone }: LoginScreenProps
     try {
       const r = await signin(email.trim(), password);
       if (r.ok) {
-        onDone(true);
+        doneLater('로그인됐다!');
       } else {
         setError(r.msg ?? '실패했어요.');
       }
@@ -100,6 +114,7 @@ export function LoginScreen({ signup, signin, onBack, onDone }: LoginScreenProps
               {error}
             </p>
           )}
+          {okMessage && <p className="login-ok">{okMessage}</p>}
           {confirmLogin ? (
             <div className="login-confirm">
               <p>이미 가입된 이메일이에요. 이 계정으로 로그인할까요?</p>
