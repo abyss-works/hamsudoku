@@ -1,3 +1,4 @@
+import { useEffect, useRef } from 'react';
 import type { Stage } from '../api/stagesApi';
 import { Board } from '../game/Board';
 import { ControlsHelp } from '../game/ControlsHelp';
@@ -10,11 +11,22 @@ interface GameScreenProps {
   stage: Stage;
   onBack: () => void;
   onNextMap: () => void;
+  onRecord: (stageCode: string, elapsedSec: number) => void;
 }
 
-export function GameScreen({ stage, onBack, onNextMap }: GameScreenProps) {
+export function GameScreen({ stage, onBack, onNextMap, onRecord }: GameScreenProps) {
   const { cells, violations, cleared, hamsterCount, pulse, hitKey, shake, tapCell, beginStroke, strokeEnter, endStroke, reset } = useHamSudoku(stage.puzzle);
   const sec = useElapsed(!cleared);
+  const wasCleared = useRef(false);
+
+  useEffect(() => {
+    if (cleared && !wasCleared.current) {
+      wasCleared.current = true;
+      onRecord(stage.code, sec);
+    } else if (!cleared) {
+      wasCleared.current = false;
+    }
+  }, [cleared, onRecord, stage.code, sec]);
 
   return (
     <div className="game">
@@ -49,6 +61,7 @@ export function GameScreen({ stage, onBack, onNextMap }: GameScreenProps) {
         onRelease={endStroke}
         onReset={reset}
         onNextMap={onNextMap}
+        onBrowse={onBack}
       />
       <ControlsHelp />
     </div>

@@ -20,6 +20,7 @@ interface BoardProps {
   onRelease: () => boolean;
   onReset: () => void;
   onNextMap: () => void;
+  onBrowse: () => void;
 }
 
 export function Board({
@@ -36,6 +37,7 @@ export function Board({
   onRelease,
   onReset,
   onNextMap,
+  onBrowse,
 }: BoardProps) {
   const suppressClick = useRef(false);
   const first = useRef(true);
@@ -116,7 +118,7 @@ export function Board({
           }),
         )}
       </div>
-      {cleared && <ClearDialog total={puzzle.size} onReset={onReset} onNextMap={onNextMap} />}
+      {cleared && <ClearDialog total={puzzle.size} onReset={onReset} onNextMap={onNextMap} onBrowse={onBrowse} />}
     </motion.div>
   );
 }

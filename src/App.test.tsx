@@ -20,7 +20,6 @@ const solutionOf = (code: string): number[] => {
 describe('화면 전환', () => {
   it('홈 스테이지 버튼은 선택화면으로 간다', async () => {
     render(<App />);
-    expect((screen.getByRole('button', { name: '이어하기' }) as HTMLButtonElement).disabled).toBe(true);
     fireEvent.click(await screen.findByRole('button', { name: '스테이지' }));
     expect(await screen.findByText('레벨 선택')).toBeTruthy();
     expect(screen.getByRole('button', { name: '1' })).toBeTruthy();
@@ -36,6 +35,31 @@ describe('화면 전환', () => {
     expect(screen.getByRole('dialog', { name: '클리어' })).toBeTruthy();
   });
 
+  it('다시하기로 재클리어하면 attempts가 오른다', async () => {
+    const { container } = render(<App />);
+    fireEvent.click(await screen.findByRole('button', { name: '스테이지' }));
+    await screen.findByText('레벨 선택');
+    fireEvent.click(screen.getByRole('button', { name: '1' }));
+    const cells = () => Array.from(container.querySelectorAll('.board .cell'));
+    solutionOf('1-1').forEach((i) => fireEvent.dblClick(cells()[i]));
+    fireEvent.click(screen.getByRole('button', { name: '다시하기' }));
+    solutionOf('1-1').forEach((i) => fireEvent.dblClick(cells()[i]));
+    const saved = JSON.parse(localStorage.getItem('hamsudoku:save:v1') ?? '{}');
+    expect(saved.clears.find((c: { stageCode: string }) => c.stageCode === '1-1')?.attempts).toBe(2);
+  });
+
+  it('클리어하면 기록이 1건만 쌓이고 선택화면에 표시된다', async () => {
+    const { container } = render(<App />);
+    fireEvent.click(await screen.findByRole('button', { name: '스테이지' }));
+    await screen.findByText('레벨 선택');
+    fireEvent.click(screen.getByRole('button', { name: '1' }));
+    const cells = () => Array.from(container.querySelectorAll('.board .cell'));
+    solutionOf('1-1').forEach((i) => fireEvent.dblClick(cells()[i]));
+    fireEvent.click(screen.getByRole('button', { name: '스테이지로' }));
+    const btn = await screen.findByRole('button', { name: '1' });
+    expect(btn.textContent).toMatch(/\d+:\d\d/);
+  });
+
   it('마지막 스테이지 클리어 후 다음 맵은 홈으로 돌아간다', async () => {
     const { container } = render(<App />);
     fireEvent.click(await screen.findByRole('button', { name: '스테이지' }));
@@ -48,8 +72,16 @@ describe('화면 전환', () => {
     expect(await screen.findByRole('button', { name: '이어하기' })).toBeTruthy();
   });
 
-  it('이어하기는 마지막 플레이로 바로 진입한다', async () => {
-    localStorage.setItem('hamsudoku:last-stage', 'lv2-s1');
+  it('이어하기는 최대 클리어의 다음으로 진입한다', async () => {
+    localStorage.setItem(
+      'hamsudoku:save:v1',
+      JSON.stringify({
+        v: 1,
+        clears: [{ stageCode: '2-1', clearedAt: 't', elapsedSec: 30, attempts: 1 }],
+        settings: { sound: true, vibration: true },
+        updatedAt: 't',
+      }),
+    );
     const { container } = render(<App />);
     fireEvent.click(await screen.findByRole('button', { name: '이어하기' }));
     expect(container.querySelector('.board')).toBeTruthy();
@@ -229,6 +261,7 @@ describe('SelectScreen', () => {
         ]}
         loading={false}
         error={null}
+        clears={new Map()}
         onSelect={noop}
         onBack={noop}
       />,
@@ -238,13 +271,13 @@ describe('SelectScreen', () => {
 
   it('에러 상태에서는 에러 문구가 뜬다', () => {
     render(
-      <SelectScreen chapters={[]} loading={false} error="스테이지 목록을 불러오지 못했다" onSelect={noop} onBack={noop} />,
+      <SelectScreen chapters={[]} loading={false} error="스테이지 목록을 불러오지 못했다" clears={new Map()} onSelect={noop} onBack={noop} />,
     );
     expect(screen.getByText('스테이지 목록을 불러오지 못했다')).toBeTruthy();
   });
 
   it('빈 카탈로그에서는 안내 문구가 뜬다', () => {
-    render(<SelectScreen chapters={[]} loading={false} error={null} onSelect={noop} onBack={noop} />,
+    render(<SelectScreen chapters={[]} loading={false} error={null} clears={new Map()} onSelect={noop} onBack={noop} />,
     );
     expect(screen.getByText('스테이지가 없어요')).toBeTruthy();
   });
@@ -262,7 +295,7 @@ describe('SelectScreen', () => {
       })),
     });
     const { container } = render(
-      <SelectScreen chapters={[mk('A', 1), mk('B', 2)]} loading={false} error={null} onSelect={noop} onBack={noop} />,
+      <SelectScreen chapters={[mk('A', 1), mk('B', 2)]} loading={false} error={null} clears={new Map()} onSelect={noop} onBack={noop} />,
     );
     const stageCount = () => container.querySelectorAll('.stage-list button').length;
     expect(stageCount()).toBe(1);

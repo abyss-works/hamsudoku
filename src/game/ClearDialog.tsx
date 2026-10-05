@@ -9,9 +9,10 @@ interface ClearDialogProps {
   total: number;
   onReset: () => void;
   onNextMap: () => void;
+  onBrowse: () => void;
 }
 
-export function ClearDialog({ total, onReset, onNextMap }: ClearDialogProps) {
+export function ClearDialog({ total, onReset, onNextMap, onBrowse }: ClearDialogProps) {
   return (
     <Overlay label="클리어">
       <Confetti />
@@ -41,6 +42,9 @@ export function ClearDialog({ total, onReset, onNextMap }: ClearDialogProps) {
         </Button>
         <Button variant="sticker" className="btn-primary" onClick={onNextMap}>
           다음 맵
+        </Button>
+        <Button variant="sticker" onClick={onBrowse}>
+          스테이지로
         </Button>
       </div>
     </Overlay>
