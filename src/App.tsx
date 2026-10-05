@@ -38,7 +38,7 @@ function App() {
     if (account.loading) return;
     const prev = uidRef.current;
     uidRef.current = account.uid;
-    if (!account.uid) return;
+    if (!account.uid || !account.cloud) return;
     if (switchedRef.current) {
       switchedRef.current = false;
       pull([])
@@ -67,6 +67,7 @@ function App() {
   const enter = (s: Stage) => {
     setStageId(s.id);
     setScreen('game');
+    if (!account.cloud) return;
     void fetchAttemptKey(s.code).then((key) => {
       if (key) attemptKeys.current.set(s.id, key);
     });
@@ -82,7 +83,7 @@ function App() {
 
   const handleRecord = (code: string, elapsedSec: number) => {
     record(code, elapsedSec);
-    if (!account.uid) return;
+    if (!account.uid || !account.cloud) return;
     const key = stage ? attemptKeys.current.get(stage.id) : undefined;
     if (stage) attemptKeys.current.delete(stage.id);
     void pushClear(code, elapsedSec, key).then((r) => {
