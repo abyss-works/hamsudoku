@@ -33,4 +33,8 @@ describe('nextStageId', () => {
     const at = (code: string): ClearEntry => ({ stageCode: code, clearedAt: 't', elapsedSec: 1, attempts: 1 });
     expect(nextStageId([at('1-2'), at('1-1')], ['1-1', '1-2', '1-3'])).toBe('1-3');
   });
+  it('1-10은 1-9 다음으로 취급한다', () => {
+    const at = (code: string): ClearEntry => ({ stageCode: code, clearedAt: 't', elapsedSec: 1, attempts: 1 });
+    expect(nextStageId([at('1-9')], ['1-9', '1-10', '2-1'])).toBe('1-10');
+  });
 });

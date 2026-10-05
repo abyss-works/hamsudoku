@@ -88,11 +88,20 @@ export function nextStageId(clears: ClearEntry[], catalogIds: string[]): string 
   const open = catalogIds.filter((id) => !done.has(id));
   if (open.length === 0) return null;
   const max = [...clears].sort(compareClears).at(-1);
-  const after = max ? catalogIds.filter((id) => id > max.stageCode) : [];
+  const after = max ? catalogIds.filter((id) => compareStageCode(id, max.stageCode) > 0) : [];
   return after.find((id) => open.includes(id)) ?? open[0] ?? null;
+}
+
+function compareStageCode(a: string, b: string): number {
+  const pa = a.split('-').map(Number);
+  const pb = b.split('-').map(Number);
+  if (pa.length === 2 && pb.length === 2 && pa.every(Number.isInteger) && pb.every(Number.isInteger)) {
+    return pa[0] - pb[0] || pa[1] - pb[1];
+  }
+  return a < b ? -1 : 1;
 }
 
 function compareClears(a: ClearEntry, b: ClearEntry): number {
   if (a.clearedAt !== b.clearedAt) return a.clearedAt < b.clearedAt ? -1 : 1;
-  return a.stageCode < b.stageCode ? -1 : 1;
+  return compareStageCode(a.stageCode, b.stageCode);
 }

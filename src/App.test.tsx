@@ -35,6 +35,19 @@ describe('화면 전환', () => {
     expect(screen.getByRole('dialog', { name: '클리어' })).toBeTruthy();
   });
 
+  it('다시하기로 재클리어하면 attempts가 오른다', async () => {
+    const { container } = render(<App />);
+    fireEvent.click(await screen.findByRole('button', { name: '스테이지' }));
+    await screen.findByText('레벨 선택');
+    fireEvent.click(screen.getByRole('button', { name: '1' }));
+    const cells = () => Array.from(container.querySelectorAll('.board .cell'));
+    solutionOf('1-1').forEach((i) => fireEvent.dblClick(cells()[i]));
+    fireEvent.click(screen.getByRole('button', { name: '다시하기' }));
+    solutionOf('1-1').forEach((i) => fireEvent.dblClick(cells()[i]));
+    const saved = JSON.parse(localStorage.getItem('hamsudoku:save:v1') ?? '{}');
+    expect(saved.clears.find((c: { stageCode: string }) => c.stageCode === '1-1')?.attempts).toBe(2);
+  });
+
   it('클리어하면 기록이 1건만 쌓이고 선택화면에 표시된다', async () => {
     const { container } = render(<App />);
     fireEvent.click(await screen.findByRole('button', { name: '스테이지' }));
