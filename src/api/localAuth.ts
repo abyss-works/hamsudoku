@@ -69,5 +69,11 @@ export function createLocalAuthApi(store: Storage = localStorage): AuthApi {
       const a = load();
       if (a) save({ ...a, uid: null });
     },
+    async reset() {
+      return { ok: false as const, msg: '로컬 모드에서는 메일을 보낼 수 없어요.' };
+    },
+    async setPassword() {
+      return { ok: false as const, msg: '로컬 모드에서는 비밀번호를 바꿀 수 없어요.' };
+    },
   };
 }

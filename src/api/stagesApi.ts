@@ -47,6 +47,8 @@ export interface AuthApi {
   signup(email: string, password: string): Promise<AuthResult>;
   signin(email: string, password: string): Promise<AuthResult>;
   signout(): Promise<void>;
+  reset(email: string): Promise<AuthResult>;
+  setPassword(password: string): Promise<AuthResult>;
 }
 
 async function postJson(path: string, body: unknown): Promise<AuthResult> {
@@ -84,6 +86,8 @@ export const cloudAuthApi: AuthApi = {
   },
   signup: (email, password) => postJson('/api/auth/signup', { email, password }),
   signin: (email, password) => postJson('/api/auth/signin', { email, password }),
+  reset: (email) => postJson('/api/auth/reset', { email }),
+  setPassword: (password) => postJson('/api/auth/password', { password }),
   async signout() {
     try {
       await fetch('/api/auth/signout', { method: 'POST' });
@@ -140,6 +144,8 @@ export const authApi: AuthApi & { mode(): Promise<AuthMode> } = {
   session: async () => (await pick()).session(),
   signup: async (email, password) => (await pick()).signup(email, password),
   signin: async (email, password) => (await pick()).signin(email, password),
+  reset: async (email) => (await pick()).reset(email),
+  setPassword: async (password) => (await pick()).setPassword(password),
   signout: async () => {
     await (await pick()).signout();
   },
