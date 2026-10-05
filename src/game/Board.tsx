@@ -1,4 +1,5 @@
 import { useEffect, useRef } from 'react';
+import { motion, useAnimationControls } from 'framer-motion';
 import { Cell } from './Cell';
 import { ClearDialog } from './ClearDialog';
 import { cellConflicted, type Violations } from './rules';
@@ -36,21 +37,17 @@ export function Board({
   onReset,
   onNextMap,
 }: BoardProps) {
-  const wrapRef = useRef<HTMLDivElement>(null);
   const suppressClick = useRef(false);
   const first = useRef(true);
+  const controls = useAnimationControls();
 
   useEffect(() => {
     if (first.current) {
       first.current = false;
       return;
     }
-    const el = wrapRef.current;
-    if (!el) return;
-    el.classList.remove('shake');
-    void el.offsetWidth;
-    el.classList.add('shake');
-  }, [shake]);
+    void controls.start({ x: [0, -6, 6, -4, 4, 0], transition: { duration: 0.4, ease: 'easeOut' } });
+  }, [shake, controls]);
 
   const cellFromPoint = (x: number, y: number): [number, number] | null => {
     const el = document.elementFromPoint(x, y)?.closest?.('.cell');
@@ -86,7 +83,7 @@ export function Board({
   };
 
   return (
-    <div className="board-wrap" ref={wrapRef}>
+    <motion.div className={`board-wrap${shake > 0 ? ' shake' : ''}`} animate={controls}>
       <div
         className="board"
         role="grid"
@@ -120,6 +117,6 @@ export function Board({
         )}
       </div>
       {cleared && <ClearDialog total={puzzle.size} onReset={onReset} onNextMap={onNextMap} />}
-    </div>
+    </motion.div>
   );
 }

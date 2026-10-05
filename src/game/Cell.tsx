@@ -1,6 +1,6 @@
-import { useEffect, useRef, type CSSProperties } from 'react';
+import { useEffect, useRef } from 'react';
+import { motion } from 'framer-motion';
 import { Heart, X } from 'lucide-react';
-import { Button } from '../ui/Button';
 import { HamsterFace } from '../ui/HamsterFace';
 import type { CellState } from './puzzles';
 import { delayForPointerType, type TapKind } from './tap';
@@ -65,10 +65,9 @@ export function Cell({ row, col, state, islandId, conflicted, hit, pulseDelay, o
   };
 
   return (
-    <Button
-      className={`cell cell-${state}${conflicted ? ' cell-conflict' : ''}${hit ? ' cell-hit' : ''}${
-        pulseDelay !== undefined ? ' cell-pulse' : ''
-      }`}
+    <motion.button
+      type="button"
+      className={`btn cell cell-${state}${conflicted ? ' cell-conflict' : ''}${hit ? ' cell-hit' : ''}`}
       data-island={islandId}
       data-state={state}
       data-r={row}
@@ -77,24 +76,53 @@ export function Cell({ row, col, state, islandId, conflicted, hit, pulseDelay, o
       onClick={handleClick}
       onDoubleClick={handleDoubleClick}
       onPointerDown={handlePress}
-      style={pulseDelay !== undefined ? ({ '--d': `${pulseDelay}ms` } as CSSProperties) : undefined}
+      initial={false}
+      animate={
+        hit
+          ? { boxShadow: ['0 0 0 0 rgb(70 167 88 / 0.8)', '0 0 0 12px rgb(70 167 88 / 0)'] }
+          : { boxShadow: '0 0 0 0 rgb(70 167 88 / 0)' }
+      }
+      transition={{ duration: 0.6, ease: 'easeOut' }}
     >
-      <span key={state} className={`cell-glyph${state === 'hamster' ? ' pop' : ''}`} aria-hidden="true">
+      <span className="cell-glyph" aria-hidden="true">
         {state === 'hamster' ? (
-          <>
+          <motion.span
+            key="ham"
+            style={{ display: 'inline-flex', alignItems: 'center', justifyContent: 'center', position: 'relative' }}
+            initial={{ scale: 0.3 }}
+            animate={{ scale: [0.3, 1.25, 1] }}
+            transition={{ duration: 0.25, ease: 'easeOut' }}
+          >
             <HamsterFace />
-            <Heart className="ham-heart" size={14} fill="currentColor" aria-hidden="true" />
-          </>
-        ) : state === 'mark' ? (
-          <X className="mark-x" strokeWidth={3} aria-hidden="true" />
-        ) : state === 'wrong' ? (
-          <X className="mark-x mark-wrong" strokeWidth={3} aria-hidden="true" />
-        ) : state === 'auto' ? (
-          <X className="mark-x mark-auto" strokeWidth={3} aria-hidden="true" />
+            <motion.span
+              className="ham-heart"
+              aria-hidden="true"
+              initial={{ opacity: 0, y: 4, scale: 0.5 }}
+              animate={{ opacity: [0, 1, 0], y: -8, scale: 1 }}
+              transition={{ duration: 0.6, ease: 'easeOut' }}
+            >
+              <Heart size={14} fill="currentColor" aria-hidden="true" />
+            </motion.span>
+          </motion.span>
+        ) : state === 'mark' || state === 'wrong' || state === 'auto' ? (
+          <motion.span
+            key={state}
+            style={{ display: 'inline-flex', alignItems: 'center', justifyContent: 'center' }}
+            aria-hidden="true"
+            initial={{ scale: 0.3, opacity: 0 }}
+            animate={{ scale: 1, opacity: 1 }}
+            transition={{ duration: 0.25, delay: (pulseDelay ?? 0) / 1000 }}
+          >
+            <X
+              className={`mark-x${state === 'wrong' ? ' mark-wrong' : ''}${state === 'auto' ? ' mark-auto' : ''}`}
+              strokeWidth={3}
+              aria-hidden="true"
+            />
+          </motion.span>
         ) : (
           ''
         )}
       </span>
-    </Button>
+    </motion.button>
   );
 }
