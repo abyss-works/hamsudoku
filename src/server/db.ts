@@ -11,6 +11,7 @@ export interface Attempt {
 
 export interface DbPort {
   issueAttempt(userId: string, stageCode: string): Promise<Attempt>;
+  findAttempt(key: string): Promise<Attempt | null>;
   useAttempt(userId: string, key: string, stageCode: string, nowIso: string): Promise<Attempt | null>;
   recordVerified(userId: string, stageCode: string, elapsedSec: number, atIso: string): Promise<void>;
   recordUnverified(userId: string, stageCode: string, elapsedSec: number, atIso: string): Promise<void>;
@@ -43,6 +44,9 @@ export function createMemoryDb(): DbPort {
       if (!a || a.userId !== userId || a.stageCode !== stageCode || a.usedAt !== null) return null;
       a.usedAt = nowIso;
       return a;
+    },
+    async findAttempt(key: string) {
+      return attempts.get(key) ?? null;
     },
     async recordVerified(userId: string, stageCode: string, elapsedSec: number, atIso: string) {
       const key = `${userId}:${stageCode}`;
@@ -77,6 +81,17 @@ export function createPrismaDb(): DbPort {
   return {
     async issueAttempt(userId: string, stageCode: string) {
       const a = await prisma.attempt.create({ data: { userId, stageCode } });
+      return {
+        id: a.id,
+        userId: a.userId,
+        stageCode: a.stageCode,
+        issuedAt: a.issuedAt.toISOString(),
+        usedAt: a.usedAt ? a.usedAt.toISOString() : null,
+      };
+    },
+    async findAttempt(key: string) {
+      const a = await prisma.attempt.findUnique({ where: { id: key } });
+      if (!a) return null;
       return {
         id: a.id,
         userId: a.userId,
