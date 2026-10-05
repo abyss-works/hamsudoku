@@ -30,7 +30,7 @@ export async function fetchStages(): Promise<Chapter[]> {
   }));
 }
 
-export type AuthResult = { ok: true } | { ok: false; msg: string };
+export type AuthResult = { ok: true } | { ok: false; msg: string; code?: string };
 
 export interface AuthApi {
   me(): Promise<{ uid: string | null; email: string | null }>;
