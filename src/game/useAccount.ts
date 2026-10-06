@@ -1,9 +1,10 @@
 import { useEffect, useState } from 'react';
-import { authApi } from '../api/stagesApi';
+import { authApi, profileApi } from '../api/stagesApi';
 
 export function useAccount(): {
   uid: string | null;
   email: string | null;
+  nickname: string | null;
   cloud: boolean;
   loading: boolean;
   signup: (email: string, password: string) => Promise<{ ok: boolean; msg?: string; code?: string }>;
@@ -11,9 +12,11 @@ export function useAccount(): {
   signout: () => Promise<void>;
   reset: (email: string) => Promise<{ ok: boolean; msg?: string }>;
   setPassword: (password: string) => Promise<{ ok: boolean; msg?: string }>;
+  saveNickname: (nickname: string) => Promise<{ ok: boolean; msg?: string; code?: string }>;
 } {
   const [uid, setUid] = useState<string | null>(null);
   const [email, setEmail] = useState<string | null>(null);
+  const [nickname, setNickname] = useState<string | null>(null);
   const [cloud, setCloud] = useState(true);
   const [loading, setLoading] = useState(true);
 
@@ -31,6 +34,11 @@ export function useAccount(): {
         setEmail(mail);
         setCloud(cl);
         setLoading(false);
+        if (id) {
+          void profileApi.get().then((p) => setNickname(p.nickname));
+        } else {
+          setNickname(null);
+        }
       });
   }, []);
 
@@ -39,11 +47,18 @@ export function useAccount(): {
     setUid(m.uid);
     setEmail(m.email);
     setCloud(m.cloud);
+    if (m.uid) {
+      const p = await profileApi.get();
+      setNickname(p.nickname);
+    } else {
+      setNickname(null);
+    }
   };
 
   return {
     uid,
     email,
+    nickname,
     cloud,
     loading,
     signup: async (e: string, p: string) => {
@@ -60,8 +75,14 @@ export function useAccount(): {
       await authApi.signout();
       setUid(null);
       setEmail(null);
+      setNickname(null);
     },
     reset: (email: string) => authApi.reset(email),
     setPassword: (password: string) => authApi.setPassword(password),
+    saveNickname: async (name: string) => {
+      const r = await profileApi.save(name);
+      if (r.ok) setNickname(r.nickname);
+      return r;
+    },
   };
 }

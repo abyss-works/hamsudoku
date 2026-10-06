@@ -1,6 +1,8 @@
-import type { AuthApi } from './stagesApi';
+import { validateNickname } from '../game/nickname';
+import type { AuthApi, ProfileApi } from './stagesApi';
 
 const KEY = 'hamsudoku:account:v1';
+const PROFILE_KEY = 'hamsudoku:profile:v1';
 
 interface Stored {
   uid: string | null;
@@ -74,6 +76,31 @@ export function createLocalAuthApi(store: Storage = localStorage): AuthApi {
     },
     async setPassword() {
       return { ok: false as const, msg: '로컬 모드에서는 비밀번호를 바꿀 수 없어요.' };
+    },
+  };
+}
+
+// 로컬 프로필 — 기기당 하나. 남의 기록이 없어 조회는 빈 매핑이다.
+export function createLocalProfileApi(store: Storage = localStorage): ProfileApi {
+  return {
+    async get() {
+      try {
+        const raw = store.getItem(PROFILE_KEY);
+        if (!raw) return { nickname: null };
+        const parsed = JSON.parse(raw) as { nickname?: unknown };
+        return { nickname: typeof parsed.nickname === 'string' ? parsed.nickname : null };
+      } catch {
+        return { nickname: null };
+      }
+    },
+    async save(nickname: string) {
+      const v = validateNickname(nickname);
+      if (!v.ok) return { ok: false, msg: v.msg };
+      store.setItem(PROFILE_KEY, JSON.stringify({ nickname: v.nickname }));
+      return { ok: true, nickname: v.nickname };
+    },
+    async lookup() {
+      return { nicknames: {} };
     },
   };
 }
