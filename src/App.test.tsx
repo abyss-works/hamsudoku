@@ -516,3 +516,34 @@ describe('SelectScreen', () => {
     expect(stageCount()).toBe(2);
   });
 });
+
+describe('레벨 탭 상태', () => {
+  it('게임에서 뒤로 가면 들어갔던 레벨 탭이 선택되어 있다', async () => {
+    render(<App />);
+    fireEvent.click(await screen.findByRole('button', { name: '스테이지' }));
+    await screen.findByText('레벨 선택');
+    fireEvent.click(screen.getByRole('button', { name: '레벨 5' }));
+    fireEvent.click(screen.getByRole('button', { name: '3' }));
+    fireEvent.click(await screen.findByRole('button', { name: '뒤로' }));
+    await screen.findByText('레벨 선택');
+    expect(screen.getByRole('button', { name: '레벨 5' }).getAttribute('aria-pressed')).toBe('true');
+    expect(screen.getByRole('button', { name: '레벨 1' }).getAttribute('aria-pressed')).toBe('false');
+  });
+
+  it('이어하기로 들어간 뒤 뒤로 가면 그 스테이지의 레벨 탭이 선택되어 있다', async () => {
+    localStorage.setItem(
+      'hamsudoku:save:v1',
+      JSON.stringify({
+        v: 1,
+        clears: [{ stageCode: '3-4', clearedAt: 't', elapsedSec: 30, attempts: 1 }],
+        settings: { sound: true, vibration: true },
+        updatedAt: 't',
+      }),
+    );
+    render(<App />);
+    fireEvent.click(await screen.findByRole('button', { name: '이어하기' }));
+    fireEvent.click(await screen.findByRole('button', { name: '뒤로' }));
+    await screen.findByText('레벨 선택');
+    expect(screen.getByRole('button', { name: '레벨 3' }).getAttribute('aria-pressed')).toBe('true');
+  });
+});

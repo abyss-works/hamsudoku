@@ -22,6 +22,8 @@ function initialScreen(): Screen {
 function App() {
   const [screen, setScreen] = useState<Screen>(initialScreen);
   const [stageId, setStageId] = useState<string | null>(null);
+  // 마지막으로 들어간 스테이지의 레벨. 선택 화면이 다시 열릴 때 그 레벨 탭을 유지한다.
+  const [chapterId, setChapterId] = useState<string | null>(null);
   const { clears, record, replace, mergeIn, reset, resumeId } = useClears();
   const account = useAccount();
   const { chapters, loading, error } = useStages();
@@ -73,6 +75,7 @@ function App() {
 
   const enter = (s: Stage) => {
     setStageId(s.id);
+    setChapterId(chapters.find((c) => c.stages.some((st) => st.id === s.id))?.id ?? null);
     setScreen('game');
     if (!account.cloud) return;
     void fetchAttemptKey(s.code).then((key) => {
@@ -152,6 +155,7 @@ function App() {
           loading={loading}
           error={error}
           clears={clears}
+          initialChapterId={chapterId}
           onSelect={enter}
           onBack={() => setScreen('home')}
         />
