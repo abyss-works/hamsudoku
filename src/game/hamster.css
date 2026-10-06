@@ -52,20 +52,16 @@
 .cell[data-island='8'] { background: #f6cfd8; }
 .cell[data-island='9'] { background: #e3d9c2; }
 
-.cell[data-state='mark'] .mark-x,
-.cell[data-state='wrong'] .mark-x,
-.cell[data-state='auto'] .mark-x {
+/* X 글리프는 퇴장 애니메이션 동안 칸 상태가 먼저 바뀌므로 자기 클래스만으로 모양을 정한다 */
+.mark-x {
   width: 38px;
   height: 38px;
   max-width: 75%;
   max-height: 75%;
-}
-
-.cell[data-state='mark'] .mark-x {
   color: var(--ink);
 }
 
-.cell[data-state='auto'] .mark-x {
+.mark-x.mark-auto {
   color: var(--ink-soft);
 }
 
@@ -74,7 +70,7 @@
   outline-offset: -3px;
 }
 
-.cell[data-state='wrong'] .mark-x {
+.mark-x.mark-wrong {
   color: #e5484d;
 }
 

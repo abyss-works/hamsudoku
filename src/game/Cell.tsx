@@ -1,5 +1,5 @@
 import { useEffect, useRef } from 'react';
-import { motion } from 'framer-motion';
+import { AnimatePresence, motion } from 'framer-motion';
 import { Heart, X } from 'lucide-react';
 import { HamsterFace } from '../ui/HamsterFace';
 import type { CellState } from './puzzles';
@@ -85,12 +85,15 @@ export function Cell({ row, col, state, islandId, conflicted, hit, pulseDelay, o
       transition={{ duration: 0.6, ease: 'easeOut' }}
     >
       <span className="cell-glyph" aria-hidden="true">
+        {/* 퇴장 중인 글리프는 popLayout 으로 흐름에서 빼서 다음 글리프와 겹쳐 그린다 */}
+        <AnimatePresence initial={false} mode="popLayout">
         {state === 'hamster' ? (
           <motion.span
             key="ham"
             style={{ display: 'inline-flex', alignItems: 'center', justifyContent: 'center', position: 'relative' }}
             initial={{ scale: 0.3 }}
             animate={{ scale: [0.3, 1.25, 1] }}
+            exit={{ scale: 0.3, opacity: 0, transition: { duration: 0.15 } }}
             transition={{ duration: 0.25, ease: 'easeOut' }}
           >
             <HamsterFace />
@@ -111,6 +114,7 @@ export function Cell({ row, col, state, islandId, conflicted, hit, pulseDelay, o
             aria-hidden="true"
             initial={{ scale: 0.3, opacity: 0 }}
             animate={{ scale: 1, opacity: 1 }}
+            exit={{ scale: 0.3, opacity: 0, transition: { duration: 0.15, delay: 0 } }}
             transition={{ duration: 0.25, delay: (pulseDelay ?? 0) / 1000 }}
           >
             <X
@@ -119,9 +123,8 @@ export function Cell({ row, col, state, islandId, conflicted, hit, pulseDelay, o
               aria-hidden="true"
             />
           </motion.span>
-        ) : (
-          ''
-        )}
+        ) : null}
+        </AnimatePresence>
       </span>
     </motion.button>
   );
