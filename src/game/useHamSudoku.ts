@@ -22,13 +22,12 @@ export interface HamSudoku {
   reset: () => void;
 }
 
-// 진행 중 드래그. 지나가는 칸마다 빈칸과 마크만 서로 토글하고 다른 상태는 손대지 않는다.
+// 진행 중 드래그. 처음 올라탄 칸만 빈칸↔마크로 토글하고, 한 번 지나간 칸은 다시 건드리지 않는다.
 interface Stroke {
   sr: number;
   sc: number;
   engaged: boolean;
-  lastR: number;
-  lastC: number;
+  visited: Set<string>;
 }
 
 export function useHamSudoku(puzzle: Puzzle): HamSudoku {
@@ -92,17 +91,17 @@ export function useHamSudoku(puzzle: Puzzle): HamSudoku {
   };
 
   const beginStroke = (r: number, c: number) => {
-    strokeRef.current = { sr: r, sc: c, engaged: false, lastR: r, lastC: c };
+    strokeRef.current = { sr: r, sc: c, engaged: false, visited: new Set([`${r},${c}`]) };
   };
 
   // 누른 칸에서 다른 칸으로 처음 움직일 때 드래그로 확정되며 누른 칸부터 토글한다.
-  // 같은 칸 연발 진입은 무시하고, 되돌아온 칸은 다시 토글한다.
+  // 이미 지나간 칸(누른 칸 포함)에 다시 들어오면 아무것도 하지 않는다.
   const strokeEnter = (r: number, c: number) => {
     const st = strokeRef.current;
     if (!st) return;
-    if (st.lastR === r && st.lastC === c) return;
-    st.lastR = r;
-    st.lastC = c;
+    const key = `${r},${c}`;
+    if (st.visited.has(key)) return;
+    st.visited.add(key);
     if (!st.engaged) {
       st.engaged = true;
       toggleOne(st.sr, st.sc);
