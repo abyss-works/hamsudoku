@@ -9,20 +9,35 @@ afterEach(cleanup);
 const at = (cells: string[][], r: number, c: number) => cells[r][c];
 
 describe('stroke', () => {
-  it('지나간 빈칸은 마크가 되고 마크는 빈칸이 된다', () => {
+  it('빈칸에서 시작하면 지나간 빈칸만 마크가 되고 마크는 그대로다', () => {
     const { result } = renderHook(() => useHamSudoku(PUZZLES[0]));
     act(() => {
       result.current.tapCell(0, 1, 'single');
     });
-    expect(at(result.current.cells, 0, 1)).toBe('mark');
     act(() => {
       result.current.beginStroke(0, 0);
       result.current.strokeEnter(0, 1);
       result.current.strokeEnter(0, 2);
+      result.current.strokeEnter(0, 3);
     });
-    expect(at(result.current.cells, 0, 0)).toBe('mark');
-    expect(at(result.current.cells, 0, 1)).toBe('empty');
-    expect(at(result.current.cells, 0, 2)).toBe('mark');
+    expect(result.current.cells[0]).toEqual(['mark', 'mark', 'mark', 'mark', 'empty']);
+  });
+
+  it('마크에서 시작하면 지나간 마크만 빈칸이 되고 빈칸은 그대로다 (1101 → 0000)', () => {
+    const { result } = renderHook(() => useHamSudoku(PUZZLES[0]));
+    act(() => {
+      result.current.tapCell(0, 0, 'single');
+      result.current.tapCell(0, 1, 'single');
+      result.current.tapCell(0, 3, 'single');
+    });
+    expect(result.current.cells[0]).toEqual(['mark', 'mark', 'empty', 'mark', 'empty']);
+    act(() => {
+      result.current.beginStroke(0, 0);
+      result.current.strokeEnter(0, 1);
+      result.current.strokeEnter(0, 2);
+      result.current.strokeEnter(0, 3);
+    });
+    expect(result.current.cells[0]).toEqual(['empty', 'empty', 'empty', 'empty', 'empty']);
   });
 
   it('햄스터·자동·오답 칸은 지나가도 바뀌지 않고 스트로크는 이어진다', () => {

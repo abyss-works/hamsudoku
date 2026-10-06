@@ -445,7 +445,7 @@ describe('드래그 칠하기', () => {
     expect(screen.getAllByRole('button', { name: /X 표시/ })).toHaveLength(4);
   });
 
-  it('마크에서 시작한 드래그는 그 마크를 지우고 지나간 빈칸은 칠한다', async () => {
+  it('마크에서 시작한 드래그는 마크만 지우고 빈칸은 건드리지 않는다', async () => {
     const { cells, board } = await enterStage11();
     fireEvent.click(cells()[0]);
     await new Promise((r) => setTimeout(r, 300));
@@ -455,8 +455,8 @@ describe('드래그 칠하기', () => {
     fireEvent.pointerUp(board);
     restore();
     await new Promise((r) => setTimeout(r, 300));
-    expect(screen.getAllByRole('button', { name: /X 표시/ })).toHaveLength(1);
-    expect(screen.getAllByRole('button', { name: /빈칸/ })).toHaveLength(24);
+    expect(screen.queryAllByRole('button', { name: /X 표시/ })).toHaveLength(0);
+    expect(screen.getAllByRole('button', { name: /빈칸/ })).toHaveLength(25);
   });
 });
 
