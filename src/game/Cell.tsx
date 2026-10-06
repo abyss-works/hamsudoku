@@ -1,5 +1,5 @@
 import { useEffect, useRef } from 'react';
-import { motion } from 'framer-motion';
+import { AnimatePresence, motion } from 'framer-motion';
 import { Heart, X } from 'lucide-react';
 import { HamsterFace } from '../ui/HamsterFace';
 import type { CellState } from './puzzles';
@@ -85,12 +85,15 @@ export function Cell({ row, col, state, islandId, conflicted, hit, pulseDelay, o
       transition={{ duration: 0.6, ease: 'easeOut' }}
     >
       <span className="cell-glyph" aria-hidden="true">
+        {/* 글리프는 모두 칸 안에 절대 배치되므로 퇴장 중인 것과 새로 들어오는 것이 겹쳐 그려진다 */}
+        <AnimatePresence initial={false}>
         {state === 'hamster' ? (
           <motion.span
             key="ham"
-            style={{ display: 'inline-flex', alignItems: 'center', justifyContent: 'center', position: 'relative' }}
+            className="cell-glyph-item"
             initial={{ scale: 0.3 }}
             animate={{ scale: [0.3, 1.25, 1] }}
+            exit={{ scale: 0.3, opacity: 0, transition: { duration: 0.15 } }}
             transition={{ duration: 0.25, ease: 'easeOut' }}
           >
             <HamsterFace />
@@ -107,10 +110,11 @@ export function Cell({ row, col, state, islandId, conflicted, hit, pulseDelay, o
         ) : state === 'mark' || state === 'wrong' || state === 'auto' ? (
           <motion.span
             key={state}
-            style={{ display: 'inline-flex', alignItems: 'center', justifyContent: 'center' }}
+            className="cell-glyph-item"
             aria-hidden="true"
             initial={{ scale: 0.3, opacity: 0 }}
             animate={{ scale: 1, opacity: 1 }}
+            exit={{ scale: 0.3, opacity: 0, transition: { duration: 0.15, delay: 0 } }}
             transition={{ duration: 0.25, delay: (pulseDelay ?? 0) / 1000 }}
           >
             <X
@@ -119,9 +123,8 @@ export function Cell({ row, col, state, islandId, conflicted, hit, pulseDelay, o
               aria-hidden="true"
             />
           </motion.span>
-        ) : (
-          ''
-        )}
+        ) : null}
+        </AnimatePresence>
       </span>
     </motion.button>
   );

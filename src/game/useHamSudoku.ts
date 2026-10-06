@@ -20,20 +20,17 @@ export interface HamSudoku {
   strokeEnter: (r: number, c: number) => void;
   endStroke: () => boolean;
   reset: () => void;
+  clearMarks: () => void;
 }
 
-// 한 스트로크 동안 바뀐 칸 목록. 움직임 D→E마다:
-// - E가 바뀌었으면: D도 바뀌었으면 둘 다, 아니면 E만 되돌린다.
-// - E가 새 칸이면: D가 되돌려졌던 칸이면 D부터 다시 칠하고, E를 칠한다.
-// 건너뛴 칸은 손대지 않는다.
+// 진행 중 드래그. 누른 칸이 마크면 지우기, 아니면 칠하기 모드다.
+// 처음 올라탄 칸만 모드대로 바꾸고, 한 번 지나간 칸은 다시 건드리지 않는다.
 interface Stroke {
   sr: number;
   sc: number;
   toMark: boolean;
   engaged: boolean;
-  lastR: number | null;
-  lastC: number | null;
-  trail: { r: number; c: number; prev: CellState }[];
+  visited: Set<string>;
 }
 
 export function useHamSudoku(puzzle: Puzzle): HamSudoku {
@@ -59,8 +56,10 @@ export function useHamSudoku(puzzle: Puzzle): HamSudoku {
     next[r][c] = result;
     if (result === 'hamster') {
       const delays = new Map<string, number>();
+      // 빈 타일과 임시마커를 정답마커로 바꾼다. 오답마커·햄스터·기존 정답마커는 그대로 둔다.
       for (const m of spreadMarks(prev.length, r, c)) {
-        if (next[m.r][m.c] === 'empty') {
+        const cur = next[m.r][m.c];
+        if (cur === 'empty' || cur === 'mark') {
           next[m.r][m.c] = 'auto';
           delays.set(`${m.r},${m.c}`, m.delayMs);
         }
@@ -85,65 +84,46 @@ export function useHamSudoku(puzzle: Puzzle): HamSudoku {
     setHitKey(null);
   };
 
+  // 마크만 전부 빈칸으로 되돌린다. 햄스터·자동·오답은 그대로 둔다.
+  const clearMarks = () => {
+    const next = latest.current.map((line) => line.map((cell) => (cell === 'mark' ? 'empty' : cell)));
+    latest.current = next;
+    strokeRef.current = null;
+    setCells(next);
+    setPulse(new Map());
+    setHitKey(null);
+  };
+
+  // 칠하기 모드는 빈칸만 마크로, 지우기 모드는 마크만 빈칸으로 바꾼다. 다른 상태는 손대지 않는다.
   const paintOne = (st: Stroke, r: number, c: number) => {
     const cur = latest.current[r][c];
     if (st.toMark ? cur !== 'empty' : cur !== 'mark') return;
     const next = latest.current.map((line) => [...line]);
     next[r][c] = st.toMark ? 'mark' : 'empty';
-    st.trail.push({ r, c, prev: cur });
     latest.current = next;
     setCells(next);
     setPulse(new Map());
     setHitKey(null);
   };
-
-  const revertOne = (st: Stroke, r: number, c: number) => {
-    const at = st.trail.findIndex((t) => t.r === r && t.c === c);
-    if (at < 0) return;
-    const [t] = st.trail.splice(at, 1);
-    const next = latest.current.map((line) => [...line]);
-    next[t.r][t.c] = t.prev;
-    latest.current = next;
-    setCells(next);
-    setPulse(new Map());
-    setHitKey(null);
-  };
-
-  const inTrail = (st: Stroke, r: number, c: number) => st.trail.some((t) => t.r === r && t.c === c);
 
   const beginStroke = (r: number, c: number) => {
-    const cur = latest.current[r][c];
-    if (cur !== 'empty' && cur !== 'mark') {
-      strokeRef.current = null;
-      return;
-    }
-    strokeRef.current = { sr: r, sc: c, toMark: cur === 'empty', engaged: false, lastR: null, lastC: null, trail: [] };
+    const toMark = latest.current[r][c] !== 'mark';
+    strokeRef.current = { sr: r, sc: c, toMark, engaged: false, visited: new Set([`${r},${c}`]) };
   };
 
+  // 누른 칸에서 다른 칸으로 처음 움직일 때 드래그로 확정되며 누른 칸부터 모드대로 바꾼다.
+  // 이미 지나간 칸(누른 칸 포함)에 다시 들어오면 아무것도 하지 않는다.
   const strokeEnter = (r: number, c: number) => {
     const st = strokeRef.current;
     if (!st) return;
-    if (st.lastR === r && st.lastC === c) return;
-    const depR = st.lastR;
-    const depC = st.lastC;
-    st.lastR = r;
-    st.lastC = c;
+    const key = `${r},${c}`;
+    if (st.visited.has(key)) return;
+    st.visited.add(key);
     if (!st.engaged) {
       st.engaged = true;
       paintOne(st, st.sr, st.sc);
-      if (r === st.sr && c === st.sc) return;
     }
-    if (inTrail(st, r, c)) {
-      if (depR !== null && depC !== null && inTrail(st, depR, depC)) {
-        revertOne(st, depR, depC);
-        revertOne(st, r, c);
-      } else {
-        revertOne(st, r, c);
-      }
-    } else {
-      if (depR !== null && depC !== null && !inTrail(st, depR, depC)) paintOne(st, depR, depC);
-      paintOne(st, r, c);
-    }
+    paintOne(st, r, c);
   };
 
   const endStroke = () => {
@@ -152,5 +132,5 @@ export function useHamSudoku(puzzle: Puzzle): HamSudoku {
     return engaged;
   };
 
-  return { cells, violations, cleared, hamsterCount, pulse, hitKey, shake, tapCell, beginStroke, strokeEnter, endStroke, reset };
+  return { cells, violations, cleared, hamsterCount, pulse, hitKey, shake, tapCell, beginStroke, strokeEnter, endStroke, reset, clearMarks };
 }

@@ -74,10 +74,10 @@ describe('화면 전환', () => {
     const { container } = render(<App />);
     fireEvent.click(await screen.findByRole('button', { name: '스테이지' }));
     await screen.findByText('레벨 선택');
-    fireEvent.click(screen.getByRole('button', { name: '레벨 3' }));
+    fireEvent.click(screen.getByRole('button', { name: '레벨 5' }));
     fireEvent.click(screen.getByRole('button', { name: '10' }));
     const cells = () => Array.from(container.querySelectorAll('.board .cell'));
-    solutionOf('3-10').forEach((i) => fireEvent.dblClick(cells()[i]));
+    solutionOf('5-10').forEach((i) => fireEvent.dblClick(cells()[i]));
     fireEvent.click(screen.getByRole('button', { name: '다음 스테이지' }));
     expect(await screen.findByRole('button', { name: '이어하기' })).toBeTruthy();
   });
@@ -432,7 +432,7 @@ describe('드래그 칠하기', () => {
     expect(await screen.findAllByRole('button', { name: /X 표시/ })).toHaveLength(2);
   });
 
-  it('되돌아가면 걸린 칸이 전부 되돌려진다', async () => {
+  it('되돌아가도 지나간 칸은 그대로 마크로 남는다', async () => {
     const { cells, board } = await enterStage11();
     fireEvent.pointerDown(cells()[0]);
     const restore = mockSpotSeq([cells()[1], cells()[2], cells()[3], cells()[2]]);
@@ -442,10 +442,10 @@ describe('드래그 칠하기', () => {
     fireEvent.pointerMove(board, { clientX: 13, clientY: 13 });
     fireEvent.pointerUp(board);
     restore();
-    expect(screen.getAllByRole('button', { name: /X 표시/ })).toHaveLength(2);
+    expect(screen.getAllByRole('button', { name: /X 표시/ })).toHaveLength(4);
   });
 
-  it('마커 시작 드래그는 빈칸을 건드리지 않고 마커만 지운다', async () => {
+  it('마크에서 시작한 드래그는 마크만 지우고 빈칸은 건드리지 않는다', async () => {
     const { cells, board } = await enterStage11();
     fireEvent.click(cells()[0]);
     await new Promise((r) => setTimeout(r, 300));
@@ -514,5 +514,55 @@ describe('SelectScreen', () => {
     expect(stageCount()).toBe(1);
     fireEvent.click(screen.getByRole('button', { name: '레벨 B' }));
     expect(stageCount()).toBe(2);
+  });
+});
+
+describe('레벨 탭 상태', () => {
+  it('게임에서 뒤로 가면 들어갔던 레벨 탭이 선택되어 있다', async () => {
+    render(<App />);
+    fireEvent.click(await screen.findByRole('button', { name: '스테이지' }));
+    await screen.findByText('레벨 선택');
+    fireEvent.click(screen.getByRole('button', { name: '레벨 5' }));
+    fireEvent.click(screen.getByRole('button', { name: '3' }));
+    fireEvent.click(await screen.findByRole('button', { name: '뒤로' }));
+    await screen.findByText('레벨 선택');
+    expect(screen.getByRole('button', { name: '레벨 5' }).getAttribute('aria-pressed')).toBe('true');
+    expect(screen.getByRole('button', { name: '레벨 1' }).getAttribute('aria-pressed')).toBe('false');
+  });
+
+  it('이어하기로 들어간 뒤 뒤로 가면 그 스테이지의 레벨 탭이 선택되어 있다', async () => {
+    localStorage.setItem(
+      'hamsudoku:save:v1',
+      JSON.stringify({
+        v: 1,
+        clears: [{ stageCode: '3-4', clearedAt: 't', elapsedSec: 30, attempts: 1 }],
+        settings: { sound: true, vibration: true },
+        updatedAt: 't',
+      }),
+    );
+    render(<App />);
+    fireEvent.click(await screen.findByRole('button', { name: '이어하기' }));
+    fireEvent.click(await screen.findByRole('button', { name: '뒤로' }));
+    await screen.findByText('레벨 선택');
+    expect(screen.getByRole('button', { name: '레벨 3' }).getAttribute('aria-pressed')).toBe('true');
+  });
+});
+
+describe('리셋 버튼', () => {
+  it('마크만 지우고 햄스터는 남긴다', async () => {
+    const { container } = render(<App />);
+    fireEvent.click(await screen.findByRole('button', { name: '스테이지' }));
+    await screen.findByText('레벨 선택');
+    fireEvent.click(screen.getByRole('button', { name: '1' }));
+    const cells = () => Array.from(container.querySelectorAll('.board .cell'));
+    const [first] = solutionOf('1-1');
+    fireEvent.dblClick(cells()[first]);
+    expect(await screen.findByRole('button', { name: /햄스터/ })).toBeTruthy();
+    const emptyIdx = cells().findIndex((c) => c.getAttribute('data-state') === 'empty');
+    fireEvent.click(cells()[emptyIdx]);
+    await screen.findByRole('button', { name: /X 표시/ });
+    fireEvent.click(screen.getByRole('button', { name: '리셋' }));
+    expect(screen.queryAllByRole('button', { name: /X 표시/ })).toHaveLength(0);
+    expect(screen.getAllByRole('button', { name: /햄스터/ })).toHaveLength(1);
   });
 });
