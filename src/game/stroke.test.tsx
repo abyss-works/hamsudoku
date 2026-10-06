@@ -50,17 +50,31 @@ describe('stroke', () => {
     expect(at(result.current.cells, 2, 4)).toBe('mark');
   });
 
-  it('되돌아가면 그 칸이 다시 토글된다', () => {
+  it('되돌아가도 이미 지나간 칸은 다시 바뀌지 않는다', () => {
     const { result } = renderHook(() => useHamSudoku(PUZZLES[0]));
     act(() => {
       result.current.beginStroke(0, 0);
       result.current.strokeEnter(0, 1);
       result.current.strokeEnter(0, 2);
+      result.current.strokeEnter(0, 3);
+      result.current.strokeEnter(0, 2);
       result.current.strokeEnter(0, 1);
+      result.current.strokeEnter(0, 0);
+    });
+    expect(result.current.cells[0]).toEqual(['mark', 'mark', 'mark', 'mark', 'empty']);
+  });
+
+  it('지나간 칸으로 돌아왔다 다시 나가도 스트로크는 살아 있다', () => {
+    const { result } = renderHook(() => useHamSudoku(PUZZLES[0]));
+    act(() => {
+      result.current.beginStroke(0, 0);
+      result.current.strokeEnter(0, 1);
+      result.current.strokeEnter(0, 0);
+      result.current.strokeEnter(1, 0);
     });
     expect(at(result.current.cells, 0, 0)).toBe('mark');
-    expect(at(result.current.cells, 0, 1)).toBe('empty');
-    expect(at(result.current.cells, 0, 2)).toBe('mark');
+    expect(at(result.current.cells, 0, 1)).toBe('mark');
+    expect(at(result.current.cells, 1, 0)).toBe('mark');
   });
 
   it('같은 칸 연발 진입은 한 번만 토글한다', () => {

@@ -432,7 +432,7 @@ describe('드래그 칠하기', () => {
     expect(await screen.findAllByRole('button', { name: /X 표시/ })).toHaveLength(2);
   });
 
-  it('되돌아간 칸은 다시 빈칸이 되고 나머지는 마크로 남는다', async () => {
+  it('되돌아가도 지나간 칸은 그대로 마크로 남는다', async () => {
     const { cells, board } = await enterStage11();
     fireEvent.pointerDown(cells()[0]);
     const restore = mockSpotSeq([cells()[1], cells()[2], cells()[3], cells()[2]]);
@@ -442,7 +442,7 @@ describe('드래그 칠하기', () => {
     fireEvent.pointerMove(board, { clientX: 13, clientY: 13 });
     fireEvent.pointerUp(board);
     restore();
-    expect(screen.getAllByRole('button', { name: /X 표시/ })).toHaveLength(3);
+    expect(screen.getAllByRole('button', { name: /X 표시/ })).toHaveLength(4);
   });
 
   it('마크에서 시작한 드래그는 그 마크를 지우고 지나간 빈칸은 칠한다', async () => {
