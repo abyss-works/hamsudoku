@@ -349,13 +349,16 @@ body {
 .level-rail {
   display: flex;
   gap: 8px;
-  overflow-x: auto;
   padding: 4px 2px 8px;
-  max-width: 100%;
+  width: 100%;
 }
 
 .level-rail .btn-sticker {
-  flex: 0 0 auto;
+  flex: 1 1 0;
+  min-width: 0;
+  padding-left: 4px;
+  padding-right: 4px;
+  white-space: nowrap;
 }
 
 .stage-list {
