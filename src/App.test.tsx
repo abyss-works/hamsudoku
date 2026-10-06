@@ -547,3 +547,22 @@ describe('레벨 탭 상태', () => {
     expect(screen.getByRole('button', { name: '레벨 3' }).getAttribute('aria-pressed')).toBe('true');
   });
 });
+
+describe('리셋 버튼', () => {
+  it('마크만 지우고 햄스터는 남긴다', async () => {
+    const { container } = render(<App />);
+    fireEvent.click(await screen.findByRole('button', { name: '스테이지' }));
+    await screen.findByText('레벨 선택');
+    fireEvent.click(screen.getByRole('button', { name: '1' }));
+    const cells = () => Array.from(container.querySelectorAll('.board .cell'));
+    const [first] = solutionOf('1-1');
+    fireEvent.dblClick(cells()[first]);
+    expect(await screen.findByRole('button', { name: /햄스터/ })).toBeTruthy();
+    const emptyIdx = cells().findIndex((c) => c.getAttribute('data-state') === 'empty');
+    fireEvent.click(cells()[emptyIdx]);
+    await screen.findByRole('button', { name: /X 표시/ });
+    fireEvent.click(screen.getByRole('button', { name: '리셋' }));
+    expect(screen.queryAllByRole('button', { name: /X 표시/ })).toHaveLength(0);
+    expect(screen.getAllByRole('button', { name: /햄스터/ })).toHaveLength(1);
+  });
+});
