@@ -85,12 +85,12 @@ export function Cell({ row, col, state, islandId, conflicted, hit, pulseDelay, o
       transition={{ duration: 0.6, ease: 'easeOut' }}
     >
       <span className="cell-glyph" aria-hidden="true">
-        {/* 퇴장 중인 글리프는 popLayout 으로 흐름에서 빼서 다음 글리프와 겹쳐 그린다 */}
-        <AnimatePresence initial={false} mode="popLayout">
+        {/* 글리프는 모두 칸 안에 절대 배치되므로 퇴장 중인 것과 새로 들어오는 것이 겹쳐 그려진다 */}
+        <AnimatePresence initial={false}>
         {state === 'hamster' ? (
           <motion.span
             key="ham"
-            style={{ display: 'inline-flex', alignItems: 'center', justifyContent: 'center', position: 'relative' }}
+            className="cell-glyph-item"
             initial={{ scale: 0.3 }}
             animate={{ scale: [0.3, 1.25, 1] }}
             exit={{ scale: 0.3, opacity: 0, transition: { duration: 0.15 } }}
@@ -110,7 +110,7 @@ export function Cell({ row, col, state, islandId, conflicted, hit, pulseDelay, o
         ) : state === 'mark' || state === 'wrong' || state === 'auto' ? (
           <motion.span
             key={state}
-            style={{ display: 'inline-flex', alignItems: 'center', justifyContent: 'center' }}
+            className="cell-glyph-item"
             aria-hidden="true"
             initial={{ scale: 0.3, opacity: 0 }}
             animate={{ scale: 1, opacity: 1 }}
