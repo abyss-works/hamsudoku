@@ -1,13 +1,31 @@
 // @vitest-environment jsdom
 import { describe, expect, it, vi } from 'vitest';
 import { cleanup, fireEvent, render, screen } from '@testing-library/react';
+import * as Sentry from '@sentry/nextjs';
 import { ErrorBoundary } from './ErrorBoundary';
+
+vi.mock('@sentry/nextjs', () => ({ captureException: vi.fn() }));
 
 function Boom(): never {
   throw new Error('boom');
 }
 
 describe('ErrorBoundary', () => {
+  it('받은 렌더 예외를 Sentry로 보고한다', () => {
+    vi.spyOn(console, 'error').mockImplementation(() => {});
+    try {
+      render(
+        <ErrorBoundary>
+          <Boom />
+        </ErrorBoundary>,
+      );
+      expect(Sentry.captureException).toHaveBeenCalledWith(expect.objectContaining({ message: 'boom' }));
+    } finally {
+      (console.error as ReturnType<typeof vi.spyOn>).mockRestore();
+      cleanup();
+    }
+  });
+
   it('자식 예외를 스티커 폴백으로 받는다', () => {
     vi.spyOn(console, 'error').mockImplementation(() => {});
     try {
