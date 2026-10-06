@@ -74,10 +74,10 @@ describe('화면 전환', () => {
     const { container } = render(<App />);
     fireEvent.click(await screen.findByRole('button', { name: '스테이지' }));
     await screen.findByText('레벨 선택');
-    fireEvent.click(screen.getByRole('button', { name: '레벨 3' }));
+    fireEvent.click(screen.getByRole('button', { name: '레벨 5' }));
     fireEvent.click(screen.getByRole('button', { name: '10' }));
     const cells = () => Array.from(container.querySelectorAll('.board .cell'));
-    solutionOf('3-10').forEach((i) => fireEvent.dblClick(cells()[i]));
+    solutionOf('5-10').forEach((i) => fireEvent.dblClick(cells()[i]));
     fireEvent.click(screen.getByRole('button', { name: '다음 스테이지' }));
     expect(await screen.findByRole('button', { name: '이어하기' })).toBeTruthy();
   });
