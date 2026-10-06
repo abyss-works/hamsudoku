@@ -22,10 +22,12 @@ export interface HamSudoku {
   reset: () => void;
 }
 
-// 진행 중 드래그. 처음 올라탄 칸만 빈칸↔마크로 토글하고, 한 번 지나간 칸은 다시 건드리지 않는다.
+// 진행 중 드래그. 누른 칸이 마크면 지우기, 아니면 칠하기 모드다.
+// 처음 올라탄 칸만 모드대로 바꾸고, 한 번 지나간 칸은 다시 건드리지 않는다.
 interface Stroke {
   sr: number;
   sc: number;
+  toMark: boolean;
   engaged: boolean;
   visited: Set<string>;
 }
@@ -79,11 +81,12 @@ export function useHamSudoku(puzzle: Puzzle): HamSudoku {
     setHitKey(null);
   };
 
-  const toggleOne = (r: number, c: number) => {
+  // 칠하기 모드는 빈칸만 마크로, 지우기 모드는 마크만 빈칸으로 바꾼다. 다른 상태는 손대지 않는다.
+  const paintOne = (st: Stroke, r: number, c: number) => {
     const cur = latest.current[r][c];
-    if (cur !== 'empty' && cur !== 'mark') return;
+    if (st.toMark ? cur !== 'empty' : cur !== 'mark') return;
     const next = latest.current.map((line) => [...line]);
-    next[r][c] = cur === 'empty' ? 'mark' : 'empty';
+    next[r][c] = st.toMark ? 'mark' : 'empty';
     latest.current = next;
     setCells(next);
     setPulse(new Map());
@@ -91,10 +94,11 @@ export function useHamSudoku(puzzle: Puzzle): HamSudoku {
   };
 
   const beginStroke = (r: number, c: number) => {
-    strokeRef.current = { sr: r, sc: c, engaged: false, visited: new Set([`${r},${c}`]) };
+    const toMark = latest.current[r][c] !== 'mark';
+    strokeRef.current = { sr: r, sc: c, toMark, engaged: false, visited: new Set([`${r},${c}`]) };
   };
 
-  // 누른 칸에서 다른 칸으로 처음 움직일 때 드래그로 확정되며 누른 칸부터 토글한다.
+  // 누른 칸에서 다른 칸으로 처음 움직일 때 드래그로 확정되며 누른 칸부터 모드대로 바꾼다.
   // 이미 지나간 칸(누른 칸 포함)에 다시 들어오면 아무것도 하지 않는다.
   const strokeEnter = (r: number, c: number) => {
     const st = strokeRef.current;
@@ -104,9 +108,9 @@ export function useHamSudoku(puzzle: Puzzle): HamSudoku {
     st.visited.add(key);
     if (!st.engaged) {
       st.engaged = true;
-      toggleOne(st.sr, st.sc);
+      paintOne(st, st.sr, st.sc);
     }
-    toggleOne(r, c);
+    paintOne(st, r, c);
   };
 
   const endStroke = () => {
