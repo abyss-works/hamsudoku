@@ -12,6 +12,9 @@ export interface Attempt {
 export interface DbPort {
   ensureUser(userId: string, email: string | null): Promise<void>;
   listUsers(): Promise<{ userId: string; email: string | null; hasProfile: boolean }[]>;
+  getNickname(userId: string): Promise<string | null>;
+  setNickname(userId: string, nickname: string): Promise<void>;
+  lookupNicknames(userIds: string[]): Promise<Record<string, string | null>>;
   issueAttempt(userId: string, stageCode: string): Promise<Attempt>;
   findAttempt(key: string): Promise<Attempt | null>;
   useAttempt(userId: string, key: string, stageCode: string, nowIso: string): Promise<Attempt | null>;
@@ -26,6 +29,7 @@ let nextId = 0;
 
 export function createMemoryDb(): DbPort {
   const users = new Map<string, { email: string | null; hasProfile: boolean }>();
+  const nicknames = new Map<string, string>();
   const attempts = new Map<string, Attempt>();
   const records = new Map<string, ClearRecord & { updatedAt: string }>();
   const events: { userId: string; stageCode: string; elapsedSec: number; verified: boolean; clearedAt: string }[] = [];
@@ -37,6 +41,15 @@ export function createMemoryDb(): DbPort {
     },
     async listUsers() {
       return [...users.entries()].map(([userId, u]) => ({ userId, email: u.email, hasProfile: u.hasProfile }));
+    },
+    async getNickname(userId: string) {
+      return nicknames.get(userId) ?? null;
+    },
+    async setNickname(userId: string, nickname: string) {
+      nicknames.set(userId, nickname);
+    },
+    async lookupNicknames(userIds: string[]) {
+      return Object.fromEntries(userIds.map((id) => [id, nicknames.get(id) ?? null]));
     },
     async issueAttempt(userId: string, stageCode: string) {
       const a: Attempt = {
@@ -105,6 +118,22 @@ export function createPrismaDb(): DbPort {
       const [all, profiles] = await Promise.all([prisma.user.findMany(), prisma.profile.findMany()]);
       const withProfile = new Set(profiles.map((p) => p.userId));
       return all.map((r) => ({ userId: r.id, email: r.email, hasProfile: withProfile.has(r.id) }));
+    },
+    async getNickname(userId: string) {
+      const p = await prisma.profile.findUnique({ where: { userId } });
+      return p?.nickname ?? null;
+    },
+    async setNickname(userId: string, nickname: string) {
+      await prisma.profile.upsert({
+        where: { userId },
+        create: { userId, nickname },
+        update: { nickname },
+      });
+    },
+    async lookupNicknames(userIds: string[]) {
+      const rows = await prisma.profile.findMany({ where: { userId: { in: userIds } } });
+      const found = new Map(rows.map((r) => [r.userId, r.nickname] as const));
+      return Object.fromEntries(userIds.map((id) => [id, found.get(id) ?? null]));
     },
     async issueAttempt(userId: string, stageCode: string) {
       const a = await prisma.attempt.create({ data: { userId, stageCode } });

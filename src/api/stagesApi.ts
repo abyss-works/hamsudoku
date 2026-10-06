@@ -1,6 +1,6 @@
 import { LEVELS } from '../game/levels.generated';
 import type { Puzzle } from '../game/puzzles';
-import { createLocalAuthApi } from './localAuth';
+import { createLocalAuthApi, createLocalProfileApi } from './localAuth';
 
 export interface Stage {
   id: string;
@@ -32,6 +32,54 @@ export async function fetchStages(): Promise<Chapter[]> {
 }
 
 export type AuthResult = { ok: true } | { ok: false; msg: string; code?: string };
+
+export type ProfileResult = { ok: true; nickname: string } | { ok: false; msg: string; code?: string };
+
+// 닉네임 — auth 부팅 캐시와 생명주기가 달라 분리한다. 모드 선택은 auth와 같은 기준.
+export interface ProfileApi {
+  get(): Promise<{ nickname: string | null }>;
+  save(nickname: string): Promise<ProfileResult>;
+  lookup(userIds: string[]): Promise<{ nicknames: Record<string, string | null> }>;
+}
+
+export const cloudProfileApi: ProfileApi = {
+  async get() {
+    try {
+      const res = await fetch('/api/profile/me');
+      if (!res.ok) return { nickname: null };
+      const data = (await res.json()) as { nickname?: string | null };
+      return { nickname: data.nickname ?? null };
+    } catch {
+      return { nickname: null };
+    }
+  },
+  async save(nickname: string) {
+    try {
+      const res = await fetch('/api/profile/nickname', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ nickname }),
+      });
+      const data = (await res.json()) as ProfileResult;
+      return data.ok ? { ok: true, nickname: data.nickname } : data;
+    } catch {
+      return { ok: false, msg: '서버에 연결하지 못했어요.' };
+    }
+  },
+  async lookup(userIds: string[]) {
+    try {
+      const res = await fetch('/api/profile/lookup', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ userIds }),
+      });
+      const data = (await res.json()) as { ok: boolean; nicknames?: Record<string, string | null> };
+      return { nicknames: data.ok ? (data.nicknames ?? {}) : {} };
+    } catch {
+      return { nicknames: {} };
+    }
+  },
+};
 
 export type AuthMode = 'cloud' | 'local';
 
@@ -159,3 +207,21 @@ export function resetAuthApi() {
   bootCache = null;
   bootConsumed = false;
 }
+
+let localProfileImpl: ProfileApi | null = null;
+
+function localProfile(): ProfileApi {
+  if (!localProfileImpl) localProfileImpl = createLocalProfileApi();
+  return localProfileImpl;
+}
+
+async function pickProfile(): Promise<ProfileApi> {
+  const b = await boot();
+  return b.mode === 'local' ? localProfile() : cloudProfileApi;
+}
+
+export const profileApi: ProfileApi = {
+  get: async () => (await pickProfile()).get(),
+  save: async (nickname: string) => (await pickProfile()).save(nickname),
+  lookup: async (userIds: string[]) => (await pickProfile()).lookup(userIds),
+};

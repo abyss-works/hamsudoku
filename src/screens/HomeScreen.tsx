@@ -10,13 +10,15 @@ interface HomeScreenProps {
   loading: boolean;
   lastStage: Stage | null;
   email: string | null;
+  nickname: string | null;
+  onSaveNickname: (name: string) => Promise<{ ok: boolean; msg?: string }>;
   onResume: (stage: Stage | null) => void;
   onBrowse: () => void;
   onLogin: () => void;
   onLogout: () => void;
 }
 
-export function HomeScreen({ loading, lastStage, email, onResume, onBrowse, onLogin, onLogout }: HomeScreenProps) {
+export function HomeScreen({ loading, lastStage, email, nickname, onSaveNickname, onResume, onBrowse, onLogin, onLogout }: HomeScreenProps) {
   const [settingsOpen, setSettingsOpen] = useState(false);
   const [profileOpen, setProfileOpen] = useState(false);
 
@@ -54,6 +56,8 @@ export function HomeScreen({ loading, lastStage, email, onResume, onBrowse, onLo
       {profileOpen && (
         <ProfileDialog
           email={email}
+          nickname={nickname}
+          onSaveNickname={onSaveNickname}
           onLogin={() => {
             setProfileOpen(false);
             onLogin();

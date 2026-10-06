@@ -145,6 +145,8 @@ function App() {
           onResume={resume}
           onBrowse={() => setScreen('select')}
           email={account.email}
+          nickname={account.nickname}
+          onSaveNickname={account.saveNickname}
           onLogin={() => setScreen('login')}
           onLogout={handleLogout}
         />
