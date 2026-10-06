@@ -56,8 +56,10 @@ export function useHamSudoku(puzzle: Puzzle): HamSudoku {
     next[r][c] = result;
     if (result === 'hamster') {
       const delays = new Map<string, number>();
+      // 빈 타일과 임시마커를 정답마커로 바꾼다. 오답마커·햄스터·기존 정답마커는 그대로 둔다.
       for (const m of spreadMarks(prev.length, r, c)) {
-        if (next[m.r][m.c] === 'empty') {
+        const cur = next[m.r][m.c];
+        if (cur === 'empty' || cur === 'mark') {
           next[m.r][m.c] = 'auto';
           delays.set(`${m.r},${m.c}`, m.delayMs);
         }
