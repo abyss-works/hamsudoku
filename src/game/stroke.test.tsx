@@ -155,3 +155,35 @@ describe('clearMarks', () => {
     expect(at(result.current.cells, 4, 4)).toBe('wrong');
   });
 });
+
+describe('정답 전파', () => {
+  it('햄스터가 생기면 같은 줄·주변의 임시마커도 정답마커로 바뀐다', () => {
+    const { result } = renderHook(() => useHamSudoku(PUZZLES[0]));
+    act(() => {
+      result.current.tapCell(0, 1, 'single'); // 같은 행의 임시마커
+      result.current.tapCell(3, 0, 'single'); // 같은 열의 임시마커
+      result.current.tapCell(1, 1, 'single'); // 대각 이웃의 임시마커
+      result.current.tapCell(2, 2, 'single'); // 무관한 칸의 임시마커
+    });
+    act(() => {
+      result.current.tapCell(0, 0, 'double'); // 정답
+    });
+    expect(at(result.current.cells, 0, 0)).toBe('hamster');
+    expect(at(result.current.cells, 0, 1)).toBe('auto');
+    expect(at(result.current.cells, 3, 0)).toBe('auto');
+    expect(at(result.current.cells, 1, 1)).toBe('auto');
+    expect(at(result.current.cells, 2, 2)).toBe('mark');
+  });
+
+  it('오답마커는 정답 전파로 바뀌지 않는다', () => {
+    const { result } = renderHook(() => useHamSudoku(PUZZLES[0]));
+    act(() => {
+      result.current.tapCell(0, 3, 'double'); // 오답 (정답은 (0,0))
+    });
+    expect(at(result.current.cells, 0, 3)).toBe('wrong');
+    act(() => {
+      result.current.tapCell(0, 0, 'double');
+    });
+    expect(at(result.current.cells, 0, 3)).toBe('wrong');
+  });
+});
