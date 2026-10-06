@@ -134,3 +134,24 @@ describe('stroke', () => {
     expect(at(result.current.cells, 2, 2)).toBe('mark');
   });
 });
+
+describe('clearMarks', () => {
+  it('마크만 전부 빈칸으로 되돌리고 햄스터·자동·오답은 그대로 둔다', () => {
+    const { result } = renderHook(() => useHamSudoku(PUZZLES[0]));
+    act(() => {
+      result.current.tapCell(0, 0, 'double'); // 햄스터, (0,2) 자동
+      result.current.tapCell(4, 4, 'double'); // 오답
+      result.current.tapCell(2, 2, 'single');
+      result.current.tapCell(3, 1, 'single');
+    });
+    expect(at(result.current.cells, 2, 2)).toBe('mark');
+    act(() => {
+      result.current.clearMarks();
+    });
+    expect(at(result.current.cells, 2, 2)).toBe('empty');
+    expect(at(result.current.cells, 3, 1)).toBe('empty');
+    expect(at(result.current.cells, 0, 0)).toBe('hamster');
+    expect(at(result.current.cells, 0, 2)).toBe('auto');
+    expect(at(result.current.cells, 4, 4)).toBe('wrong');
+  });
+});

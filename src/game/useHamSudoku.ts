@@ -20,6 +20,7 @@ export interface HamSudoku {
   strokeEnter: (r: number, c: number) => void;
   endStroke: () => boolean;
   reset: () => void;
+  clearMarks: () => void;
 }
 
 // 진행 중 드래그. 누른 칸이 마크면 지우기, 아니면 칠하기 모드다.
@@ -81,6 +82,16 @@ export function useHamSudoku(puzzle: Puzzle): HamSudoku {
     setHitKey(null);
   };
 
+  // 마크만 전부 빈칸으로 되돌린다. 햄스터·자동·오답은 그대로 둔다.
+  const clearMarks = () => {
+    const next = latest.current.map((line) => line.map((cell) => (cell === 'mark' ? 'empty' : cell)));
+    latest.current = next;
+    strokeRef.current = null;
+    setCells(next);
+    setPulse(new Map());
+    setHitKey(null);
+  };
+
   // 칠하기 모드는 빈칸만 마크로, 지우기 모드는 마크만 빈칸으로 바꾼다. 다른 상태는 손대지 않는다.
   const paintOne = (st: Stroke, r: number, c: number) => {
     const cur = latest.current[r][c];
@@ -119,5 +130,5 @@ export function useHamSudoku(puzzle: Puzzle): HamSudoku {
     return engaged;
   };
 
-  return { cells, violations, cleared, hamsterCount, pulse, hitKey, shake, tapCell, beginStroke, strokeEnter, endStroke, reset };
+  return { cells, violations, cleared, hamsterCount, pulse, hitKey, shake, tapCell, beginStroke, strokeEnter, endStroke, reset, clearMarks };
 }
