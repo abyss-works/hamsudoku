@@ -24,6 +24,7 @@
 }
 
 .cell {
+  position: relative;
   aspect-ratio: 1;
   min-width: 0;
   border-radius: 0;
@@ -79,18 +80,27 @@
   z-index: 1;
 }
 
+/* 글리프 층은 칸을 가득 채우고, 각 글리프는 그 안에 절대 배치로 가운데 놓인다.
+   퇴장 애니메이션 중인 글리프가 흐름에 남지 않아 칸 밖으로 밀리지 않는다. */
 .cell-glyph {
+  position: absolute;
+  inset: 0;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  pointer-events: none;
+}
+
+.cell-glyph-item {
+  position: absolute;
   display: inline-flex;
   align-items: center;
   justify-content: center;
-  position: relative;
 }
 
 .cell-glyph svg {
   width: 42px;
   height: 42px;
-  max-width: 85%;
-  max-height: 85%;
 }
 
 .ham-heart {
