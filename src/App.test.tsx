@@ -432,7 +432,7 @@ describe('드래그 칠하기', () => {
     expect(await screen.findAllByRole('button', { name: /X 표시/ })).toHaveLength(2);
   });
 
-  it('되돌아가면 걸린 칸이 전부 되돌려진다', async () => {
+  it('되돌아간 칸은 다시 빈칸이 되고 나머지는 마크로 남는다', async () => {
     const { cells, board } = await enterStage11();
     fireEvent.pointerDown(cells()[0]);
     const restore = mockSpotSeq([cells()[1], cells()[2], cells()[3], cells()[2]]);
@@ -442,10 +442,10 @@ describe('드래그 칠하기', () => {
     fireEvent.pointerMove(board, { clientX: 13, clientY: 13 });
     fireEvent.pointerUp(board);
     restore();
-    expect(screen.getAllByRole('button', { name: /X 표시/ })).toHaveLength(2);
+    expect(screen.getAllByRole('button', { name: /X 표시/ })).toHaveLength(3);
   });
 
-  it('마커 시작 드래그는 빈칸을 건드리지 않고 마커만 지운다', async () => {
+  it('마크에서 시작한 드래그는 그 마크를 지우고 지나간 빈칸은 칠한다', async () => {
     const { cells, board } = await enterStage11();
     fireEvent.click(cells()[0]);
     await new Promise((r) => setTimeout(r, 300));
@@ -455,8 +455,8 @@ describe('드래그 칠하기', () => {
     fireEvent.pointerUp(board);
     restore();
     await new Promise((r) => setTimeout(r, 300));
-    expect(screen.queryAllByRole('button', { name: /X 표시/ })).toHaveLength(0);
-    expect(screen.getAllByRole('button', { name: /빈칸/ })).toHaveLength(25);
+    expect(screen.getAllByRole('button', { name: /X 표시/ })).toHaveLength(1);
+    expect(screen.getAllByRole('button', { name: /빈칸/ })).toHaveLength(24);
   });
 });
 
