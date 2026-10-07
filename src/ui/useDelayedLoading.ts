@@ -3,7 +3,9 @@ import { useEffect, useRef, useState } from 'react';
 // 로딩 표시가 깜빡이지 않게 늦추는 훅이다.
 // threshold 안에 끝나면 표시를 아예 안 띄우고, 뜬 뒤에는 최소 시간만큼 유지한다.
 // 타이머는 ref에 모아 언마운트 때 한 번에 정리한다.
-export function useDelayedLoading(loading: boolean, thresholdMs = 80, minVisibleMs = 350): boolean {
+// 로딩 표시 정책: 150ms 안에 끝나면 아무것도 안 띄우고,
+// 뜨기 시작하면 최소 400ms는 유지한다.
+export function useDelayedLoading(loading: boolean, thresholdMs = 150, minVisibleMs = 400): boolean {
   const [show, setShow] = useState(false);
   const box = useRef<{ delay: ReturnType<typeof setTimeout> | null; hide: ReturnType<typeof setTimeout> | null; shown: boolean; shownAt: number }>({
     delay: null,

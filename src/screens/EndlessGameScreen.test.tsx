@@ -43,18 +43,28 @@ afterEach(() => {
 
 describe('EndlessGameScreen', () => {
   it('판이 오기 전에는 보드를 그리지 않는다', async () => {
-    vi.stubGlobal(
-      'fetch',
-      vi.fn(async (url: string) => {
-        if (url === '/api/endless/next') return new Promise<Response>(() => {});
-        if (url === '/api/endless/fail') return Response.json({ ok: true });
-        throw new Error(`unexpected ${url}`);
-      }),
-    );
-    const { container } = render(<EndlessGameScreen onBack={() => {}} />);
-    await act(async () => {});
-    expect(container.querySelector('.board')).toBeNull();
-    expect(screen.getByRole('status', { name: '불러오는 중' })).toBeTruthy();
+    vi.useFakeTimers();
+    try {
+      vi.stubGlobal(
+        'fetch',
+        vi.fn(async (url: string) => {
+          if (url === '/api/endless/next') return new Promise<Response>(() => {});
+          if (url === '/api/endless/fail') return Response.json({ ok: true });
+          throw new Error(`unexpected ${url}`);
+        }),
+      );
+      const { container } = render(<EndlessGameScreen onBack={() => {}} />);
+      await act(async () => {});
+      expect(container.querySelector('.board')).toBeNull();
+      expect(screen.queryByRole('status', { name: '불러오는 중' })).toBeNull();
+      await act(async () => {
+        vi.advanceTimersByTime(200);
+      });
+      expect(screen.getByRole('status', { name: '불러오는 중' })).toBeTruthy();
+      expect(container.querySelector('.board')).toBeNull();
+    } finally {
+      vi.useRealTimers();
+    }
   });
 
   it('시작하면 보드와 씨앗 3이 보인다', async () => {

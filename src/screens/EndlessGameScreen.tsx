@@ -9,6 +9,7 @@ import { Button } from '../ui/Button';
 import { BootSplash } from '../ui/BootSplash';
 import { Confetti } from '../ui/Confetti';
 import { Overlay } from '../ui/Overlay';
+import { useDelayedLoading } from '../ui/useDelayedLoading';
 import { useLoading } from '../ui/LoadingProvider';
 
 interface EndlessBoardProps {
@@ -105,6 +106,8 @@ export function EndlessGameScreen({ onBack }: { onBack: () => void }) {
   const session = useEndlessSession();
   const { track } = useLoading();
   const startedRef = useRef(false);
+  // 진입 게이트도 전역 정책(150ms blank)을 따른다.
+  const showEntryLoading = useDelayedLoading(!session.puzzle);
 
   useEffect(() => {
     if (startedRef.current) return;
@@ -128,7 +131,7 @@ export function EndlessGameScreen({ onBack }: { onBack: () => void }) {
         </div>
       );
     }
-    return <BootSplash />;
+    return showEntryLoading ? <BootSplash /> : null;
   }
 
   return (
