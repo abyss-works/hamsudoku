@@ -1,4 +1,4 @@
-import { useState } from 'react';
+import { useEffect, useState } from 'react';
 import { PawPrint, Settings, Sprout, Trophy, User } from 'lucide-react';
 import { Button } from '../ui/Button';
 import type { EndlessSummaryState } from '../game/useEndlessSummary';
@@ -22,6 +22,13 @@ export function HomeScreen({ email, nickname, summary, onSaveNickname, onBrowse,
   const [settingsOpen, setSettingsOpen] = useState(false);
   const [profileOpen, setProfileOpen] = useState(false);
   const [rankOpen, setRankOpen] = useState(false);
+
+  // 홈에 들어올 때마다 요약(씨앗 잔액·내 순위)을 최신으로 맞춘다.
+  useEffect(() => {
+    void summary.refresh();
+    // summary 객체는 렌더마다 새로 만들어지므로 최초 1회만 본다.
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, []);
 
   return (
     <div className="home">
