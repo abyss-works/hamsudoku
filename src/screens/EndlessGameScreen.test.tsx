@@ -153,4 +153,29 @@ describe('EndlessGameScreen', () => {
     expect(await screen.findByText('무한모드를 불러오지 못했어요.')).toBeTruthy();
     await waitFor(() => expect((screen.getByRole('button', { name: '다음 판' }) as HTMLButtonElement).disabled).toBe(false));
   });
+
+  it('씨앗은 컨테이너 씨앗 박스에 보인다', async () => {
+    stubFetch();
+    const { container } = render(<EndlessGameScreen onBack={() => {}} />);
+    expect(await screen.findByRole('status', { name: '씨앗 3/3' })).toBeTruthy();
+    expect(container.querySelector('.mode-status .seed-box')).toBeTruthy();
+  });
+
+  it('리셋은 임시마커만 지우고 햄스터는 남긴다', async () => {
+    stubFetch();
+    const { container } = render(<EndlessGameScreen onBack={() => {}} />);
+    await screen.findByRole('status', { name: '씨앗 3/3' });
+    const cells = () => Array.from(container.querySelectorAll('.board .cell'));
+    const sol = new Set(SOLUTION_INDEXES);
+    const at = (c: Element) => Number(c.getAttribute('data-r')) * PUZZLE.size + Number(c.getAttribute('data-c'));
+    fireEvent.dblClick(cells()[SOLUTION_INDEXES[0]]);
+    expect(await screen.findByRole('button', { name: /햄스터/ })).toBeTruthy();
+    const markCell = cells().find((c) => c.getAttribute('data-state') === 'empty' && !sol.has(at(c)));
+    expect(markCell).toBeTruthy();
+    fireEvent.click(markCell as Element);
+    expect(await screen.findAllByRole('button', { name: /X 표시/ })).not.toHaveLength(0);
+    fireEvent.click(screen.getByRole('button', { name: '리셋' }));
+    await waitFor(() => expect(screen.queryAllByRole('button', { name: /X 표시/ })).toHaveLength(0));
+    expect(screen.getAllByRole('button', { name: /햄스터/ })).not.toHaveLength(0);
+  });
 });

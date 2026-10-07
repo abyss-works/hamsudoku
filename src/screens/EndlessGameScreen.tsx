@@ -1,4 +1,4 @@
-import { useEffect, useRef, type ReactNode } from 'react';
+import { useEffect, useRef, useState, type ReactNode } from 'react';
 import { Board } from '../game/Board';
 import { ControlsHelp } from '../game/ControlsHelp';
 import { RulesHelp } from '../game/RulesHelp';
@@ -11,6 +11,7 @@ import { Confetti } from '../ui/Confetti';
 import { Overlay } from '../ui/Overlay';
 import { useDelayedLoading } from '../ui/useDelayedLoading';
 import { useLoading } from '../ui/LoadingProvider';
+import { Sprout } from 'lucide-react';
 
 interface EndlessBoardProps {
   puzzle: Puzzle;
@@ -19,11 +20,16 @@ interface EndlessBoardProps {
   clearOverlay: ReactNode;
 }
 
-function EndlessBoard({ puzzle, onWrong, onFinish, clearOverlay }: EndlessBoardProps) {
+function EndlessBoard({ puzzle, onWrong, onFinish, clearOverlay, clearMarksSignal }: EndlessBoardProps & { clearMarksSignal: number }) {
   const board = useHamSudoku(puzzle);
   const wrongCount = board.cells.flat().filter((s) => s === 'wrong').length;
   const prevWrong = useRef(0);
   const wasCleared = useRef(false);
+
+  // HUD 리셋은 임시마커만 지운다. 햄스터·잠긴 타일은 그대로 둔다.
+  useEffect(() => {
+    if (clearMarksSignal > 0) board.clearMarks();
+  }, [clearMarksSignal]);
 
   useEffect(() => {
     const diff = wrongCount - prevWrong.current;
@@ -106,6 +112,7 @@ export function EndlessGameScreen({ onBack }: { onBack: () => void }) {
   const session = useEndlessSession();
   const { track } = useLoading();
   const startedRef = useRef(false);
+  const [marksSignal, setMarksSignal] = useState(0);
   // 진입 게이트도 전역 정책(150ms blank)을 따른다.
   const showEntryLoading = useDelayedLoading(!session.puzzle);
 
@@ -141,11 +148,15 @@ export function EndlessGameScreen({ onBack }: { onBack: () => void }) {
           뒤로
         </Button>
         <span className="hud-code">무한모드</span>
-        <span className="hud-seeds" role="status" aria-label={`씨앗 ${session.seeds}/3`}>
-          {Array.from({ length: 3 }, (_, i) => (
-            <span key={i} className={i < session.seeds ? 'seed on' : 'seed'} aria-hidden="true" />
-          ))}
-        </span>
+        <Button variant="sticker" onClick={() => setMarksSignal((i) => i + 1)}>
+          리셋
+        </Button>
+      </div>
+      <div className="mode-status">
+        <div className="seed-box" role="status" aria-label={`씨앗 ${session.seeds}/3`}>
+          <Sprout size={20} aria-hidden="true" />
+          <span className="seed-count">{session.seeds}</span>
+        </div>
       </div>
       <RulesHelp />
       <EndlessBoard
@@ -153,6 +164,7 @@ export function EndlessGameScreen({ onBack }: { onBack: () => void }) {
         puzzle={session.puzzle}
         onWrong={session.reportWrong}
         onFinish={() => void session.finish()}
+        clearMarksSignal={marksSignal}
         clearOverlay={
           <ClearOverlay
             result={session.finishResult}
