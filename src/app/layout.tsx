@@ -31,6 +31,15 @@ export default function RootLayout({
         />
       </head>
       <body>
+        <div id="boot-static" aria-hidden="true">
+          <div className="boot-splash">
+            <div className="boot-dots">
+              <span />
+              <span />
+              <span />
+            </div>
+          </div>
+        </div>
         <div id="root">{children}</div>
       </body>
     </html>

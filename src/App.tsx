@@ -152,6 +152,11 @@ function App() {
   const ready = fontsReady && (dataReady || bootTimedOut);
   const showBootLoading = useDelayedLoading(!ready);
 
+  // 정적 스플래시(첫 HTML과 함께 옴)는 React 부팅이 끝나면 치운다.
+  useEffect(() => {
+    if (ready) document.getElementById('boot-static')?.remove();
+  }, [ready]);
+
   return (
     <main className="app">
       {!ready ? (
