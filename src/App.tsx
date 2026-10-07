@@ -169,6 +169,7 @@ function App() {
             <HomeScreen
               email={account.email}
               nickname={account.nickname}
+              uid={account.uid}
               summary={summary}
               onBrowse={() => setScreen('select')}
               onEndless={() => setScreen('endless')}

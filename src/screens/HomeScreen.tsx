@@ -9,6 +9,7 @@ import { SettingsDialog } from './SettingsDialog';
 interface HomeScreenProps {
   email: string | null;
   nickname: string | null;
+  uid: string | null;
   summary: EndlessSummaryState;
   onSaveNickname: (name: string) => Promise<{ ok: boolean; msg?: string }>;
   onBrowse: () => void;
@@ -18,7 +19,7 @@ interface HomeScreenProps {
   onLogout: () => void;
 }
 
-export function HomeScreen({ email, nickname, summary, onSaveNickname, onBrowse, onEndless, endlessEnabled, onLogin, onLogout }: HomeScreenProps) {
+export function HomeScreen({ email, nickname, uid, summary, onSaveNickname, onBrowse, onEndless, endlessEnabled, onLogin, onLogout }: HomeScreenProps) {
   const [settingsOpen, setSettingsOpen] = useState(false);
   const [profileOpen, setProfileOpen] = useState(false);
   const [rankOpen, setRankOpen] = useState(false);
@@ -96,7 +97,7 @@ export function HomeScreen({ email, nickname, summary, onSaveNickname, onBrowse,
           onClose={() => setProfileOpen(false)}
         />
       )}
-      {rankOpen && <RankDialog rank={summary.rank} onClose={() => setRankOpen(false)} />}
+      {rankOpen && <RankDialog rank={summary.rank} uid={uid} onClose={() => setRankOpen(false)} />}
     </div>
   );
 }
