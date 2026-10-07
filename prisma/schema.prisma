@@ -109,3 +109,9 @@ model EndlessEvent {
 
   @@index([userId, stageId])
 }
+
+model EndlessStreak {
+  userId  String @id
+  current Int    @default(0)
+  best    Int    @default(0)
+}
