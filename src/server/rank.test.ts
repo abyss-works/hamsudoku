@@ -1,6 +1,6 @@
 import { describe, expect, it } from 'vitest';
 import { createMemoryDb } from './db';
-import { createRankStore, rebuildFromLedger } from './rank';
+import { createRankStore, rankStoreFromEnv, rebuildFromLedger } from './rank';
 
 type Call = { url: string; init: RequestInit };
 
@@ -68,5 +68,14 @@ describe('rebuildFromLedger', () => {
     const store = makeStore(['OK'], calls);
     expect(await rebuildFromLedger(db, store, '2026-W41')).toBe(1);
     expect(JSON.parse(String(calls[0].init.body))).toEqual(['zadd', 'rank:2026-W41', 3, 'u1']);
+  });
+});
+
+describe('rankStoreFromEnv', () => {
+  it('env가 없으면 null이다', () => {
+    expect(rankStoreFromEnv({})).toBeNull();
+  });
+  it('env가 있으면 저장소를 만든다', () => {
+    expect(rankStoreFromEnv({ UPSTASH_REDIS_REST_URL: 'https://u', UPSTASH_REDIS_REST_TOKEN: 't' })).not.toBeNull();
   });
 });
