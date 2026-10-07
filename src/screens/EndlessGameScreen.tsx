@@ -58,16 +58,34 @@ function EndlessBoard({ puzzle, onWrong, onFinish, clearOverlay }: EndlessBoardP
   );
 }
 
-function ClearOverlay({ seeds, onNext, onExit }: { seeds: number; onNext: () => void; onExit: () => void }) {
+function ClearOverlay({
+  result,
+  error,
+  onNext,
+  onExit,
+}: {
+  result: { ok: boolean; earned: number } | null;
+  error: string | null;
+  onNext: () => void;
+  onExit: () => void;
+}) {
+  const pending = result === null;
+  const failed = result?.ok === false;
   return (
     <Overlay label="클리어">
-      <Confetti />
-      <p className="clear-title">햄스터를 다 찾았다! 씨앗 {seeds}개를 얻었어요</p>
+      {!failed && <Confetti />}
+      <p className="clear-title">
+        {pending
+          ? '기록을 저장하는 중…'
+          : failed
+            ? (error ?? '기록을 저장하지 못했어요.')
+            : `햄스터를 다 찾았다! 씨앗 ${result.earned}개를 얻었어요`}
+      </p>
       <div className="clear-actions">
-        <Button variant="sticker" className="btn-primary" onClick={onNext}>
+        <Button variant="sticker" className="btn-primary" onClick={onNext} disabled={pending}>
           다음 판
         </Button>
-        <Button variant="sticker" onClick={onExit}>
+        <Button variant="sticker" onClick={onExit} disabled={pending}>
           나가기
         </Button>
       </div>
@@ -119,12 +137,13 @@ export function EndlessGameScreen({ onBack }: { onBack: () => void }) {
         puzzle={session.puzzle}
         onWrong={session.reportWrong}
         onFinish={() => void session.finish()}
-        clearOverlay={<ClearOverlay seeds={session.seeds} onNext={() => void session.start()} onExit={onBack} />}
+        clearOverlay={<ClearOverlay result={session.finishResult} error={session.error} onNext={() => void session.start()} onExit={onBack} />}
       />
       <ControlsHelp />
       {session.phase === 'gameover' && (
         <Overlay label="게임오버">
           <p className="clear-title">씨앗을 다 썼어요…</p>
+          {session.error && <p className="home-note">{session.error}</p>}
           <div className="clear-actions">
             <Button variant="sticker" className="btn-primary" onClick={() => void session.start()}>
               재도전

@@ -85,6 +85,32 @@ describe('useEndlessSession', () => {
     });
     expect(result.current.mirror.wallet.balance).toBe(0);
     expect(result.current.error).toBe('정답이 맞지 않아요.');
+    expect(result.current.finishResult).toEqual({ ok: false, earned: 0 });
+  });
+
+  it('재시도 후에도 무효면 낙관 반영을 되돌린다', async () => {
+    let first = true;
+    stubFetch(() => {
+      if (first) {
+        first = false;
+        throw new TypeError('network');
+      }
+      return Response.json({ ok: false, reason: '정답이 맞지 않아요.' });
+    });
+    const { result } = renderHook(() => useEndlessSession());
+    await act(async () => {
+      await result.current.start();
+    });
+    await act(async () => {
+      await result.current.finish();
+    });
+    await waitFor(
+      () => {
+        expect(result.current.mirror.wallet.balance).toBe(0);
+        expect(result.current.finishResult).toEqual({ ok: false, earned: 0 });
+      },
+      { timeout: 6000 },
+    );
   });
 
   it('네트워크 오류는 3초 뒤 1회 재시도한다', async () => {
