@@ -544,3 +544,22 @@ body {
 .dot.on {
   background: var(--carrot);
 }
+
+.hud-seeds {
+  display: flex;
+  gap: 4px;
+  align-items: center;
+}
+
+.seed {
+  width: 12px;
+  height: 12px;
+  border-radius: 50%;
+  border: 2px solid var(--ink);
+  background: var(--card);
+}
+
+.seed.on {
+  background: var(--sun);
+}
+
