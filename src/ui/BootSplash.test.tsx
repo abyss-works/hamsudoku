@@ -4,9 +4,10 @@ import { render, screen } from '@testing-library/react';
 import { BootSplash } from './BootSplash';
 
 describe('BootSplash', () => {
-  it('로딩 상태를 알리고 마스코트와 도트를 보여준다', () => {
+  it('로딩 상태를 알리고 홈 문구와 하단 도트를 보여준다', () => {
     const { container } = render(<BootSplash />);
     expect(screen.getByRole('status', { name: '불러오는 중' })).toBeTruthy();
-    expect(container.querySelectorAll('.boot-dots span')).toHaveLength(3);
+    expect(screen.getByText('숨은 햄스터를 찾아라')).toBeTruthy();
+    expect(container.querySelectorAll('.boot-actions .boot-dots span')).toHaveLength(3);
   });
 });
