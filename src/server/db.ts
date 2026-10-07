@@ -29,6 +29,15 @@ export interface EndlessSummary {
   streak: StreakRow;
 }
 
+export interface EndlessEventRow {
+  seedLeft: number;
+  elapsedMs: number;
+  verified: boolean;
+  suspicious: boolean;
+  reason?: string;
+  createdAt: string;
+}
+
 export interface DbPort {
   ensureUser(userId: string, email: string | null): Promise<void>;
   listUsers(): Promise<{ userId: string; email: string | null; hasProfile: boolean }[]>;
@@ -50,14 +59,15 @@ export interface DbPort {
   commitEndlessClear(
     userId: string,
     stageId: string,
-    input: { earned: number; season: string; seedLeft: number; elapsedMs: number; suspicious: boolean },
+    input: { earned: number; season: string; seedLeft: number; elapsedMs: number; suspicious: boolean; atIso: string },
   ): Promise<EndlessSummary>;
-  commitEndlessFail(userId: string, stageId: string): Promise<{ streak: StreakRow }>;
+  commitEndlessFail(userId: string, stageId: string, atIso: string): Promise<{ streak: StreakRow }>;
   appendEndlessEvent(
     userId: string,
     stageId: string,
     input: { seedLeft: number; elapsedMs: number; verified: boolean; suspicious: boolean; reason?: string },
   ): Promise<void>;
+  listRecentEndlessEvents(userId: string, limit: number): Promise<EndlessEventRow[]>;
   getEndlessSummary(userId: string): Promise<EndlessSummary>;
 }
 
@@ -168,7 +178,7 @@ export function createMemoryDb(): DbPort {
     async commitEndlessClear(userId, stageId, input) {
       const key = progressKey(userId, stageId);
       const prev = endlessProgress.get(key) ?? { cleared: false, attempts: 0, lastPlayedAt: '' };
-      endlessProgress.set(key, { cleared: true, attempts: prev.attempts + 1, lastPlayedAt: new Date().toISOString() });
+      endlessProgress.set(key, { cleared: true, attempts: prev.attempts + 1, lastPlayedAt: input.atIso });
       wallets.set(userId, balanceOf(userId) + input.earned);
       const s = streakOf(userId);
       const next =
@@ -183,14 +193,14 @@ export function createMemoryDb(): DbPort {
         elapsedMs: input.elapsedMs,
         verified: true,
         suspicious: input.suspicious,
-        createdAt: new Date().toISOString(),
+        createdAt: input.atIso,
       });
       return { balance: balanceOf(userId), clearedCount: clearedCountOf(userId), streak: next };
     },
-    async commitEndlessFail(userId, stageId) {
+    async commitEndlessFail(userId, stageId, atIso) {
       const key = progressKey(userId, stageId);
       const prev = endlessProgress.get(key) ?? { cleared: false, attempts: 0, lastPlayedAt: '' };
-      endlessProgress.set(key, { ...prev, attempts: prev.attempts + 1, lastPlayedAt: new Date().toISOString() });
+      endlessProgress.set(key, { ...prev, attempts: prev.attempts + 1, lastPlayedAt: atIso });
       const s = streakOf(userId);
       const next = { current: 0, best: s.best };
       streaks.set(userId, next);
@@ -198,6 +208,20 @@ export function createMemoryDb(): DbPort {
     },
     async appendEndlessEvent(userId, stageId, input) {
       endlessEvents.push({ userId, stageId, ...input, createdAt: new Date().toISOString() });
+    },
+    async listRecentEndlessEvents(userId, limit) {
+      return endlessEvents
+        .filter((e) => e.userId === userId)
+        .slice(-limit)
+        .reverse()
+        .map((e) => ({
+          seedLeft: e.seedLeft,
+          elapsedMs: e.elapsedMs,
+          verified: e.verified,
+          suspicious: e.suspicious,
+          reason: e.reason,
+          createdAt: e.createdAt,
+        }));
     },
     async getEndlessSummary(userId) {
       return { balance: balanceOf(userId), clearedCount: clearedCountOf(userId), streak: streakOf(userId) };
@@ -340,8 +364,8 @@ export function createPrismaDb(): DbPort {
       return prisma.$transaction(async (tx) => {
         await tx.endlessProgress.upsert({
           where: { userId_stageId: { userId, stageId } },
-          create: { userId, stageId, cleared: true, attempts: 1, lastPlayedAt: new Date() },
-          update: { cleared: true, attempts: { increment: 1 }, lastPlayedAt: new Date() },
+          create: { userId, stageId, cleared: true, attempts: 1, lastPlayedAt: new Date(input.atIso) },
+          update: { cleared: true, attempts: { increment: 1 }, lastPlayedAt: new Date(input.atIso) },
         });
         const wallet = await tx.seedWallet.upsert({
           where: { userId },
@@ -366,12 +390,12 @@ export function createPrismaDb(): DbPort {
         return { balance: wallet.balance, clearedCount, streak: { current: streak.current, best: streak.best } };
       });
     },
-    async commitEndlessFail(userId, stageId) {
+    async commitEndlessFail(userId, stageId, atIso) {
       return prisma.$transaction(async (tx) => {
         await tx.endlessProgress.upsert({
           where: { userId_stageId: { userId, stageId } },
-          create: { userId, stageId, cleared: false, attempts: 1, lastPlayedAt: new Date() },
-          update: { attempts: { increment: 1 }, lastPlayedAt: new Date() },
+          create: { userId, stageId, cleared: false, attempts: 1, lastPlayedAt: new Date(atIso) },
+          update: { attempts: { increment: 1 }, lastPlayedAt: new Date(atIso) },
         });
         const prev = await tx.endlessStreak.findUnique({ where: { userId } });
         const streak = await tx.endlessStreak.upsert({
@@ -384,6 +408,21 @@ export function createPrismaDb(): DbPort {
     },
     async appendEndlessEvent(userId, stageId, input) {
       await prisma.endlessEvent.create({ data: { userId, stageId, ...input } });
+    },
+    async listRecentEndlessEvents(userId, limit) {
+      const rows = await prisma.endlessEvent.findMany({
+        where: { userId },
+        orderBy: { createdAt: 'desc' },
+        take: limit,
+      });
+      return rows.map((r) => ({
+        seedLeft: r.seedLeft,
+        elapsedMs: r.elapsedMs,
+        verified: r.verified,
+        suspicious: r.suspicious,
+        reason: r.reason ?? undefined,
+        createdAt: r.createdAt.toISOString(),
+      }));
     },
     async getEndlessSummary(userId) {
       const [wallet, clearedCount, streak] = await Promise.all([
