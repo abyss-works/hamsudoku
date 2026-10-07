@@ -28,8 +28,10 @@ export function HomeScreen({ email, nickname, uid, summary, onSaveNickname, onBr
   const [guestGateOpen, setGuestGateOpen] = useState(false);
 
   // 홈에 들어올 때마다 요약(씨앗 잔액·내 순위)을 최신으로 맞춘다.
+  // 조용한 재요청을 쓴다 — loading 토글이 부팅 게이트를 재고정하면 화면 전환 직후
+  // 스플래시로 되돌아가는 결함이 생긴다.
   useEffect(() => {
-    void summary.refresh();
+    void summary.refreshSoft();
     // summary 객체는 렌더마다 새로 만들어지므로 최초 1회만 본다.
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
