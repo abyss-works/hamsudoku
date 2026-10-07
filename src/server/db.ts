@@ -242,43 +242,60 @@ export function createMemoryDb(): DbPort {
 
 const prisma = new PrismaClient();
 
-export function createPrismaDb(): DbPort {
+// P2002는 코드 속성으로 판정한다. PrismaClientKnownRequestError의
+// instanceof 대신 code를 보는 이유는 복사본이 다른 클라이언트에서도
+// 동일하게 동작하고 테스트 스텁으로 재현할 수 있기 때문이다.
+function isUniqueConflict(e: unknown): boolean {
+  return typeof e === 'object' && e !== null && (e as { code?: unknown }).code === 'P2002';
+}
+
+export function createPrismaDb(client: PrismaClient = prisma): DbPort {
   return {
     async ensureUser(userId: string, email: string | null) {
-      await prisma.user.upsert({
-        where: { id: userId },
-        create: { id: userId, email },
-        update: email ? { email } : {},
-      });
-      await prisma.profile.upsert({
-        where: { userId },
-        create: { userId },
-        update: {},
-      });
+      try {
+        await client.user.upsert({
+          where: { id: userId },
+          create: { id: userId, email },
+          update: email ? { email } : {},
+        });
+      } catch (e) {
+        // 동시 첫 로그인 경합으로 행이 이미 있으면 update로 조정한다.
+        if (!isUniqueConflict(e)) throw e;
+        if (email) await client.user.update({ where: { id: userId }, data: { email } });
+      }
+      try {
+        await client.profile.upsert({
+          where: { userId },
+          create: { userId },
+          update: {},
+        });
+      } catch (e) {
+        if (!isUniqueConflict(e)) throw e;
+      }
     },
     async listUsers() {
-      const [all, profiles] = await Promise.all([prisma.user.findMany(), prisma.profile.findMany()]);
+      const [all, profiles] = await Promise.all([client.user.findMany(), client.profile.findMany()]);
       const withProfile = new Set(profiles.map((p) => p.userId));
       return all.map((r) => ({ userId: r.id, email: r.email, hasProfile: withProfile.has(r.id) }));
     },
     async getNickname(userId: string) {
-      const p = await prisma.profile.findUnique({ where: { userId } });
+      const p = await client.profile.findUnique({ where: { userId } });
       return p?.nickname ?? null;
     },
     async setNickname(userId: string, nickname: string) {
-      await prisma.profile.upsert({
+      await client.profile.upsert({
         where: { userId },
         create: { userId, nickname },
         update: { nickname },
       });
     },
     async lookupNicknames(userIds: string[]) {
-      const rows = await prisma.profile.findMany({ where: { userId: { in: userIds } } });
+      const rows = await client.profile.findMany({ where: { userId: { in: userIds } } });
       const found = new Map(rows.map((r) => [r.userId, r.nickname] as const));
       return Object.fromEntries(userIds.map((id) => [id, found.get(id) ?? null]));
     },
     async issueAttempt(userId: string, stageCode: string) {
-      const a = await prisma.attempt.create({ data: { userId, stageCode } });
+      const a = await client.attempt.create({ data: { userId, stageCode } });
       return {
         id: a.id,
         userId: a.userId,
@@ -288,7 +305,7 @@ export function createPrismaDb(): DbPort {
       };
     },
     async findAttempt(key: string) {
-      const a = await prisma.attempt.findUnique({ where: { id: key } });
+      const a = await client.attempt.findUnique({ where: { id: key } });
       if (!a) return null;
       return {
         id: a.id,
@@ -299,12 +316,12 @@ export function createPrismaDb(): DbPort {
       };
     },
     async useAttempt(userId: string, key: string, stageCode: string, nowIso: string) {
-      const updated = await prisma.attempt.updateMany({
+      const updated = await client.attempt.updateMany({
         where: { id: key, userId, stageCode, usedAt: null },
         data: { usedAt: new Date(nowIso) },
       });
       if (updated.count === 0) return null;
-      const a = await prisma.attempt.findUniqueOrThrow({ where: { id: key } });
+      const a = await client.attempt.findUniqueOrThrow({ where: { id: key } });
       return {
         id: a.id,
         userId: a.userId,
@@ -314,7 +331,7 @@ export function createPrismaDb(): DbPort {
       };
     },
     async recordVerified(userId: string, stageCode: string, elapsedSec: number, atIso: string) {
-      const prev = await prisma.clearRecord.findUnique({
+      const prev = await client.clearRecord.findUnique({
         where: { userId_stageCode: { userId, stageCode } },
       });
       const merged = mergeClear(
@@ -322,22 +339,22 @@ export function createPrismaDb(): DbPort {
         elapsedSec,
         atIso,
       );
-      await prisma.clearRecord.upsert({
+      await client.clearRecord.upsert({
         where: { userId_stageCode: { userId, stageCode } },
         create: { userId, stageCode, bestElapsedSec: merged.bestElapsedSec, attempts: merged.attempts, lastClearedAt: new Date(merged.lastClearedAt) },
         update: { bestElapsedSec: merged.bestElapsedSec, attempts: merged.attempts, lastClearedAt: new Date(merged.lastClearedAt) },
       });
-      await prisma.clearEvent.create({
+      await client.clearEvent.create({
         data: { userId, stageCode, elapsedSec, verified: true, clearedAt: new Date(atIso) },
       });
     },
     async recordUnverified(userId: string, stageCode: string, elapsedSec: number, atIso: string) {
-      await prisma.clearEvent.create({
+      await client.clearEvent.create({
         data: { userId, stageCode, elapsedSec, verified: false, clearedAt: new Date(atIso) },
       });
     },
     async listRecords(userId: string) {
-      const rows = await prisma.clearRecord.findMany({ where: { userId } });
+      const rows = await client.clearRecord.findMany({ where: { userId } });
       return {
         clears: rows.map((r) => ({
           stageCode: r.stageCode,
@@ -348,16 +365,16 @@ export function createPrismaDb(): DbPort {
       };
     },
     async insertStage(stage) {
-      await prisma.endlessStage.create({ data: stage });
+      await client.endlessStage.create({ data: stage });
     },
     async getStage(stageId) {
-      const s = await prisma.endlessStage.findUnique({ where: { id: stageId } });
+      const s = await client.endlessStage.findUnique({ where: { id: stageId } });
       return s
         ? { id: s.id, size: s.size, regions: s.regions, solution: s.solution, tier: s.tier, seed: s.seed }
         : null;
     },
     async pickUnclearedStage(userId) {
-      const rows = await prisma.$queryRaw<{ id: string }[]>`
+      const rows = await client.$queryRaw<{ id: string }[]>`
         SELECT s.id FROM "EndlessStage" s
         WHERE NOT EXISTS (
           SELECT 1 FROM "EndlessProgress" p
@@ -365,14 +382,14 @@ export function createPrismaDb(): DbPort {
         )
         ORDER BY random() LIMIT 1`;
       if (rows.length === 0) return null;
-      const s = await prisma.endlessStage.findUniqueOrThrow({ where: { id: rows[0].id } });
+      const s = await client.endlessStage.findUniqueOrThrow({ where: { id: rows[0].id } });
       return { id: s.id, size: s.size, regions: s.regions, solution: s.solution, tier: s.tier, seed: s.seed };
     },
     async countStages() {
-      return prisma.endlessStage.count();
+      return client.endlessStage.count();
     },
     async commitEndlessClear(userId, stageId, input) {
-      return prisma.$transaction(async (tx) => {
+      return client.$transaction(async (tx) => {
         await tx.endlessProgress.upsert({
           where: { userId_stageId: { userId, stageId } },
           create: { userId, stageId, cleared: true, attempts: 1, lastPlayedAt: new Date(input.atIso) },
@@ -402,7 +419,7 @@ export function createPrismaDb(): DbPort {
       });
     },
     async commitEndlessFail(userId, stageId, atIso) {
-      return prisma.$transaction(async (tx) => {
+      return client.$transaction(async (tx) => {
         await tx.endlessProgress.upsert({
           where: { userId_stageId: { userId, stageId } },
           create: { userId, stageId, cleared: false, attempts: 1, lastPlayedAt: new Date(atIso) },
@@ -418,10 +435,10 @@ export function createPrismaDb(): DbPort {
       });
     },
     async appendEndlessEvent(userId, stageId, input) {
-      await prisma.endlessEvent.create({ data: { userId, stageId, ...input } });
+      await client.endlessEvent.create({ data: { userId, stageId, ...input } });
     },
     async listRecentEndlessEvents(userId, limit) {
-      const rows = await prisma.endlessEvent.findMany({
+      const rows = await client.endlessEvent.findMany({
         where: { userId },
         orderBy: { createdAt: 'desc' },
         take: limit,
@@ -437,9 +454,9 @@ export function createPrismaDb(): DbPort {
     },
     async getEndlessSummary(userId) {
       const [wallet, clearedCount, streak] = await Promise.all([
-        prisma.seedWallet.findUnique({ where: { userId } }),
-        prisma.endlessProgress.count({ where: { userId, cleared: true } }),
-        prisma.endlessStreak.findUnique({ where: { userId } }),
+        client.seedWallet.findUnique({ where: { userId } }),
+        client.endlessProgress.count({ where: { userId, cleared: true } }),
+        client.endlessStreak.findUnique({ where: { userId } }),
       ]);
       return {
         balance: wallet?.balance ?? 0,
@@ -448,7 +465,7 @@ export function createPrismaDb(): DbPort {
       };
     },
     async listSeasonEarnings(season) {
-      const rows = await prisma.seedLedger.groupBy({
+      const rows = await client.seedLedger.groupBy({
         by: ['userId'],
         where: { season, kind: 'earn' },
         _sum: { amount: true },
