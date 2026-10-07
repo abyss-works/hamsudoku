@@ -1,8 +1,8 @@
 import { useState } from 'react';
 import { PawPrint, Settings, Sprout, Trophy, User } from 'lucide-react';
 import { Button } from '../ui/Button';
-import { HamsterFace } from '../ui/HamsterFace';
 import type { EndlessSummaryState } from '../game/useEndlessSummary';
+import { pickMascot } from '../ui/mascots';
 import { ProfileDialog } from './ProfileDialog';
 import { RankDialog } from './RankDialog';
 import { SettingsDialog } from './SettingsDialog';
@@ -23,6 +23,8 @@ export function HomeScreen({ email, nickname, summary, onSaveNickname, onBrowse,
   const [settingsOpen, setSettingsOpen] = useState(false);
   const [profileOpen, setProfileOpen] = useState(false);
   const [rankOpen, setRankOpen] = useState(false);
+  // 마운트마다 4종 중 1종을 균등 확률로 고르고 유지한다.
+  const [mascot] = useState(pickMascot);
 
   return (
     <div className="home">
@@ -41,7 +43,7 @@ export function HomeScreen({ email, nickname, summary, onSaveNickname, onBrowse,
         </div>
       )}
       <div className="home-mascot" aria-hidden="true">
-        <HamsterFace />
+        <img src={mascot} alt="" />
       </div>
       <h1 className="home-title">
         <PawPrint size={34} aria-hidden="true" /> hamsudoku

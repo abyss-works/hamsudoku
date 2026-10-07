@@ -153,6 +153,14 @@ body {
   display: block;
 }
 
+.home-mascot img {
+  width: 120px;
+  height: 120px;
+  display: block;
+  border-radius: 50%;
+  object-fit: cover;
+}
+
 .home-title {
   font-family: var(--font-display);
   font-size: clamp(40px, 13vw, 52px);

@@ -2,6 +2,7 @@
 import { afterEach, describe, expect, it, vi } from 'vitest';
 import { act, cleanup, fireEvent, render, screen } from '@testing-library/react';
 import App, { BOOT_TIMEOUT_MS } from './App';
+import { MASCOTS } from './ui/mascots';
 import { resetAuthApi } from './api/stagesApi';
 import { SelectScreen } from './screens/SelectScreen';
 import { LEVELS } from './game/levels.generated';
@@ -162,6 +163,21 @@ describe('화면 전환', () => {
     } finally {
       vi.useRealTimers();
     }
+  });
+
+  it('홈 로고는 마스코트 4종 중 하나를 쓴다', async () => {
+    stubFetch(async (url: string) => {
+      if (url.endsWith('/api/auth/me')) return Response.json({ uid: 'u1', email: 'e@x.y' });
+      if (url.endsWith('/api/records')) return Response.json({ clears: [] });
+      if (url.endsWith('/api/endless/me'))
+        return Response.json({ wallet: { balance: 2 }, clearedCount: 1, streak: { current: 0, best: 1 }, season: '2026-W41' });
+      if (url.endsWith('/api/endless/rank'))
+        return Response.json({ season: '2026-W41', top: [], snapshotAt: '2026-10-07T00:00:00.000Z', me: { rank: null, score: 0 } });
+      throw new Error(`unexpected ${url}`);
+    });
+    const { container } = render(<App />);
+    await screen.findByRole('button', { name: '스테이지' });
+    expect([...MASCOTS]).toContain(container.querySelector('.home-mascot img')?.getAttribute('src'));
   });
 
   it('기어는 설정 껍데기를 열고 닫는다', async () => {
