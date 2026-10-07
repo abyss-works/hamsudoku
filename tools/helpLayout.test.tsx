@@ -1,7 +1,7 @@
 // @vitest-environment jsdom
 import fs from 'node:fs';
 import path from 'node:path';
-import { afterEach, describe, expect, it } from 'vitest';
+import { afterEach, describe, expect, it, vi } from 'vitest';
 import { cleanup, render } from '@testing-library/react';
 import { ControlsHelp } from '../src/game/ControlsHelp';
 import { RulesHelp } from '../src/game/RulesHelp';
@@ -40,5 +40,11 @@ describe('도움말 레이아웃', () => {
       expect(cs.display).toBe('flex');
       expect(cs.flexDirection).toBe('column');
     }
+  });
+  it('조작 항목 렌더링에 경고가 없다', () => {
+    const spy = vi.spyOn(console, 'error').mockImplementation(() => {});
+    render(<ControlsHelp />);
+    expect(spy).not.toHaveBeenCalled();
+    spy.mockRestore();
   });
 });
