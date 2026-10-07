@@ -43,6 +43,13 @@ export const LEVEL_CONFIGS: Record<number, LevelConfig> = {
   5: { size: 7, count: 10, maxTier: 3, t1: { min: 1, max: 6 }, t2: { min: 0, max: 4 }, t3: { min: 0, max: 2 }, maxChain: 4, singles: { min: 0, max: 1 }, score: { min: 31, max: 90 } },
 };
 
+// 무한모드 풀 밴드. 레벨 4·5(7x7, tier 2~3) 수준을 모두 포함한다.
+export const ENDLESS_BAND: LevelConfig = {
+  size: 7, count: 1, maxTier: 3,
+  t1: { min: 1, max: 6 }, t2: { min: 0, max: 4 }, t3: { min: 0, max: 2 }, maxChain: 4,
+  singles: { min: 0, max: 1 }, score: { min: 15, max: 90 },
+};
+
 function within(v: number, r: Range): boolean {
   return v >= r.min && v <= r.max;
 }
