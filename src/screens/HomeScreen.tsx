@@ -5,6 +5,7 @@ import type { EndlessSummaryState } from '../game/useEndlessSummary';
 import { ProfileDialog } from './ProfileDialog';
 import { RankDialog } from './RankDialog';
 import { SettingsDialog } from './SettingsDialog';
+import { GuestEndlessDialog } from './GuestEndlessDialog';
 
 interface HomeScreenProps {
   email: string | null;
@@ -23,6 +24,8 @@ export function HomeScreen({ email, nickname, uid, summary, onSaveNickname, onBr
   const [settingsOpen, setSettingsOpen] = useState(false);
   const [profileOpen, setProfileOpen] = useState(false);
   const [rankOpen, setRankOpen] = useState(false);
+  const guest = endlessEnabled && uid !== null && email === null;
+  const [guestGateOpen, setGuestGateOpen] = useState(false);
 
   // 홈에 들어올 때마다 요약(씨앗 잔액·내 순위)을 최신으로 맞춘다.
   useEffect(() => {
@@ -63,7 +66,7 @@ export function HomeScreen({ email, nickname, uid, summary, onSaveNickname, onBr
             variant="sticker"
             className="btn-sun home-endless-main"
             disabled={!endlessEnabled}
-            onClick={onEndless}
+            onClick={guest ? () => setGuestGateOpen(true) : onEndless}
           >
             무한모드
           </Button>
@@ -83,6 +86,15 @@ export function HomeScreen({ email, nickname, uid, summary, onSaveNickname, onBr
         </div>
         {!endlessEnabled && <p className="home-note">무한모드는 온라인 연결이 필요해요</p>}
       </div>
+      {guestGateOpen && (
+        <GuestEndlessDialog
+          onClose={() => setGuestGateOpen(false)}
+          onLogin={() => {
+            setGuestGateOpen(false);
+            onLogin();
+          }}
+        />
+      )}
       {settingsOpen && <SettingsDialog onClose={() => setSettingsOpen(false)} />}
       {profileOpen && (
         <ProfileDialog
