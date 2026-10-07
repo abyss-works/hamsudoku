@@ -100,6 +100,22 @@ describe('화면 전환', () => {
     expect((endless as HTMLButtonElement).disabled).toBe(true);
   });
 
+  it('클라우드 홈은 지갑과 랭킹 카드를 보여준다', async () => {
+    stubFetch(async (url: string) => {
+      if (url.endsWith('/api/auth/me')) return Response.json({ uid: 'u1', email: 'e@x.y' });
+      if (url.endsWith('/api/records')) return Response.json({ clears: [] });
+      if (url.endsWith('/api/endless/me'))
+        return Response.json({ wallet: { balance: 5 }, clearedCount: 1, streak: { current: 0, best: 1 }, season: '2026-W41' });
+      if (url.endsWith('/api/endless/rank'))
+        return Response.json({ season: '2026-W41', top: [], snapshotAt: '2026-10-07T00:00:00.000Z', me: { rank: null, score: 0 } });
+      throw new Error(`unexpected ${url}`);
+    });
+    render(<App />);
+    expect(await screen.findByText('씨앗 5개')).toBeTruthy();
+    fireEvent.click(await screen.findByRole('button', { name: '랭킹' }));
+    expect(await screen.findByRole('dialog', { name: '랭킹' })).toBeTruthy();
+  });
+
   it('기어는 설정 껍데기를 열고 닫는다', () => {
     render(<App />);
     fireEvent.click(screen.getByRole('button', { name: '설정' }));
