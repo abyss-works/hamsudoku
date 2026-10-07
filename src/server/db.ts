@@ -69,6 +69,7 @@ export interface DbPort {
   ): Promise<void>;
   listRecentEndlessEvents(userId: string, limit: number): Promise<EndlessEventRow[]>;
   getEndlessSummary(userId: string): Promise<EndlessSummary>;
+  listSeasonEarnings(season: string): Promise<{ userId: string; amount: number }[]>;
 }
 
 let nextId = 0;
@@ -93,6 +94,7 @@ export function createMemoryDb(): DbPort {
     reason?: string;
     createdAt: string;
   }[] = [];
+  const seedLedger: { userId: string; amount: number; season: string }[] = [];
 
   const progressKey = (userId: string, stageId: string) => `${userId}:${stageId}`;
   const streakOf = (userId: string): StreakRow => streaks.get(userId) ?? { current: 0, best: 0 };
@@ -180,6 +182,7 @@ export function createMemoryDb(): DbPort {
       const prev = endlessProgress.get(key) ?? { cleared: false, attempts: 0, lastPlayedAt: '' };
       endlessProgress.set(key, { cleared: true, attempts: prev.attempts + 1, lastPlayedAt: input.atIso });
       wallets.set(userId, balanceOf(userId) + input.earned);
+      seedLedger.push({ userId, amount: input.earned, season: input.season });
       const s = streakOf(userId);
       const next =
         input.seedLeft === 3
@@ -225,6 +228,14 @@ export function createMemoryDb(): DbPort {
     },
     async getEndlessSummary(userId) {
       return { balance: balanceOf(userId), clearedCount: clearedCountOf(userId), streak: streakOf(userId) };
+    },
+    async listSeasonEarnings(season) {
+      const sums = new Map<string, number>();
+      for (const e of seedLedger) {
+        if (e.season !== season) continue;
+        sums.set(e.userId, (sums.get(e.userId) ?? 0) + e.amount);
+      }
+      return [...sums.entries()].map(([userId, amount]) => ({ userId, amount }));
     },
   };
 }
@@ -435,6 +446,14 @@ export function createPrismaDb(): DbPort {
         clearedCount,
         streak: { current: streak?.current ?? 0, best: streak?.best ?? 0 },
       };
+    },
+    async listSeasonEarnings(season) {
+      const rows = await prisma.seedLedger.groupBy({
+        by: ['userId'],
+        where: { season, kind: 'earn' },
+        _sum: { amount: true },
+      });
+      return rows.map((r) => ({ userId: r.userId, amount: r._sum.amount ?? 0 }));
     },
   };
 }
