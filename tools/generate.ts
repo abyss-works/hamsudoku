@@ -302,7 +302,7 @@ function parseArgs(argv: string[]): Args {
 
 export function renderModule(levels: GeneratedLevel[], seed: number, infos: PoolInfo[]): string {
   const lines = [
-    `// 생성 산출물. 직접 수정 금지 — npx tsx tools/generate.ts --seed ${seed} --level all 로 재생성한다.`,
+    `// 생성 산출물. 직접 수정 금지 — pnpm exec tsx tools/generate.ts --seed ${seed} --level all 로 재생성한다.`,
     `// 개수: ${levels.length}`,
     `// 가중치: ${WEIGHTS.version}`,
     `// 밴드: ${JSON.stringify(LEVEL_CONFIGS)}`,
