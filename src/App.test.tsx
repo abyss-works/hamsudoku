@@ -82,12 +82,22 @@ describe('화면 전환', () => {
     expect(await screen.findByRole('button', { name: '스테이지' })).toBeTruthy();
   });
 
-  it('홈은 스테이지·무한모드 두 진입만 보여준다', async () => {
+  it('홈은 스테이지·무한모드 두 진입을 보여준다', async () => {
     render(<App />);
     expect(await screen.findByRole('button', { name: '스테이지' })).toBeTruthy();
     const endless = await screen.findByRole('button', { name: '무한모드' });
-    expect((endless as HTMLButtonElement).disabled).toBe(true);
+    expect((endless as HTMLButtonElement).disabled).toBe(false);
     expect(screen.queryByRole('button', { name: '이어하기' })).toBeNull();
+  });
+
+  it('local 모드에서는 무한모드가 비활성화된다', async () => {
+    stubFetch(async (url: string) => {
+      if (url.endsWith('/api/auth/me')) return Response.json({ uid: null, email: null, cloud: false });
+      throw new Error(`unexpected ${url}`);
+    });
+    render(<App />);
+    const endless = await screen.findByRole('button', { name: '무한모드' });
+    expect((endless as HTMLButtonElement).disabled).toBe(true);
   });
 
   it('기어는 설정 껍데기를 열고 닫는다', () => {
