@@ -4,6 +4,7 @@ import {
   clearRequestSchema,
   clearResponseSchema,
   endlessMirrorSchema,
+  failRequestSchema,
   nextResponseSchema,
   rankResponseSchema,
   seasonIdSchema,
@@ -45,6 +46,14 @@ describe('계약 스키마', () => {
   it('clear 응답의 무효 분기를 파싱한다', () => {
     const parsed = clearResponseSchema.safeParse({ ok: false, reason: '하한 미달' });
     expect(parsed.success).toBe(true);
+  });
+
+  it('fail 요청을 파싱한다', () => {
+    expect(failRequestSchema.safeParse({ attemptKey: 'k' }).success).toBe(true);
+  });
+
+  it('fail 요청은 attemptKey 누락을 거부한다', () => {
+    expect(failRequestSchema.safeParse({}).success).toBe(false);
   });
 
   it('rank 응답의 me.rank null을 허용한다', () => {
