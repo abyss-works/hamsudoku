@@ -79,23 +79,15 @@ describe('화면 전환', () => {
     const cells = () => Array.from(container.querySelectorAll('.board .cell'));
     solutionOf('5-10').forEach((i) => fireEvent.dblClick(cells()[i]));
     fireEvent.click(screen.getByRole('button', { name: '다음 스테이지' }));
-    expect(await screen.findByRole('button', { name: '이어하기' })).toBeTruthy();
+    expect(await screen.findByRole('button', { name: '스테이지' })).toBeTruthy();
   });
 
-  it('이어하기는 최대 클리어의 다음으로 진입한다', async () => {
-    localStorage.setItem(
-      'hamsudoku:save:v1',
-      JSON.stringify({
-        v: 1,
-        clears: [{ stageCode: '2-1', clearedAt: 't', elapsedSec: 30, attempts: 1 }],
-        settings: { sound: true, vibration: true },
-        updatedAt: 't',
-      }),
-    );
-    const { container } = render(<App />);
-    fireEvent.click(await screen.findByRole('button', { name: '이어하기' }));
-    expect(container.querySelector('.board')).toBeTruthy();
-    expect(container.querySelectorAll('.board .cell')).toHaveLength(36);
+  it('홈은 스테이지·무한모드 두 진입만 보여준다', async () => {
+    render(<App />);
+    expect(await screen.findByRole('button', { name: '스테이지' })).toBeTruthy();
+    const endless = await screen.findByRole('button', { name: '무한모드' });
+    expect((endless as HTMLButtonElement).disabled).toBe(true);
+    expect(screen.queryByRole('button', { name: '이어하기' })).toBeNull();
   });
 
   it('기어는 설정 껍데기를 열고 닫는다', () => {
@@ -114,7 +106,7 @@ describe('화면 전환', () => {
     fireEvent.click(screen.getByRole('button', { name: '로그인' }));
     expect(await screen.findByRole('button', { name: '이메일로 계속하기' })).toBeTruthy();
     fireEvent.click(screen.getByRole('button', { name: '뒤로' }));
-    expect(await screen.findByRole('button', { name: '이어하기' })).toBeTruthy();
+    expect(await screen.findByRole('button', { name: '스테이지' })).toBeTruthy();
   });
 
   it('세션 만료 때 계정 화면으로 간다', async () => {
@@ -169,7 +161,7 @@ describe('화면 전환', () => {
     fireEvent.change(screen.getByLabelText('비밀번호'), { target: { value: '123456' } });
     fireEvent.click(screen.getByRole('button', { name: '이메일로 계속하기' }));
     expect(await screen.findByText('계정이 만들어졌다!')).toBeTruthy();
-    expect(await screen.findByRole('button', { name: '이어하기' }, { timeout: 5000 })).toBeTruthy();
+    expect(await screen.findByRole('button', { name: '스테이지' }, { timeout: 5000 })).toBeTruthy();
     expect(promoted).toBe(true);
     const saved = JSON.parse(localStorage.getItem('hamsudoku:save:v1') ?? '{}');
     expect(saved.clears).toEqual([
@@ -212,7 +204,7 @@ describe('화면 전환', () => {
     fireEvent.click(screen.getByRole('button', { name: '이메일로 계속하기' }));
     fireEvent.click(await screen.findByRole('button', { name: '로그인하기' }));
     expect(await screen.findByText('로그인됐다!')).toBeTruthy();
-    await screen.findByRole('button', { name: '이어하기' }, { timeout: 5000 });
+    await screen.findByRole('button', { name: '스테이지' }, { timeout: 5000 });
     await vi.waitFor(() => {
       const saved = JSON.parse(localStorage.getItem('hamsudoku:save:v1') ?? '{}');
       expect(saved.clears).toEqual([
@@ -237,7 +229,7 @@ describe('화면 전환', () => {
     fireEvent.change(screen.getByLabelText('이메일'), { target: { value: 'e@x.y' } });
     fireEvent.change(screen.getByLabelText('비밀번호'), { target: { value: '123456' } });
     fireEvent.click(screen.getByRole('button', { name: '이메일로 계속하기' }));
-    expect(await screen.findByRole('button', { name: '이어하기' }, { timeout: 5000 })).toBeTruthy();
+    expect(await screen.findByRole('button', { name: '스테이지' }, { timeout: 5000 })).toBeTruthy();
     expect(urls.filter((u) => u.includes('/api/records') || u.includes('/api/clear') || u.includes('/api/attempts'))).toEqual([]);
     const account = JSON.parse(localStorage.getItem('hamsudoku:account:v1') ?? '{}');
     expect(account.email).toBe('e@x.y');
@@ -276,7 +268,7 @@ describe('화면 전환', () => {
       fireEvent.change(screen.getByLabelText('새 비밀번호 확인'), { target: { value: 'abcdef' } });
       fireEvent.click(screen.getByRole('button', { name: '비밀번호 바꾸기' }));
       expect(await screen.findByText('비밀번호를 바꿨어요!')).toBeTruthy();
-      expect(await screen.findByRole('button', { name: '이어하기' }, { timeout: 5000 })).toBeTruthy();
+      expect(await screen.findByRole('button', { name: '스테이지' }, { timeout: 5000 })).toBeTruthy();
     } finally {
       window.history.pushState({}, '', '/');
     }
@@ -307,7 +299,7 @@ describe('화면 전환', () => {
       },
       { timeout: 5000 },
     );
-    expect(await screen.findByRole('button', { name: '이어하기' })).toBeTruthy();
+    expect(await screen.findByRole('button', { name: '스테이지' })).toBeTruthy();
   });
 
   it('게임 중 뒤로가기 후 재진입하면 빈판이다', async () => {
@@ -528,23 +520,6 @@ describe('레벨 탭 상태', () => {
     await screen.findByText('레벨 선택');
     expect(screen.getByRole('button', { name: '레벨 5' }).getAttribute('aria-pressed')).toBe('true');
     expect(screen.getByRole('button', { name: '레벨 1' }).getAttribute('aria-pressed')).toBe('false');
-  });
-
-  it('이어하기로 들어간 뒤 뒤로 가면 그 스테이지의 레벨 탭이 선택되어 있다', async () => {
-    localStorage.setItem(
-      'hamsudoku:save:v1',
-      JSON.stringify({
-        v: 1,
-        clears: [{ stageCode: '3-4', clearedAt: 't', elapsedSec: 30, attempts: 1 }],
-        settings: { sound: true, vibration: true },
-        updatedAt: 't',
-      }),
-    );
-    render(<App />);
-    fireEvent.click(await screen.findByRole('button', { name: '이어하기' }));
-    fireEvent.click(await screen.findByRole('button', { name: '뒤로' }));
-    await screen.findByText('레벨 선택');
-    expect(screen.getByRole('button', { name: '레벨 3' }).getAttribute('aria-pressed')).toBe('true');
   });
 });
 

@@ -123,6 +123,14 @@ body {
   padding: 12px 14px;
 }
 
+.home-note {
+  margin: 0;
+  text-align: center;
+  color: var(--ink-soft);
+  font-family: var(--font-help);
+  font-size: 14px;
+}
+
 .login {
   width: 100%;
   display: flex;
