@@ -14,6 +14,7 @@ import { LoginScreen } from './screens/LoginScreen';
 import { SelectScreen } from './screens/SelectScreen';
 import { SetPasswordScreen } from './screens/SetPasswordScreen';
 import { BootSplash } from './ui/BootSplash';
+import { LoadingProvider } from './ui/LoadingProvider';
 import { useFontsReady } from './ui/useFontsReady';
 
 export type Screen = 'home' | 'select' | 'game' | 'login' | 'recovery' | 'endless';
@@ -158,7 +159,8 @@ function App() {
   }, [ready]);
 
   return (
-    <main className="app">
+    <LoadingProvider>
+      <main className="app">
       {!ready ? (
         showBootLoading && <BootSplash />
       ) : (
@@ -216,7 +218,8 @@ function App() {
           )}
         </>
       )}
-    </main>
+      </main>
+    </LoadingProvider>
   );
 }
 

@@ -8,6 +8,7 @@ import type { Puzzle } from '../game/puzzles';
 import { Button } from '../ui/Button';
 import { Confetti } from '../ui/Confetti';
 import { Overlay } from '../ui/Overlay';
+import { useLoading } from '../ui/LoadingProvider';
 
 interface EndlessBoardProps {
   puzzle: Puzzle;
@@ -101,13 +102,14 @@ function ClearOverlay({
 
 export function EndlessGameScreen({ onBack }: { onBack: () => void }) {
   const session = useEndlessSession();
+  const { track } = useLoading();
   const startedRef = useRef(false);
 
   useEffect(() => {
     if (startedRef.current) return;
     startedRef.current = true;
-    void session.start();
-  }, [session]);
+    void track(session.start());
+  }, [session, track]);
 
   if (!session.puzzle) {
     return (
@@ -149,7 +151,7 @@ export function EndlessGameScreen({ onBack }: { onBack: () => void }) {
             error={session.error}
             submitting={session.submitting}
             starting={session.starting}
-            onNext={() => void session.start()}
+            onNext={() => void track(session.start())}
             onExit={onBack}
           />
         }
@@ -160,7 +162,7 @@ export function EndlessGameScreen({ onBack }: { onBack: () => void }) {
           <p className="clear-title">씨앗을 다 썼어요…</p>
           {session.error && <p className="home-note">{session.error}</p>}
           <div className="clear-actions">
-            <Button variant="sticker" className="btn-primary" onClick={() => void session.start()}>
+            <Button variant="sticker" className="btn-primary" onClick={() => void track(session.start())}>
               재도전
             </Button>
             <Button variant="sticker" onClick={onBack}>
