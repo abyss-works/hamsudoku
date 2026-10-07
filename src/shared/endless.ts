@@ -41,6 +41,12 @@ export const clearResponseSchema = z.discriminatedUnion('ok', [
   }),
 ]);
 
+export const failRequestSchema = z.object({
+  attemptKey: z.string().min(1),
+});
+
+export const failResponseSchema = z.object({ ok: z.literal(true) });
+
 export const rankEntrySchema = z.object({
   userId: z.string(),
   nickname: z.string().nullable(),
@@ -76,6 +82,8 @@ export type NextRequest = z.infer<typeof nextRequestSchema>;
 export type NextResponse = z.infer<typeof nextResponseSchema>;
 export type ClearRequest = z.infer<typeof clearRequestSchema>;
 export type ClearResponse = z.infer<typeof clearResponseSchema>;
+export type FailRequest = z.infer<typeof failRequestSchema>;
+export type FailResponse = z.infer<typeof failResponseSchema>;
 export type RankEntry = z.infer<typeof rankEntrySchema>;
 export type RankResponse = z.infer<typeof rankResponseSchema>;
 export type MeResponse = z.infer<typeof meResponseSchema>;
