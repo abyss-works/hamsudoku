@@ -5,13 +5,14 @@ import { useAccount } from './game/useAccount';
 import { fetchAttemptKey, pull, pushClear, reconcile } from './game/sync';
 import type { ClearEntry } from './game/save';
 import { useStages } from './game/useStages';
+import { EndlessGameScreen } from './screens/EndlessGameScreen';
 import { GameScreen } from './screens/GameScreen';
 import { HomeScreen } from './screens/HomeScreen';
 import { LoginScreen } from './screens/LoginScreen';
 import { SelectScreen } from './screens/SelectScreen';
 import { SetPasswordScreen } from './screens/SetPasswordScreen';
 
-export type Screen = 'home' | 'select' | 'game' | 'login' | 'recovery';
+export type Screen = 'home' | 'select' | 'game' | 'login' | 'recovery' | 'endless';
 
 function initialScreen(): Screen {
   if (typeof window === 'undefined') return 'home';
@@ -132,6 +133,8 @@ function App() {
         <HomeScreen
           loading={loading}
           onBrowse={() => setScreen('select')}
+          onEndless={() => setScreen('endless')}
+          endlessEnabled={account.cloud}
           email={account.email}
           nickname={account.nickname}
           onSaveNickname={account.saveNickname}
@@ -159,6 +162,7 @@ function App() {
           onRecord={handleRecord}
         />
       )}
+      {screen === 'endless' && <EndlessGameScreen onBack={() => setScreen('home')} />}
       {screen === 'login' && (
         <LoginScreen
           signup={account.signup}

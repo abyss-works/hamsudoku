@@ -82,12 +82,38 @@ describe('화면 전환', () => {
     expect(await screen.findByRole('button', { name: '스테이지' })).toBeTruthy();
   });
 
-  it('홈은 스테이지·무한모드 두 진입만 보여준다', async () => {
+  it('홈은 스테이지·무한모드 두 진입을 보여준다', async () => {
     render(<App />);
     expect(await screen.findByRole('button', { name: '스테이지' })).toBeTruthy();
     const endless = await screen.findByRole('button', { name: '무한모드' });
-    expect((endless as HTMLButtonElement).disabled).toBe(true);
+    expect((endless as HTMLButtonElement).disabled).toBe(false);
     expect(screen.queryByRole('button', { name: '이어하기' })).toBeNull();
+  });
+
+  it('local 모드에서는 무한모드가 비활성화된다', async () => {
+    stubFetch(async (url: string) => {
+      if (url.endsWith('/api/auth/me')) return Response.json({ uid: null, email: null, cloud: false });
+      throw new Error(`unexpected ${url}`);
+    });
+    render(<App />);
+    const endless = await screen.findByRole('button', { name: '무한모드' });
+    expect((endless as HTMLButtonElement).disabled).toBe(true);
+  });
+
+  it('클라우드 홈은 지갑과 랭킹 카드를 보여준다', async () => {
+    stubFetch(async (url: string) => {
+      if (url.endsWith('/api/auth/me')) return Response.json({ uid: 'u1', email: 'e@x.y' });
+      if (url.endsWith('/api/records')) return Response.json({ clears: [] });
+      if (url.endsWith('/api/endless/me'))
+        return Response.json({ wallet: { balance: 5 }, clearedCount: 1, streak: { current: 0, best: 1 }, season: '2026-W41' });
+      if (url.endsWith('/api/endless/rank'))
+        return Response.json({ season: '2026-W41', top: [], snapshotAt: '2026-10-07T00:00:00.000Z', me: { rank: null, score: 0 } });
+      throw new Error(`unexpected ${url}`);
+    });
+    render(<App />);
+    expect(await screen.findByText('씨앗 5개')).toBeTruthy();
+    fireEvent.click(await screen.findByRole('button', { name: '랭킹' }));
+    expect(await screen.findByRole('dialog', { name: '랭킹' })).toBeTruthy();
   });
 
   it('기어는 설정 껍데기를 열고 닫는다', () => {

@@ -1,4 +1,4 @@
-import { useEffect, useRef } from 'react';
+import { useEffect, useRef, type ReactNode } from 'react';
 import { motion, useAnimationControls } from 'framer-motion';
 import { Cell } from './Cell';
 import { ClearDialog } from './ClearDialog';
@@ -22,6 +22,7 @@ interface BoardProps {
   onReset: () => void;
   onNextMap: () => void;
   onBrowse: () => void;
+  clearOverlay?: ReactNode;
 }
 
 export function Board({
@@ -39,6 +40,7 @@ export function Board({
   onReset,
   onNextMap,
   onBrowse,
+  clearOverlay,
 }: BoardProps) {
   const suppressClick = useRef(false);
   const first = useRef(true);
@@ -155,7 +157,8 @@ export function Board({
           }),
         )}
       </div>
-      {cleared && <ClearDialog total={puzzle.size} onReset={onReset} onNextMap={onNextMap} onBrowse={onBrowse} />}
+      {cleared &&
+        (clearOverlay ?? <ClearDialog total={puzzle.size} onReset={onReset} onNextMap={onNextMap} onBrowse={onBrowse} />)}
     </motion.div>
   );
 }
