@@ -70,3 +70,10 @@ export async function rebuildFromLedger(db: DbPort, store: RankStore, season: st
   }
   return rows.length;
 }
+
+export function rankStoreFromEnv(env: Record<string, string | undefined> = process.env): RankStore | null {
+  const url = env.UPSTASH_REDIS_REST_URL;
+  const token = env.UPSTASH_REDIS_REST_TOKEN;
+  if (!url || !token) return null;
+  return createRankStore({ url, token });
+}
