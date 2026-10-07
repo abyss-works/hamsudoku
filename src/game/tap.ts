@@ -2,8 +2,8 @@ import type { CellState } from './puzzles';
 
 export type TapKind = 'single' | 'double';
 
-export const SINGLE_TAP_MS_MOUSE = 150;
-export const SINGLE_TAP_MS_TOUCH = 250;
+export const SINGLE_TAP_MS_MOUSE = 80;
+export const SINGLE_TAP_MS_TOUCH = 130;
 
 export function delayForPointerType(t: string | null | undefined): number {
   return t === 'touch' ? SINGLE_TAP_MS_TOUCH : SINGLE_TAP_MS_MOUSE;

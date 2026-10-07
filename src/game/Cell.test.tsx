@@ -35,7 +35,7 @@ describe('Cell', () => {
     expect(onTap).toHaveBeenCalledWith('double');
   });
 
-  it('터치는 250ms 뒤에 전달된다', () => {
+  it('터치는 130ms 뒤에 전달된다', () => {
     vi.useFakeTimers();
     const onTap = vi.fn();
     render(<Cell row={0} col={0} state="empty" islandId={0} conflicted={false} onTap={onTap} onPress={() => {}} />);
@@ -43,11 +43,11 @@ describe('Cell', () => {
     fireEvent.pointerDown(btn, { pointerType: 'touch' });
     fireEvent.click(btn);
     act(() => {
-      vi.advanceTimersByTime(150);
+      vi.advanceTimersByTime(100);
     });
     expect(onTap).not.toHaveBeenCalled();
     act(() => {
-      vi.advanceTimersByTime(100);
+      vi.advanceTimersByTime(50);
     });
     expect(onTap).toHaveBeenCalledWith('single');
   });
