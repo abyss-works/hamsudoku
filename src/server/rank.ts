@@ -18,6 +18,7 @@ export interface RankStore {
 }
 
 const TOP_TTL_SEC = 60;
+const SEASON_TTL_SEC = 14 * 24 * 60 * 60;
 
 export function createRankStore(opts: { url: string; token: string; fetchImpl?: typeof fetch }): RankStore {
   const doFetch = opts.fetchImpl ?? fetch;
@@ -39,6 +40,7 @@ export function createRankStore(opts: { url: string; token: string; fetchImpl?: 
   return {
     async increment(season, userId, amount) {
       await cmd(['zincrby', key(season), amount, userId]);
+      await cmd(['expire', key(season), SEASON_TTL_SEC]);
     },
     async top(season, limit) {
       const cached = await cmd<string | null>(['get', topKey(season)]);
@@ -59,6 +61,7 @@ export function createRankStore(opts: { url: string; token: string; fetchImpl?: 
     },
     async setScore(season, userId, score) {
       await cmd(['zadd', key(season), score, userId]);
+      await cmd(['expire', key(season), SEASON_TTL_SEC]);
     },
   };
 }

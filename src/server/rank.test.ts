@@ -23,6 +23,13 @@ describe('createRankStore', () => {
     expect(JSON.parse(String(calls[0].init.body))).toEqual(['zincrby', 'rank:2026-W41', 3, 'u1']);
   });
 
+  it('increment는 시즌 키에 만료 TTL을 건다', async () => {
+    const calls: Call[] = [];
+    const store = makeStore([7, 1], calls);
+    await store.increment('2026-W41', 'u1', 3);
+    expect(JSON.parse(String(calls[1].init.body))).toEqual(['expire', 'rank:2026-W41', 1209600]);
+  });
+
   it('top은 스냅샷이 없으면 만들고 저장한다', async () => {
     const calls: Call[] = [];
     const store = makeStore([null, ['u1', 9, 'u2', 4], 'OK'], calls);
@@ -65,9 +72,10 @@ describe('rebuildFromLedger', () => {
     await db.insertStage({ id: 'e-1', size: 7, regions: '0'.repeat(49), solution: '0,0', tier: 2, seed: 1 });
     await db.commitEndlessClear('u1', 'e-1', { earned: 3, season: '2026-W41', seedLeft: 3, elapsedMs: 30000, suspicious: false, atIso: '2026-10-07T00:00:00.000Z' });
     const calls: Call[] = [];
-    const store = makeStore(['OK'], calls);
+    const store = makeStore(['OK', 'OK'], calls);
     expect(await rebuildFromLedger(db, store, '2026-W41')).toBe(1);
     expect(JSON.parse(String(calls[0].init.body))).toEqual(['zadd', 'rank:2026-W41', 3, 'u1']);
+    expect(JSON.parse(String(calls[1].init.body))).toEqual(['expire', 'rank:2026-W41', 1209600]);
   });
 });
 
