@@ -11,6 +11,7 @@ import { HomeScreen } from './screens/HomeScreen';
 import { LoginScreen } from './screens/LoginScreen';
 import { SelectScreen } from './screens/SelectScreen';
 import { SetPasswordScreen } from './screens/SetPasswordScreen';
+import { useFontsReady } from './ui/useFontsReady';
 
 export type Screen = 'home' | 'select' | 'game' | 'login' | 'recovery' | 'endless';
 
@@ -28,6 +29,9 @@ function App() {
   const { clears, record, replace, mergeIn, reset } = useClears();
   const account = useAccount();
   const { chapters, loading, error } = useStages();
+  // 웹폰트 교체 요동을 막으려고 폰트가 올라오기 전에는 빈 셸만 둔다.
+  // 타임아웃이 지나면 폰트 없이도 렌더한다.
+  const fontsReady = useFontsReady();
   const attemptKeys = useRef(new Map<string, string>());
   const clearsRef = useRef<ClearEntry[]>([]);
   clearsRef.current = [...clears.values()];
@@ -129,56 +133,60 @@ function App() {
 
   return (
     <main className="app">
-      {screen === 'home' && (
-        <HomeScreen
-          loading={loading}
-          onBrowse={() => setScreen('select')}
-          onEndless={() => setScreen('endless')}
-          endlessEnabled={account.cloud}
-          email={account.email}
-          nickname={account.nickname}
-          onSaveNickname={account.saveNickname}
-          onLogin={() => setScreen('login')}
-          onLogout={handleLogout}
-        />
-      )}
-      {screen === 'select' && (
-        <SelectScreen
-          chapters={chapters}
-          loading={loading}
-          error={error}
-          clears={clears}
-          initialChapterId={chapterId}
-          onSelect={enter}
-          onBack={() => setScreen('home')}
-        />
-      )}
-      {screen === 'game' && stage && (
-        <GameScreen
-          key={stage.id}
-          stage={stage}
-          onBack={() => setScreen('select')}
-          onNextMap={goNextMap}
-          onRecord={handleRecord}
-        />
-      )}
-      {screen === 'endless' && <EndlessGameScreen onBack={() => setScreen('home')} />}
-      {screen === 'login' && (
-        <LoginScreen
-          signup={account.signup}
-          signin={signinThenSwitch}
-          reset={account.reset}
-          cloud={account.cloud}
-          onBack={() => setScreen('home')}
-          onDone={() => setScreen('home')}
-        />
-      )}
-      {screen === 'recovery' && (
-        <SetPasswordScreen
-          setPassword={account.setPassword}
-          linkError={new URLSearchParams(window.location.search).get('recovery') === 'error'}
-          onDone={goHome}
-        />
+      {!fontsReady ? null : (
+        <>
+          {screen === 'home' && (
+            <HomeScreen
+              loading={loading}
+              onBrowse={() => setScreen('select')}
+              onEndless={() => setScreen('endless')}
+              endlessEnabled={account.cloud}
+              email={account.email}
+              nickname={account.nickname}
+              onSaveNickname={account.saveNickname}
+              onLogin={() => setScreen('login')}
+              onLogout={handleLogout}
+            />
+          )}
+          {screen === 'select' && (
+            <SelectScreen
+              chapters={chapters}
+              loading={loading}
+              error={error}
+              clears={clears}
+              initialChapterId={chapterId}
+              onSelect={enter}
+              onBack={() => setScreen('home')}
+            />
+          )}
+          {screen === 'game' && stage && (
+            <GameScreen
+              key={stage.id}
+              stage={stage}
+              onBack={() => setScreen('select')}
+              onNextMap={goNextMap}
+              onRecord={handleRecord}
+            />
+          )}
+          {screen === 'endless' && <EndlessGameScreen onBack={() => setScreen('home')} />}
+          {screen === 'login' && (
+            <LoginScreen
+              signup={account.signup}
+              signin={signinThenSwitch}
+              reset={account.reset}
+              cloud={account.cloud}
+              onBack={() => setScreen('home')}
+              onDone={() => setScreen('home')}
+            />
+          )}
+          {screen === 'recovery' && (
+            <SetPasswordScreen
+              setPassword={account.setPassword}
+              linkError={new URLSearchParams(window.location.search).get('recovery') === 'error'}
+              onDone={goHome}
+            />
+          )}
+        </>
       )}
     </main>
   );
