@@ -2,7 +2,6 @@
 import { afterEach, describe, expect, it, vi } from 'vitest';
 import { act, cleanup, fireEvent, render, screen } from '@testing-library/react';
 import App, { BOOT_TIMEOUT_MS } from './App';
-import { MASCOTS } from './ui/mascots';
 import { resetAuthApi } from './api/stagesApi';
 import { SelectScreen } from './screens/SelectScreen';
 import { LEVELS } from './game/levels.generated';
@@ -165,7 +164,7 @@ describe('화면 전환', () => {
     }
   });
 
-  it('홈 로고는 마스코트 4종 중 하나를 쓴다', async () => {
+  it('홈 로고는 원본 마스코트를 쓴다', async () => {
     stubFetch(async (url: string) => {
       if (url.endsWith('/api/auth/me')) return Response.json({ uid: 'u1', email: 'e@x.y' });
       if (url.endsWith('/api/records')) return Response.json({ clears: [] });
@@ -177,7 +176,7 @@ describe('화면 전환', () => {
     });
     const { container } = render(<App />);
     await screen.findByRole('button', { name: '스테이지' });
-    expect([...MASCOTS]).toContain(container.querySelector('.home-mascot img')?.getAttribute('src'));
+    expect(container.querySelector('.home-mascot img')?.getAttribute('src')).toBe('/hamster-mascot.svg');
   });
 
   it('기어는 설정 껍데기를 열고 닫는다', async () => {
