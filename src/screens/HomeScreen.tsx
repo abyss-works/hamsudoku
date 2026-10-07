@@ -3,6 +3,7 @@ import { PawPrint, Settings, Sprout, Trophy, User } from 'lucide-react';
 import { Button } from '../ui/Button';
 import { HamsterFace } from '../ui/HamsterFace';
 import { useEndlessSummary } from '../game/useEndlessSummary';
+import { useDelayedLoading } from '../ui/useDelayedLoading';
 import { ProfileDialog } from './ProfileDialog';
 import { RankDialog } from './RankDialog';
 import { SettingsDialog } from './SettingsDialog';
@@ -24,6 +25,7 @@ export function HomeScreen({ loading, email, nickname, onSaveNickname, onBrowse,
   const [profileOpen, setProfileOpen] = useState(false);
   const [rankOpen, setRankOpen] = useState(false);
   const summary = useEndlessSummary(endlessEnabled);
+  const showLoading = useDelayedLoading(loading);
 
   return (
     <div className="home">
@@ -49,7 +51,7 @@ export function HomeScreen({ loading, email, nickname, onSaveNickname, onBrowse,
       </h1>
       <p className="home-sub">숨은 햄스터를 찾아라</p>
       <div className="home-actions">
-        {loading && <p>불러오는 중…</p>}
+        {showLoading && <p>불러오는 중…</p>}
         <Button variant="sticker" className="btn-primary" onClick={onBrowse}>
           스테이지
         </Button>
