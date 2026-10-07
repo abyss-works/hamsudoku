@@ -1,6 +1,6 @@
 import { z } from 'zod';
 
-export const seasonIdSchema = z.string().regex(/^\d{4}-W\d{2}$/);
+export const seasonIdSchema = z.string().regex(/^\d{4}-W(0[1-9]|[1-4]\d|5[0-3])$/);
 
 export const endlessStageSchema = z.object({
   id: z.string().min(1),
@@ -27,13 +27,19 @@ export const clearRequestSchema = z.object({
   seedLeft: z.number().int().min(0).max(3),
 });
 
-export const clearResponseSchema = z.object({
-  ok: z.literal(true),
-  earned: z.number().int().min(0).max(3),
-  balance: z.number().int().min(0),
-  streak: z.number().int().min(0),
-  suspicious: z.boolean(),
-});
+export const clearResponseSchema = z.discriminatedUnion('ok', [
+  z.object({
+    ok: z.literal(true),
+    earned: z.number().int().min(0).max(3),
+    balance: z.number().int().min(0),
+    streak: z.number().int().min(0),
+    suspicious: z.boolean(),
+  }),
+  z.object({
+    ok: z.literal(false),
+    reason: z.string().min(1),
+  }),
+]);
 
 export const rankEntrySchema = z.object({
   userId: z.string(),
@@ -44,7 +50,7 @@ export const rankEntrySchema = z.object({
 export const rankResponseSchema = z.object({
   season: seasonIdSchema,
   top: z.array(rankEntrySchema),
-  snapshotAt: z.string(),
+  snapshotAt: z.iso.datetime(),
   me: z.object({ rank: z.number().int().min(1).nullable(), score: z.number().int().min(0) }),
 });
 

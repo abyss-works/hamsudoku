@@ -6,6 +6,7 @@ import {
   endlessMirrorSchema,
   nextResponseSchema,
   rankResponseSchema,
+  seasonIdSchema,
 } from './endless';
 
 describe('계약 스키마', () => {
@@ -41,6 +42,11 @@ describe('계약 스키마', () => {
     expect(parsed.success).toBe(true);
   });
 
+  it('clear 응답의 무효 분기를 파싱한다', () => {
+    const parsed = clearResponseSchema.safeParse({ ok: false, reason: '하한 미달' });
+    expect(parsed.success).toBe(true);
+  });
+
   it('rank 응답의 me.rank null을 허용한다', () => {
     const parsed = rankResponseSchema.safeParse({
       season: '2026-W41',
@@ -49,6 +55,22 @@ describe('계약 스키마', () => {
       me: { rank: null, score: 0 },
     });
     expect(parsed.success).toBe(true);
+  });
+
+  it('rank 응답은 잘못된 snapshotAt을 거부한다', () => {
+    const parsed = rankResponseSchema.safeParse({
+      season: '2026-W41',
+      top: [],
+      snapshotAt: 'x',
+      me: { rank: null, score: 0 },
+    });
+    expect(parsed.success).toBe(false);
+  });
+
+  it('seasonIdSchema가 W00과 W54 이상을 거부한다', () => {
+    expect(seasonIdSchema.safeParse('2026-W41').success).toBe(true);
+    expect(seasonIdSchema.safeParse('2026-W00').success).toBe(false);
+    expect(seasonIdSchema.safeParse('2026-W54').success).toBe(false);
   });
 
   it('미러 스키마와 저장 키를 노출한다', () => {
