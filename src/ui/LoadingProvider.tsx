@@ -28,7 +28,8 @@ export function LoadingProvider({ children }: { children: ReactNode }) {
       },
     );
   }, []);
-  const show = useDelayedLoading(pending > 0);
+  // 베일은 끝나면 즉시 치운다. 임계(80ms) 덕분에 짧은 작업은 뜨지도 않는다.
+  const show = useDelayedLoading(pending > 0, 80, 0);
 
   return (
     <LoadingContext.Provider value={{ track }}>
