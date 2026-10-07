@@ -1,5 +1,5 @@
 import fs from 'node:fs';
-import { countSingles, inBand, LEVEL_CONFIGS, poolTarget, type GeneratedLevel, type ShapeInfo } from '../src/game/levels';
+import { countSingles, ENDLESS_BAND, inBand, LEVEL_CONFIGS, poolTarget, type GeneratedLevel, type ShapeInfo } from '../src/game/levels';
 import { measure, WEIGHTS, type Measure } from '../src/game/logic';
 import type { Pos } from '../src/game/solver';
 import { checkIslands, countSolutions } from '../src/game/solver';
@@ -194,6 +194,28 @@ export function generateLevel(level: number, seed: number): { levels: GeneratedL
     })),
     info: { level, pool: pool.length, scoreMin: pool[0].m.score, scoreMax: pool[pool.length - 1].m.score },
   };
+}
+
+export interface EndlessCandidate {
+  islands: number[][];
+  solution: Pos[];
+  tier: number;
+}
+
+export function generateEndlessPool(seed: number, target: number): EndlessCandidate[] {
+  const rand = mulberry32(seed + 1000);
+  const out: EndlessCandidate[] = [];
+  const seen = new Set<string>();
+  for (let attempt = 0; attempt < MAX_ATTEMPTS * 20 && out.length < target; attempt += 1) {
+    const cand = sampleCandidate(ENDLESS_BAND.size, rand);
+    if (!cand) continue;
+    const key = JSON.stringify(cand.islands);
+    if (seen.has(key)) continue;
+    if (!inBand(cand.m, cand.sh, ENDLESS_BAND)) continue;
+    seen.add(key);
+    out.push({ islands: cand.islands, solution: cand.solution, tier: cand.m.tier });
+  }
+  return out;
 }
 
 export function quantile(sorted: number[], p: number): number {
