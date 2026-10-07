@@ -31,9 +31,12 @@ describe('LoadingProvider', () => {
       </LoadingProvider>,
     );
     fireEvent.click(screen.getByRole('button', { name: 'go' }));
-    expect(container.querySelector('.loading-veil')).toBeNull();
     act(() => {
       vi.advanceTimersByTime(100);
+    });
+    expect(container.querySelector('.loading-veil')).toBeNull();
+    act(() => {
+      vi.advanceTimersByTime(150);
     });
     expect(container.querySelector('.loading-veil')).toBeTruthy();
   });
@@ -51,7 +54,7 @@ describe('LoadingProvider', () => {
     );
     fireEvent.click(screen.getByRole('button', { name: 'go' }));
     act(() => {
-      vi.advanceTimersByTime(100);
+      vi.advanceTimersByTime(250);
     });
     expect(container.querySelector('.loading-veil')).toBeTruthy();
     await act(async () => {
@@ -73,7 +76,7 @@ describe('LoadingProvider', () => {
     );
     fireEvent.click(screen.getByRole('button', { name: 'go' }));
     act(() => {
-      vi.advanceTimersByTime(100);
+      vi.advanceTimersByTime(250);
     });
     expect(container.querySelector('.loading-veil')).toBeTruthy();
     await act(async () => {
