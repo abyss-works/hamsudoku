@@ -3,6 +3,7 @@ import type { Chapter, Stage } from '../api/stagesApi';
 import { formatElapsed } from '../game/useElapsed';
 import type { ClearEntry } from '../game/save';
 import { Button } from '../ui/Button';
+import { useDelayedLoading } from '../ui/useDelayedLoading';
 
 interface SelectScreenProps {
   chapters: Chapter[];
@@ -17,6 +18,7 @@ interface SelectScreenProps {
 export function SelectScreen({ chapters, loading, error, clears, initialChapterId, onSelect, onBack }: SelectScreenProps) {
   const [selectedId, setSelectedId] = useState<string | null>(initialChapterId ?? null);
   const active = chapters.find((c) => c.id === selectedId) ?? chapters[0];
+  const showLoading = useDelayedLoading(loading);
 
   return (
     <div className="select">
@@ -26,7 +28,7 @@ export function SelectScreen({ chapters, loading, error, clears, initialChapterI
         </Button>
         <h2 className="select-title">레벨 선택</h2>
       </div>
-      {loading && <p>불러오는 중…</p>}
+      {showLoading && <p>불러오는 중…</p>}
       {!loading && error && <p role="alert">{error}</p>}
       {!loading && !error && chapters.length === 0 && <p>스테이지가 없어요</p>}
       {!loading && !error && chapters.length > 0 && (

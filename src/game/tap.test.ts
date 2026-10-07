@@ -31,11 +31,11 @@ describe('nextState', () => {
 });
 
 describe('delayForPointerType', () => {
-  it('터치는 250ms, 나머지는 150ms다', () => {
-    expect(delayForPointerType('touch')).toBe(250);
-    expect(delayForPointerType('mouse')).toBe(150);
-    expect(delayForPointerType('pen')).toBe(150);
-    expect(delayForPointerType(null)).toBe(150);
+  it('터치는 130ms, 나머지는 80ms다', () => {
+    expect(delayForPointerType('touch')).toBe(130);
+    expect(delayForPointerType('mouse')).toBe(80);
+    expect(delayForPointerType('pen')).toBe(80);
+    expect(delayForPointerType(null)).toBe(80);
   });
 });
 

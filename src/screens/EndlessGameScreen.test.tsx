@@ -1,6 +1,6 @@
 // @vitest-environment jsdom
 import { afterEach, describe, expect, it, vi } from 'vitest';
-import { cleanup, fireEvent, render, screen, waitFor } from '@testing-library/react';
+import { act, cleanup, fireEvent, render, screen, waitFor } from '@testing-library/react';
 import { encryptSolution } from '../server/crypto';
 import { PUZZLES } from '../game/puzzles';
 import { EndlessGameScreen } from './EndlessGameScreen';
@@ -42,6 +42,31 @@ afterEach(() => {
 });
 
 describe('EndlessGameScreen', () => {
+  it('판이 오기 전에는 보드를 그리지 않는다', async () => {
+    vi.useFakeTimers();
+    try {
+      vi.stubGlobal(
+        'fetch',
+        vi.fn(async (url: string) => {
+          if (url === '/api/endless/next') return new Promise<Response>(() => {});
+          if (url === '/api/endless/fail') return Response.json({ ok: true });
+          throw new Error(`unexpected ${url}`);
+        }),
+      );
+      const { container } = render(<EndlessGameScreen onBack={() => {}} />);
+      await act(async () => {});
+      expect(container.querySelector('.board')).toBeNull();
+      expect(screen.queryByRole('status', { name: '불러오는 중' })).toBeNull();
+      await act(async () => {
+        vi.advanceTimersByTime(200);
+      });
+      expect(screen.getByRole('status', { name: '불러오는 중' })).toBeTruthy();
+      expect(container.querySelector('.board')).toBeNull();
+    } finally {
+      vi.useRealTimers();
+    }
+  });
+
   it('시작하면 보드와 씨앗 3이 보인다', async () => {
     stubFetch();
     const { container } = render(<EndlessGameScreen onBack={() => {}} />);
@@ -127,5 +152,30 @@ describe('EndlessGameScreen', () => {
     fireEvent.click(screen.getByRole('button', { name: '다음 판' }));
     expect(await screen.findByText('무한모드를 불러오지 못했어요.')).toBeTruthy();
     await waitFor(() => expect((screen.getByRole('button', { name: '다음 판' }) as HTMLButtonElement).disabled).toBe(false));
+  });
+
+  it('씨앗은 컨테이너 씨앗 박스에 보인다', async () => {
+    stubFetch();
+    const { container } = render(<EndlessGameScreen onBack={() => {}} />);
+    expect(await screen.findByRole('status', { name: '씨앗 3/3' })).toBeTruthy();
+    expect(container.querySelector('.mode-status .seed-box')).toBeTruthy();
+  });
+
+  it('리셋은 임시마커만 지우고 햄스터는 남긴다', async () => {
+    stubFetch();
+    const { container } = render(<EndlessGameScreen onBack={() => {}} />);
+    await screen.findByRole('status', { name: '씨앗 3/3' });
+    const cells = () => Array.from(container.querySelectorAll('.board .cell'));
+    const sol = new Set(SOLUTION_INDEXES);
+    const at = (c: Element) => Number(c.getAttribute('data-r')) * PUZZLE.size + Number(c.getAttribute('data-c'));
+    fireEvent.dblClick(cells()[SOLUTION_INDEXES[0]]);
+    expect(await screen.findByRole('button', { name: /햄스터/ })).toBeTruthy();
+    const markCell = cells().find((c) => c.getAttribute('data-state') === 'empty' && !sol.has(at(c)));
+    expect(markCell).toBeTruthy();
+    fireEvent.click(markCell as Element);
+    expect(await screen.findAllByRole('button', { name: /X 표시/ })).not.toHaveLength(0);
+    fireEvent.click(screen.getByRole('button', { name: '리셋' }));
+    await waitFor(() => expect(screen.queryAllByRole('button', { name: /X 표시/ })).toHaveLength(0));
+    expect(screen.getAllByRole('button', { name: /햄스터/ })).not.toHaveLength(0);
   });
 });

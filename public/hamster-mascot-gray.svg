@@ -1,0 +1,101 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 370 342" role="img" aria-label="회색 햄스터">
+  <defs>
+    <clipPath id="hm-gray-clip">
+      <circle cx="183.4" cy="126.5" r="222.8" />
+    </clipPath>
+    <linearGradient id="hm-gray-fur" x1="0" y1="0" x2="0" y2="1">
+      <stop offset="0" stop-color="#c3bdb7" />
+      <stop offset="0.6" stop-color="#c0bab4" />
+      <stop offset="1" stop-color="#b4ada7" />
+    </linearGradient>
+    <linearGradient id="hm-gray-paw" x1="0" y1="0" x2="0" y2="1">
+      <stop offset="0" stop-color="#fff6e3" />
+      <stop offset="0.62" stop-color="#fdf1db" />
+      <stop offset="1" stop-color="#e8cda4" />
+    </linearGradient>
+  </defs>
+
+  <!-- 귀: 머리 뒤에 놓여 아래쪽 절반이 가려진다 -->
+  <circle cx="75" cy="57" r="44" fill="#99908a" />
+  <circle cx="81" cy="62" r="29" fill="#f1b696" />
+  <circle cx="293" cy="57" r="44" fill="#99908a" />
+  <circle cx="287" cy="62" r="29" fill="#f1b696" />
+
+  <g clip-path="url(#hm-gray-clip)">
+    <!-- 머리와 몸통 -->
+    <path
+      fill="url(#hm-gray-fur)"
+      d="M184 31
+         C 150 31 122 36 102 47
+         C 80 59 62 76 52 98
+         C 45 112 41 120 37 128
+         C 33 141 27 150 19 155
+         L 12 154 L 16 163
+         C 10 175 6 188 4 202
+         C 2 214 2 226 4 236
+         L 0 242 L 5 246
+         C 6 268 10 292 14 318
+         L 354 318
+         C 358 292 362 268 363 246
+         L 368 242 L 364 236
+         C 366 226 366 214 364 202
+         C 362 188 358 175 352 163
+         L 356 154 L 349 155
+         C 341 150 335 141 331 128
+         C 327 120 323 112 316 98
+         C 306 76 288 59 266 47
+         C 246 36 218 31 184 31 Z" />
+    <!-- 정수리 털 -->
+    <path
+      fill="#c3bdb7"
+      d="M144 42
+         C 141 31 146 21 157 16
+         C 157 25 161 30 166 34
+         C 165 23 171 16 181 13
+         C 179 23 182 29 187 33
+         C 189 24 196 19 204 20
+         C 198 27 198 35 202 44 Z" />
+    <!-- 앞발 사이 밝은 배 -->
+    <ellipse cx="184" cy="300" rx="96" ry="19" fill="#d3cfca" />
+
+    <!-- 앞발 -->
+    <path fill="url(#hm-gray-paw)" d="M62 300 C 62 279 81 264 103 264 C 125 264 144 279 144 300 L 144 312 C 144 324 136 331 124 331 L 82 331 C 70 331 62 324 62 312 Z" />
+    <path fill="url(#hm-gray-paw)" d="M222 300 C 222 279 241 264 263 264 C 285 264 304 279 304 300 L 304 312 C 304 324 296 331 284 331 L 242 331 C 230 331 222 324 222 312 Z" />
+    <g stroke="#e9a796" stroke-width="3.5" stroke-linecap="round" fill="none">
+      <path d="M96 301 Q 93.5 312 96 323" />
+      <path d="M122 301 Q 124.5 312 122 323" />
+      <path d="M244 301 Q 241.5 312 244 323" />
+      <path d="M270 301 Q 272.5 312 270 323" />
+    </g>
+  </g>
+
+  <!-- 얼굴 크림 영역 -->
+  <path
+    fill="#fff5e1"
+    d="M30 204
+       C 34 186 52 176 76 171
+       C 100 167 135 168 152 162
+       C 160 152 171 147 184 147
+       C 197 147 208 152 216 162
+       C 233 168 268 167 292 171
+       C 316 176 334 186 338 204
+       C 344 244 290 275 184 275
+       C 78 275 24 244 30 204 Z" />
+
+  <!-- 볼 -->
+  <circle cx="100" cy="196" r="33" fill="#fbcca5" />
+  <circle cx="269" cy="196" r="33" fill="#fbcca5" />
+
+  <!-- 눈 -->
+  <ellipse cx="120" cy="148" rx="17.5" ry="19" fill="#442d23" />
+  <circle cx="114.5" cy="140.5" r="5" fill="#ffffff" />
+  <ellipse cx="247" cy="148" rx="17.5" ry="19" fill="#442d23" />
+  <circle cx="241.5" cy="140.5" r="5" fill="#ffffff" />
+
+  <!-- 코와 입 -->
+  <path fill="#ee9182" d="M167 167 C 167 160 201 160 201 167 C 201 175 191 184 184 184 C 177 184 167 175 167 167 Z" />
+  <g stroke="#4a3426" stroke-width="6" stroke-linecap="round" stroke-linejoin="round" fill="none">
+    <path d="M184 184 L 184 197" />
+    <path d="M155 200 Q 158 211 169 211 Q 181 211 184 197 Q 187 211 199 211 Q 210 211 213 200" />
+  </g>
+</svg>

@@ -1,4 +1,4 @@
-import { useEffect, useRef } from 'react';
+import { useEffect, useRef, useState } from 'react';
 import type { Stage } from '../api/stagesApi';
 import { Board } from '../game/Board';
 import { ControlsHelp } from '../game/ControlsHelp';
@@ -17,7 +17,8 @@ interface GameScreenProps {
 export function GameScreen({ stage, onBack, onNextMap, onRecord }: GameScreenProps) {
   const { cells, violations, cleared, hamsterCount, pulse, hitKey, shake, tapCell, beginStroke, strokeEnter, endStroke, reset, clearMarks } =
     useHamSudoku(stage.puzzle);
-  const sec = useElapsed(!cleared);
+  const [runId, setRunId] = useState(0);
+  const sec = useElapsed(!cleared, runId);
   const wasCleared = useRef(false);
 
   useEffect(() => {
@@ -28,6 +29,12 @@ export function GameScreen({ stage, onBack, onNextMap, onRecord }: GameScreenPro
       wasCleared.current = false;
     }
   }, [cleared, onRecord, stage.code, sec]);
+
+  // 다시하기는 보드와 시간을 함께 되돌린다.
+  const retry = () => {
+    reset();
+    setRunId((i) => i + 1);
+  };
 
   return (
     <div className="game">
@@ -60,7 +67,7 @@ export function GameScreen({ stage, onBack, onNextMap, onRecord }: GameScreenPro
         onPress={beginStroke}
         onEnter={strokeEnter}
         onRelease={endStroke}
-        onReset={reset}
+        onReset={retry}
         onNextMap={onNextMap}
         onBrowse={onBack}
       />

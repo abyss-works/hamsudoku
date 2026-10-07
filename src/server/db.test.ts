@@ -1,5 +1,6 @@
 import { describe, expect, it } from 'vitest';
-import { createMemoryDb } from './db';
+import type { PrismaClient } from '@prisma/client';
+import { createMemoryDb, createPrismaDb } from './db';
 
 describe('DbPort', () => {
   it('쓴 키는 재사용이 안 된다', async () => {
@@ -87,5 +88,54 @@ describe('endless DbPort', () => {
     await db.commitEndlessClear('u1', 'e-2', { earned: 2, season: '2026-W41', seedLeft: 2, elapsedMs: 30000, suspicious: false, atIso: '2026-10-07T00:01:00.000Z' });
     await db.commitEndlessClear('u2', 'e-1', { earned: 1, season: '2026-W40', seedLeft: 1, elapsedMs: 30000, suspicious: false, atIso: '2026-10-07T00:02:00.000Z' });
     expect(await db.listSeasonEarnings('2026-W41')).toEqual([{ userId: 'u1', amount: 5 }]);
+  });
+});
+
+describe('ensureUser 경합', () => {
+  const conflict = () => Object.assign(new Error('Unique constraint failed'), { code: 'P2002' });
+
+  function stubClient(behavior: { upsert: () => Promise<unknown> }): { client: PrismaClient; calls: { update: number } } {
+    const calls = { update: 0 };
+    const client = {
+      user: {
+        upsert: behavior.upsert,
+        update: async () => {
+          calls.update += 1;
+          return {};
+        },
+        findUnique: async () => null,
+      },
+      profile: {
+        upsert: async () => ({}),
+        findUnique: async () => null,
+      },
+    } as unknown as PrismaClient;
+    return { client, calls };
+  }
+
+  it('user upsert 경합(P2002)은 update로 복구하고 던지지 않는다', async () => {
+    let first = true;
+    const { client, calls } = stubClient({
+      upsert: async () => {
+        if (first) {
+          first = false;
+          throw conflict();
+        }
+        return {};
+      },
+    });
+    const db = createPrismaDb(client);
+    await expect(db.ensureUser('u1', 'e@x.y')).resolves.toBeUndefined();
+    expect(calls.update).toBe(1);
+  });
+
+  it('P2002가 아닌 오류는 그대로 던진다', async () => {
+    const { client } = stubClient({
+      upsert: async () => {
+        throw Object.assign(new Error('boom'), { code: 'P2024' });
+      },
+    });
+    const db = createPrismaDb(client);
+    await expect(db.ensureUser('u1', 'e@x.y')).rejects.toThrow('boom');
   });
 });

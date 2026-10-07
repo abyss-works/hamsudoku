@@ -1,9 +1,17 @@
 // @vitest-environment jsdom
 import { afterEach, describe, expect, it, vi } from 'vitest';
-import { cleanup, render, screen } from '@testing-library/react';
+import { act, cleanup, fireEvent, render, screen } from '@testing-library/react';
+import { PUZZLES } from '../game/puzzles';
 import { GameScreen } from './GameScreen';
 
-afterEach(cleanup);
+afterEach(() => {
+  cleanup();
+  vi.useRealTimers();
+});
+
+function hudText(container: Element): string {
+  return container.querySelector('.hud-code')?.textContent ?? '';
+}
 
 const SIX = {
   id: 't',
@@ -32,5 +40,21 @@ describe('GameScreen', () => {
     expect(rules.querySelectorAll('.help-col')).toHaveLength(3);
     const controls = screen.getByLabelText('기본 조작');
     expect(controls.querySelectorAll('.help-col')).toHaveLength(3);
+  });
+
+  it('다시하기를 누르면 시간이 0으로 돌아간다', async () => {
+    vi.useFakeTimers();
+    const puzzle = PUZZLES[0];
+    const stage = { id: 'p0', code: '1-1', title: '테스트', puzzle, locked: false };
+    const { container } = render(<GameScreen stage={stage} onBack={vi.fn()} onNextMap={vi.fn()} onRecord={vi.fn()} />);
+    act(() => {
+      vi.advanceTimersByTime(3000);
+    });
+    expect(hudText(container)).toBe('1-1 · 0:03');
+    const cells = Array.from(container.querySelectorAll('.board .cell'));
+    for (const [r, c] of puzzle.solution) fireEvent.dblClick(cells[r * puzzle.size + c]);
+    expect(screen.getByRole('dialog', { name: '클리어' })).toBeTruthy();
+    fireEvent.click(screen.getByRole('button', { name: '다시하기' }));
+    expect(hudText(container)).toBe('1-1 · 0:00');
   });
 });

@@ -1,7 +1,7 @@
 // @vitest-environment jsdom
 import { afterEach, describe, expect, it, vi } from 'vitest';
-import { cleanup, fireEvent, render, screen } from '@testing-library/react';
-import App from './App';
+import { act, cleanup, fireEvent, render, screen } from '@testing-library/react';
+import App, { BOOT_TIMEOUT_MS } from './App';
 import { resetAuthApi } from './api/stagesApi';
 import { SelectScreen } from './screens/SelectScreen';
 import { LEVELS } from './game/levels.generated';
@@ -111,14 +111,77 @@ describe('화면 전환', () => {
       throw new Error(`unexpected ${url}`);
     });
     render(<App />);
-    expect(await screen.findByText('씨앗 5개')).toBeTruthy();
+    expect(await screen.findByRole('status', { name: '씨앗 5개' })).toBeTruthy();
     fireEvent.click(await screen.findByRole('button', { name: '랭킹' }));
     expect(await screen.findByRole('dialog', { name: '랭킹' })).toBeTruthy();
   });
 
-  it('기어는 설정 껍데기를 열고 닫는다', () => {
+  it('부팅 데이터가 모이기 전에는 홈을 그리지 않는다', async () => {
+    let resolveMe!: (v: Response) => void;
+    const meGate = new Promise<Response>((r) => {
+      resolveMe = r;
+    });
+    stubFetch(async (url: string) => {
+      if (url.endsWith('/api/auth/me')) return Response.json({ uid: 'u1', email: 'e@x.y' });
+      if (url.endsWith('/api/records')) return Response.json({ clears: [] });
+      if (url.endsWith('/api/endless/me')) return meGate;
+      if (url.endsWith('/api/endless/rank'))
+        return Response.json({ season: '2026-W41', top: [], snapshotAt: '2026-10-07T00:00:00.000Z', me: { rank: null, score: 0 } });
+      throw new Error(`unexpected ${url}`);
+    });
     render(<App />);
-    fireEvent.click(screen.getByRole('button', { name: '설정' }));
+    await act(async () => {});
+    expect(screen.queryByRole('button', { name: '스테이지' })).toBeNull();
+    expect(screen.queryByRole('status', { name: /씨앗/ })).toBeNull();
+    await act(async () => {
+      resolveMe(
+        Response.json({ wallet: { balance: 2 }, clearedCount: 1, streak: { current: 0, best: 1 }, season: '2026-W41' }),
+      );
+    });
+    expect(await screen.findByRole('button', { name: '스테이지' })).toBeTruthy();
+    expect(await screen.findByRole('status', { name: '씨앗 2개' })).toBeTruthy();
+  });
+
+  it('부팅 타임아웃이 지나면 데이터 없이도 그린다', async () => {
+    vi.useFakeTimers();
+    try {
+      stubFetch(async (url: string) => {
+        if (url.endsWith('/api/auth/me')) return Response.json({ uid: 'u1', email: 'e@x.y' });
+        if (url.endsWith('/api/records')) return Response.json({ clears: [] });
+        if (url.endsWith('/api/endless/me')) return new Promise<Response>(() => {});
+        if (url.endsWith('/api/endless/rank')) return new Promise<Response>(() => {});
+        throw new Error(`unexpected ${url}`);
+      });
+      render(<App />);
+      await act(async () => {});
+      expect(screen.queryByRole('button', { name: '스테이지' })).toBeNull();
+      await act(async () => {
+        vi.advanceTimersByTime(BOOT_TIMEOUT_MS);
+      });
+      expect(screen.getByRole('button', { name: '스테이지' })).toBeTruthy();
+    } finally {
+      vi.useRealTimers();
+    }
+  });
+
+  it('홈 로고는 원본 마스코트를 쓴다', async () => {
+    stubFetch(async (url: string) => {
+      if (url.endsWith('/api/auth/me')) return Response.json({ uid: 'u1', email: 'e@x.y' });
+      if (url.endsWith('/api/records')) return Response.json({ clears: [] });
+      if (url.endsWith('/api/endless/me'))
+        return Response.json({ wallet: { balance: 2 }, clearedCount: 1, streak: { current: 0, best: 1 }, season: '2026-W41' });
+      if (url.endsWith('/api/endless/rank'))
+        return Response.json({ season: '2026-W41', top: [], snapshotAt: '2026-10-07T00:00:00.000Z', me: { rank: null, score: 0 } });
+      throw new Error(`unexpected ${url}`);
+    });
+    const { container } = render(<App />);
+    await screen.findByRole('button', { name: '스테이지' });
+    expect(container.querySelector('.home-mascot img')?.getAttribute('src')).toBe('/hamster-mascot.svg');
+  });
+
+  it('기어는 설정 껍데기를 열고 닫는다', async () => {
+    render(<App />);
+    fireEvent.click(await screen.findByRole('button', { name: '설정' }));
     expect(screen.getByRole('dialog', { name: '설정' })).toBeTruthy();
     expect(screen.getAllByText('준비중')).toHaveLength(2);
     expect(screen.queryByRole('button', { name: '로그인' })).toBeNull();
@@ -128,7 +191,7 @@ describe('화면 전환', () => {
 
   it('프로필에서 계정 화면이 열리고 닫힌다', async () => {
     render(<App />);
-    fireEvent.click(screen.getByRole('button', { name: '프로필' }));
+    fireEvent.click(await screen.findByRole('button', { name: '프로필' }));
     fireEvent.click(screen.getByRole('button', { name: '로그인' }));
     expect(await screen.findByRole('button', { name: '이메일로 계속하기' })).toBeTruthy();
     fireEvent.click(screen.getByRole('button', { name: '뒤로' }));
@@ -149,7 +212,7 @@ describe('화면 전환', () => {
     const fetchMock = vi.fn(async () => Response.json({ ok: true }));
     vi.stubGlobal('fetch', fetchMock);
     render(<App />);
-    fireEvent.click(screen.getByRole('button', { name: '프로필' }));
+    fireEvent.click(await screen.findByRole('button', { name: '프로필' }));
     fireEvent.click(screen.getByRole('button', { name: '로그인' }));
     fireEvent.change(screen.getByLabelText('이메일'), { target: { value: 'e@x.y' } });
     fireEvent.change(screen.getByLabelText('비밀번호'), { target: { value: '123' } });
@@ -181,7 +244,7 @@ describe('화면 전환', () => {
       throw new Error(`unexpected ${url}`);
     });
     render(<App />);
-    fireEvent.click(screen.getByRole('button', { name: '프로필' }));
+    fireEvent.click(await screen.findByRole('button', { name: '프로필' }));
     fireEvent.click(screen.getByRole('button', { name: '로그인' }));
     fireEvent.change(screen.getByLabelText('이메일'), { target: { value: 'e@x.y' } });
     fireEvent.change(screen.getByLabelText('비밀번호'), { target: { value: '123456' } });
@@ -223,7 +286,7 @@ describe('화면 전환', () => {
       throw new Error(`unexpected ${url}`);
     });
     render(<App />);
-    fireEvent.click(screen.getByRole('button', { name: '프로필' }));
+    fireEvent.click(await screen.findByRole('button', { name: '프로필' }));
     fireEvent.click(screen.getByRole('button', { name: '로그인' }));
     fireEvent.change(screen.getByLabelText('이메일'), { target: { value: 'e@x.y' } });
     fireEvent.change(screen.getByLabelText('비밀번호'), { target: { value: '123456' } });
@@ -250,7 +313,7 @@ describe('화면 전환', () => {
       }),
     );
     render(<App />);
-    fireEvent.click(screen.getByRole('button', { name: '프로필' }));
+    fireEvent.click(await screen.findByRole('button', { name: '프로필' }));
     fireEvent.click(screen.getByRole('button', { name: '로그인' }));
     fireEvent.change(screen.getByLabelText('이메일'), { target: { value: 'e@x.y' } });
     fireEvent.change(screen.getByLabelText('비밀번호'), { target: { value: '123456' } });
@@ -273,7 +336,7 @@ describe('화면 전환', () => {
       throw new Error(`unexpected ${url}`);
     });
     render(<App />);
-    fireEvent.click(screen.getByRole('button', { name: '프로필' }));
+    fireEvent.click(await screen.findByRole('button', { name: '프로필' }));
     fireEvent.click(screen.getByRole('button', { name: '로그인' }));
     fireEvent.change(screen.getByLabelText('이메일'), { target: { value: 'e@x.y' } });
     fireEvent.click(screen.getByRole('button', { name: '비밀번호를 잊었어요' }));
@@ -290,7 +353,7 @@ describe('화면 전환', () => {
         throw new Error(`unexpected ${url}`);
       });
       render(<App />);
-      fireEvent.change(screen.getByLabelText('새 비밀번호'), { target: { value: 'abcdef' } });
+      fireEvent.change(await screen.findByLabelText('새 비밀번호'), { target: { value: 'abcdef' } });
       fireEvent.change(screen.getByLabelText('새 비밀번호 확인'), { target: { value: 'abcdef' } });
       fireEvent.click(screen.getByRole('button', { name: '비밀번호 바꾸기' }));
       expect(await screen.findByText('비밀번호를 바꿨어요!')).toBeTruthy();
@@ -316,7 +379,7 @@ describe('화면 전환', () => {
       throw new Error(`unexpected ${url}`);
     });
     render(<App />);
-    fireEvent.click(screen.getByRole('button', { name: '프로필' }));
+    fireEvent.click(await screen.findByRole('button', { name: '프로필' }));
     fireEvent.click(await screen.findByRole('button', { name: '로그아웃' }));
     await vi.waitFor(
       () => {

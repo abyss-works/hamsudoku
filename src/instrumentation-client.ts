@@ -1,6 +1,7 @@
 import * as Sentry from '@sentry/nextjs';
 
 // DSN이 없으면 SDK가 꺼진다. 로컬 개발은 DSN 없이 돌린다.
+// 구조화 로그(Sentry.logger)는 기본 활성화되어 있어 별도 옵션이 필요 없다.
 Sentry.init({
   dsn: process.env.NEXT_PUBLIC_SENTRY_DSN,
   // 트래픽이 적어 전수 수집한다. 무료 한도(월 5M spans)에 닿으면 낮춘다.
