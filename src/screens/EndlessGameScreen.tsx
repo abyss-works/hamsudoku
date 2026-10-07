@@ -61,31 +61,37 @@ function EndlessBoard({ puzzle, onWrong, onFinish, clearOverlay }: EndlessBoardP
 function ClearOverlay({
   result,
   error,
+  submitting,
+  starting,
   onNext,
   onExit,
 }: {
   result: { ok: boolean; earned: number } | null;
   error: string | null;
+  submitting: boolean;
+  starting: boolean;
   onNext: () => void;
   onExit: () => void;
 }) {
-  const pending = result === null;
-  const failed = result?.ok === false;
+  const pending = submitting || starting;
+  const showPending = pending || result === null;
+  const failed = result !== null && result.ok === false;
   return (
     <Overlay label="클리어">
-      {!failed && <Confetti />}
+      {!showPending && !failed && <Confetti />}
       <p className="clear-title">
-        {pending
+        {showPending || result === null
           ? '기록을 저장하는 중…'
-          : failed
+          : result.ok === false
             ? (error ?? '기록을 저장하지 못했어요.')
             : `햄스터를 다 찾았다! 씨앗 ${result.earned}개를 얻었어요`}
       </p>
+      {!showPending && !failed && error && <p className="home-note">{error}</p>}
       <div className="clear-actions">
-        <Button variant="sticker" className="btn-primary" onClick={onNext} disabled={pending}>
+        <Button variant="sticker" className="btn-primary" onClick={onNext} disabled={showPending}>
           다음 판
         </Button>
-        <Button variant="sticker" onClick={onExit} disabled={pending}>
+        <Button variant="sticker" onClick={onExit} disabled={showPending}>
           나가기
         </Button>
       </div>
@@ -137,7 +143,16 @@ export function EndlessGameScreen({ onBack }: { onBack: () => void }) {
         puzzle={session.puzzle}
         onWrong={session.reportWrong}
         onFinish={() => void session.finish()}
-        clearOverlay={<ClearOverlay result={session.finishResult} error={session.error} onNext={() => void session.start()} onExit={onBack} />}
+        clearOverlay={
+          <ClearOverlay
+            result={session.finishResult}
+            error={session.error}
+            submitting={session.submitting}
+            starting={session.starting}
+            onNext={() => void session.start()}
+            onExit={onBack}
+          />
+        }
       />
       <ControlsHelp />
       {session.phase === 'gameover' && (

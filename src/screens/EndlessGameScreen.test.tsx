@@ -97,4 +97,35 @@ describe('EndlessGameScreen', () => {
     expect((screen.getByRole('button', { name: '다음 판' }) as HTMLButtonElement).disabled).toBe(true);
     await waitFor(() => expect(screen.getByText(/씨앗 3개를 얻었어요/)).toBeTruthy(), { timeout: 6000 });
   });
+
+  it('다음 판 로드가 실패하면 오버레이가 잠기지 않고 오류를 보여준다', async () => {
+    let nextCalls = 0;
+    vi.stubGlobal(
+      'fetch',
+      vi.fn(async (url: string, init?: RequestInit) => {
+        if (url === '/api/endless/next') {
+          nextCalls += 1;
+          if (nextCalls > 1) throw new TypeError('network');
+          const { clientPublicKey } = JSON.parse(String(init?.body)) as { clientPublicKey: string };
+          const enc = await encryptSolution(clientPublicKey, SOLUTION_TEXT);
+          return Response.json({
+            stage: { id: 'e-1', size: PUZZLE.size, regions: PUZZLE.islands.flat().join('') },
+            ...enc,
+            attemptKey: 'k1',
+          });
+        }
+        if (url === '/api/endless/clear') return Response.json({ ok: true, earned: 3, balance: 3, streak: 1, suspicious: false });
+        if (url === '/api/endless/fail') return Response.json({ ok: true });
+        throw new Error(`unexpected ${url}`);
+      }),
+    );
+    const { container } = render(<EndlessGameScreen onBack={() => {}} />);
+    await screen.findByRole('status', { name: '씨앗 3/3' });
+    const cells = Array.from(container.querySelectorAll('.board .cell'));
+    for (const i of SOLUTION_INDEXES) fireEvent.dblClick(cells[i]);
+    await screen.findByText(/씨앗 3개를 얻었어요/);
+    fireEvent.click(screen.getByRole('button', { name: '다음 판' }));
+    expect(await screen.findByText('무한모드를 불러오지 못했어요.')).toBeTruthy();
+    await waitFor(() => expect((screen.getByRole('button', { name: '다음 판' }) as HTMLButtonElement).disabled).toBe(false));
+  });
 });

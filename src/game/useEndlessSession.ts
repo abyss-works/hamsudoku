@@ -16,6 +16,8 @@ export interface EndlessSession {
   mirror: EndlessMirror;
   error: string | null;
   finishResult: { ok: boolean; earned: number } | null;
+  submitting: boolean;
+  starting: boolean;
   start(): Promise<void>;
   reportWrong(): void;
   finish(): Promise<void>;
@@ -31,6 +33,8 @@ export function useEndlessSession(): EndlessSession {
   const [mirror, setMirror] = useState<EndlessMirror>(() => loadMirror(seasonId(new Date())));
   const [error, setError] = useState<string | null>(null);
   const [finishResult, setFinishResult] = useState<{ ok: boolean; earned: number } | null>(null);
+  const [submitting, setSubmitting] = useState(false);
+  const [starting, setStarting] = useState(false);
   const attemptKeyRef = useRef<string | null>(null);
   const solutionRef = useRef<[number, number][]>([]);
   const seedRef = useRef(3);
@@ -48,11 +52,11 @@ export function useEndlessSession(): EndlessSession {
 
   const start = useCallback(async () => {
     if (startingRef.current) return;
+    setStarting(true);
     startingRef.current = true;
     const gen = genRef.current + 1;
     genRef.current = gen;
     setError(null);
-    setFinishResult(null);
     finishedRef.current = false;
     try {
       const next = await nextStage();
@@ -71,6 +75,7 @@ export function useEndlessSession(): EndlessSession {
       else setError('무한모드를 불러오지 못했어요.');
     } finally {
       startingRef.current = false;
+      setStarting(false);
     }
   }, []);
 
@@ -100,32 +105,11 @@ export function useEndlessSession(): EndlessSession {
     const optimistic = applyClear(markCleared(previous, sid), left);
     setMirrorBoth(optimistic);
     setFinishResult(null);
-
-    const submit = () => submitClear({ attemptKey: key, stageId: sid, solution: solutionRef.current, seedLeft: left });
+    setSubmitting(true);
 
     try {
-      const res = await submit();
-      if (stale()) return;
-      if (res.ok) {
-        setMirrorBoth(applyClearResponse(optimistic, res));
-        setFinishResult({ ok: true, earned: res.earned });
-      } else {
-        setMirrorBoth(previous);
-        setError(res.reason);
-        setFinishResult({ ok: false, earned: 0 });
-      }
-      setPhase('cleared');
-    } catch (e) {
-      if (stale()) return;
-      if (e instanceof EndlessApiError) {
-        setMirrorBoth(previous);
-        setError(e.status === 401 ? '로그인이 필요해요.' : '기록을 저장하지 못했어요.');
-        setFinishResult({ ok: false, earned: 0 });
-        setPhase('cleared');
-        return;
-      }
-      await new Promise((resolve) => setTimeout(resolve, RETRY_DELAY_MS));
-      if (stale()) return;
+      const submit = () => submitClear({ attemptKey: key, stageId: sid, solution: solutionRef.current, seedLeft: left });
+
       try {
         const res = await submit();
         if (stale()) return;
@@ -137,14 +121,40 @@ export function useEndlessSession(): EndlessSession {
           setError(res.reason);
           setFinishResult({ ok: false, earned: 0 });
         }
-      } catch {
+        setPhase('cleared');
+      } catch (e) {
         if (stale()) return;
-        setError('기록을 저장하지 못했어요.');
-        setFinishResult({ ok: false, earned: 0 });
+        if (e instanceof EndlessApiError) {
+          setMirrorBoth(previous);
+          setError(e.status === 401 ? '로그인이 필요해요.' : '기록을 저장하지 못했어요.');
+          setFinishResult({ ok: false, earned: 0 });
+          setPhase('cleared');
+          return;
+        }
+        await new Promise((resolve) => setTimeout(resolve, RETRY_DELAY_MS));
+        if (stale()) return;
+        try {
+          const res = await submit();
+          if (stale()) return;
+          if (res.ok) {
+            setMirrorBoth(applyClearResponse(optimistic, res));
+            setFinishResult({ ok: true, earned: res.earned });
+          } else {
+            setMirrorBoth(previous);
+            setError(res.reason);
+            setFinishResult({ ok: false, earned: 0 });
+          }
+        } catch {
+          if (stale()) return;
+          setError('기록을 저장하지 못했어요.');
+          setFinishResult({ ok: false, earned: 0 });
+        }
+        setPhase('cleared');
       }
-      setPhase('cleared');
+    } finally {
+      setSubmitting(false);
     }
   }, [setMirrorBoth]);
 
-  return { puzzle, stageId, seeds, phase, mirror, error, finishResult, start, reportWrong, finish };
+  return { puzzle, stageId, seeds, phase, mirror, error, finishResult, submitting, starting, start, reportWrong, finish };
 }
