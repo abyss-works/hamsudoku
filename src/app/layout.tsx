@@ -33,10 +33,21 @@ export default function RootLayout({
       <body>
         <div id="boot-static" aria-hidden="true">
           <div className="boot-splash">
-            <div className="boot-dots">
-              <span />
-              <span />
-              <span />
+            <div className="home-mascot" aria-hidden="true">
+              <img src="/hamster-mascot.svg" alt="" />
+            </div>
+            <h1 className="home-title" aria-hidden="true">
+              hamsudoku
+            </h1>
+            <p className="home-sub" aria-hidden="true">
+              숨은 햄스터를 찾아라
+            </p>
+            <div className="boot-actions" aria-hidden="true">
+              <div className="boot-dots">
+                <span />
+                <span />
+                <span />
+              </div>
             </div>
           </div>
         </div>

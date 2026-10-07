@@ -38,8 +38,17 @@ body {
   width: 100%;
   min-height: calc(100dvh - 32px);
   padding: 8px 0 16px;
-  background-image: radial-gradient(rgb(74 49 40 / 0.07) 2px, transparent 2.5px);
-  background-size: 28px 28px;
+}
+
+#boot-static {
+  min-height: 100dvh;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+}
+
+#boot-static .boot-splash {
+  min-height: auto;
 }
 
 .boot-actions {
