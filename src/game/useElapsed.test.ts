@@ -32,6 +32,19 @@ describe('useElapsed', () => {
     });
     expect(result.current).toBe(2);
   });
+
+  it('resetKey가 바뀌면 0으로 돌아간다', () => {
+    vi.useFakeTimers();
+    const { result, rerender } = renderHook(({ resetKey }: { resetKey: number }) => useElapsed(true, resetKey), {
+      initialProps: { resetKey: 0 },
+    });
+    act(() => {
+      vi.advanceTimersByTime(3000);
+    });
+    expect(result.current).toBe(3);
+    rerender({ resetKey: 1 });
+    expect(result.current).toBe(0);
+  });
 });
 
 describe('formatElapsed', () => {
