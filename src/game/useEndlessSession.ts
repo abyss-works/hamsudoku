@@ -1,4 +1,5 @@
 import { useCallback, useRef, useState } from 'react';
+import * as Sentry from '@sentry/nextjs';
 import { EndlessApiError, nextStage, reportFail, submitClear } from '../api/endlessApi';
 import type { EndlessMirror } from '../shared/endless';
 import { seasonId } from '../shared/season';
@@ -71,8 +72,12 @@ export function useEndlessSession(): EndlessSession {
       setPhase('playing');
     } catch (e) {
       if (genRef.current !== gen) return;
+      // 예상된 흐름(비로그인 401)은 로그하지 않고, Unexpected 실패만 남긴다.
       if (e instanceof EndlessApiError && e.status === 401) setError('로그인이 필요해요.');
-      else setError('무한모드를 불러오지 못했어요.');
+      else {
+        Sentry.logger.warn('Endless stage load failed', { status: e instanceof EndlessApiError ? e.status : 0 });
+        setError('무한모드를 불러오지 못했어요.');
+      }
     } finally {
       startingRef.current = false;
       setStarting(false);
