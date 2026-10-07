@@ -44,14 +44,14 @@ describe('endless DbPort', () => {
     const db = createMemoryDb();
     await db.insertStage(stage('e-1'));
     expect((await db.pickUnclearedStage('u1'))?.id).toBe('e-1');
-    await db.commitEndlessClear('u1', 'e-1', { earned: 2, season: '2026-W41', seedLeft: 2, elapsedMs: 30000, suspicious: false });
+    await db.commitEndlessClear('u1', 'e-1', { earned: 2, season: '2026-W41', seedLeft: 2, elapsedMs: 30000, suspicious: false, atIso: '2026-10-07T00:00:00.000Z' });
     expect(await db.pickUnclearedStage('u1')).toBeNull();
   });
 
   it('클리어는 지갑·진행·스트릭을 반영한다', async () => {
     const db = createMemoryDb();
     await db.insertStage(stage('e-1'));
-    const s = await db.commitEndlessClear('u1', 'e-1', { earned: 3, season: '2026-W41', seedLeft: 3, elapsedMs: 30000, suspicious: false });
+    const s = await db.commitEndlessClear('u1', 'e-1', { earned: 3, season: '2026-W41', seedLeft: 3, elapsedMs: 30000, suspicious: false, atIso: '2026-10-07T00:00:00.000Z' });
     expect(s).toMatchObject({ balance: 3, clearedCount: 1, streak: { current: 1, best: 1 } });
   });
 
@@ -59,16 +59,16 @@ describe('endless DbPort', () => {
     const db = createMemoryDb();
     await db.insertStage(stage('e-1'));
     await db.insertStage(stage('e-2'));
-    await db.commitEndlessClear('u1', 'e-1', { earned: 3, season: '2026-W41', seedLeft: 3, elapsedMs: 30000, suspicious: false });
-    const s = await db.commitEndlessClear('u1', 'e-2', { earned: 1, season: '2026-W41', seedLeft: 1, elapsedMs: 40000, suspicious: false });
+    await db.commitEndlessClear('u1', 'e-1', { earned: 3, season: '2026-W41', seedLeft: 3, elapsedMs: 30000, suspicious: false, atIso: '2026-10-07T00:00:00.000Z' });
+    const s = await db.commitEndlessClear('u1', 'e-2', { earned: 1, season: '2026-W41', seedLeft: 1, elapsedMs: 40000, suspicious: false, atIso: '2026-10-07T00:00:00.000Z' });
     expect(s.streak).toEqual({ current: 0, best: 1 });
   });
 
   it('실패는 attempts를 올리고 current를 리셋한다', async () => {
     const db = createMemoryDb();
     await db.insertStage(stage('e-1'));
-    await db.commitEndlessClear('u1', 'e-1', { earned: 3, season: '2026-W41', seedLeft: 3, elapsedMs: 30000, suspicious: false });
-    const { streak } = await db.commitEndlessFail('u1', 'e-1');
+    await db.commitEndlessClear('u1', 'e-1', { earned: 3, season: '2026-W41', seedLeft: 3, elapsedMs: 30000, suspicious: false, atIso: '2026-10-07T00:00:00.000Z' });
+    const { streak } = await db.commitEndlessFail('u1', 'e-1', '2026-10-07T00:00:00.000Z');
     expect(streak).toEqual({ current: 0, best: 1 });
   });
 
