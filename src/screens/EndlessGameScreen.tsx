@@ -6,6 +6,7 @@ import { useEndlessSession } from '../game/useEndlessSession';
 import { useHamSudoku } from '../game/useHamSudoku';
 import type { Puzzle } from '../game/puzzles';
 import { Button } from '../ui/Button';
+import { BootSplash } from '../ui/BootSplash';
 import { Confetti } from '../ui/Confetti';
 import { Overlay } from '../ui/Overlay';
 import { useLoading } from '../ui/LoadingProvider';
@@ -112,18 +113,21 @@ export function EndlessGameScreen({ onBack }: { onBack: () => void }) {
   }, [session, track]);
 
   if (!session.puzzle) {
-    return (
-      <div className="game">
-        <div className="hud">
-          <Button variant="sticker" onClick={onBack}>
-            뒤로
-          </Button>
-          <span className="hud-code">무한모드</span>
-          <span />
+    if (session.error) {
+      return (
+        <div className="game">
+          <div className="hud">
+            <Button variant="sticker" onClick={onBack}>
+              뒤로
+            </Button>
+            <span className="hud-code">무한모드</span>
+            <span />
+          </div>
+          <p role="alert">{session.error}</p>
         </div>
-        <p className="home-note">{session.error ?? '판을 불러오는 중…'}</p>
-      </div>
-    );
+      );
+    }
+    return <BootSplash />;
   }
 
   return (
