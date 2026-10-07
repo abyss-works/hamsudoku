@@ -13,6 +13,7 @@ import { HomeScreen } from './screens/HomeScreen';
 import { LoginScreen } from './screens/LoginScreen';
 import { SelectScreen } from './screens/SelectScreen';
 import { SetPasswordScreen } from './screens/SetPasswordScreen';
+import { BootSplash } from './ui/BootSplash';
 import { useFontsReady } from './ui/useFontsReady';
 
 export type Screen = 'home' | 'select' | 'game' | 'login' | 'recovery' | 'endless';
@@ -154,7 +155,7 @@ function App() {
   return (
     <main className="app">
       {!ready ? (
-        showBootLoading && <p>불러오는 중…</p>
+        showBootLoading && <BootSplash />
       ) : (
         <>
           {screen === 'home' && (
