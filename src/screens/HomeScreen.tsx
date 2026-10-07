@@ -33,12 +33,6 @@ export function HomeScreen({ email, nickname, summary, onSaveNickname, onBrowse,
           <Settings size={22} aria-hidden="true" />
         </Button>
       </div>
-      {endlessEnabled && summary.me && (
-        <div className="seed-box" role="status" aria-label={`씨앗 ${summary.me.wallet.balance}개`}>
-          <Sprout size={20} aria-hidden="true" />
-          <span className="seed-count">{summary.me.wallet.balance}</span>
-        </div>
-      )}
       <div className="home-mascot" aria-hidden="true">
         <img src="/hamster-mascot.svg" alt="" />
       </div>
@@ -46,6 +40,12 @@ export function HomeScreen({ email, nickname, summary, onSaveNickname, onBrowse,
         <PawPrint size={34} aria-hidden="true" /> hamsudoku
       </h1>
       <p className="home-sub">숨은 햄스터를 찾아라</p>
+      {endlessEnabled && summary.me && (
+        <div className="seed-box" role="status" aria-label={`씨앗 ${summary.me.wallet.balance}개`}>
+          <Sprout size={20} aria-hidden="true" />
+          <span className="seed-count">{summary.me.wallet.balance}</span>
+        </div>
+      )}
       <div className="home-actions">
         <Button variant="sticker" className="btn-primary" onClick={onBrowse}>
           스테이지
