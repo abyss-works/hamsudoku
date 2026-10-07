@@ -40,6 +40,10 @@ body {
   padding: 8px 0 16px;
 }
 
+.boot-splash .home-mascot {
+  margin-top: 28dvh;
+}
+
 #boot-static {
   width: 100%;
   max-width: 480px;
