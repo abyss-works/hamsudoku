@@ -53,3 +53,59 @@ model Attempt {
 
   @@index([userId])
 }
+
+model EndlessStage {
+  id         String   @id
+  size       Int
+  regions    String
+  solution   String
+  tier       Int
+  seed       Int
+  plays      Int      @default(0)
+  clears     Int      @default(0)
+  avgClearMs Int      @default(0)
+  createdAt  DateTime @default(now())
+}
+
+model EndlessProgress {
+  userId       String
+  stageId      String
+  cleared      Boolean  @default(false)
+  attempts     Int      @default(0)
+  lastPlayedAt DateTime
+
+  @@id([userId, stageId])
+  @@index([userId, cleared])
+}
+
+model SeedWallet {
+  userId  String @id
+  balance Int    @default(0)
+}
+
+model SeedLedger {
+  id        String   @id @default(uuid())
+  userId    String
+  kind      String
+  amount    Int
+  stageId   String?
+  season    String
+  createdAt DateTime @default(now())
+
+  @@index([season, kind])
+  @@index([userId, season])
+}
+
+model EndlessEvent {
+  id         String   @id @default(uuid())
+  userId     String
+  stageId    String
+  seedLeft   Int
+  elapsedMs  Int
+  verified   Boolean
+  suspicious Boolean  @default(false)
+  reason     String?
+  createdAt  DateTime @default(now())
+
+  @@index([userId, stageId])
+}
