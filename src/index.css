@@ -148,26 +148,12 @@ body {
 }
 
 .home-mascot {
-  background: var(--paper-deep);
-  border: 3px dashed var(--ink);
-  border-radius: 50%;
-  padding: 18px;
   margin-top: 12px;
-  box-shadow: var(--shadow-hard-sm);
-}
-
-.home-mascot svg {
-  width: 120px;
-  height: 120px;
-  display: block;
 }
 
 .home-mascot img {
-  width: 120px;
-  height: 120px;
+  width: 168px;
   display: block;
-  border-radius: 50%;
-  object-fit: cover;
 }
 
 .home-title {
