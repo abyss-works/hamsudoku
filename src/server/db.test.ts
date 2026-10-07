@@ -78,4 +78,14 @@ describe('endless DbPort', () => {
     const s = await db.getEndlessSummary('u1');
     expect(s).toMatchObject({ balance: 0, clearedCount: 0, streak: { current: 0, best: 0 } });
   });
+
+  it('시즌 적립을 사용자별로 합산한다', async () => {
+    const db = createMemoryDb();
+    await db.insertStage(stage('e-1'));
+    await db.insertStage(stage('e-2'));
+    await db.commitEndlessClear('u1', 'e-1', { earned: 3, season: '2026-W41', seedLeft: 3, elapsedMs: 30000, suspicious: false, atIso: '2026-10-07T00:00:00.000Z' });
+    await db.commitEndlessClear('u1', 'e-2', { earned: 2, season: '2026-W41', seedLeft: 2, elapsedMs: 30000, suspicious: false, atIso: '2026-10-07T00:01:00.000Z' });
+    await db.commitEndlessClear('u2', 'e-1', { earned: 1, season: '2026-W40', seedLeft: 1, elapsedMs: 30000, suspicious: false, atIso: '2026-10-07T00:02:00.000Z' });
+    expect(await db.listSeasonEarnings('2026-W41')).toEqual([{ userId: 'u1', amount: 5 }]);
+  });
 });
