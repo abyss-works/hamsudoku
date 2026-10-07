@@ -41,7 +41,7 @@ describe('LoadingProvider', () => {
     expect(container.querySelector('.loading-veil')).toBeTruthy();
   });
 
-  it('작업이 끝나면 베일이 바로 사라진다', async () => {
+  it('작업이 끝나면 최소 표시 뒤에 베일이 사라진다', async () => {
     vi.useFakeTimers();
     let resolve!: (v: string) => void;
     const gate = new Promise<string>((r) => {
@@ -60,10 +60,17 @@ describe('LoadingProvider', () => {
     await act(async () => {
       resolve('done');
     });
+    act(() => {
+      vi.advanceTimersByTime(200);
+    });
+    expect(container.querySelector('.loading-veil')).toBeTruthy();
+    act(() => {
+      vi.advanceTimersByTime(300);
+    });
     expect(container.querySelector('.loading-veil')).toBeNull();
   });
 
-  it('실패한 작업도 카운트를 내리고 베일을 치운다', async () => {
+  it('실패한 작업도 카운트를 내리고 최소 표시 뒤에 치운다', async () => {
     vi.useFakeTimers();
     let reject!: (e: Error) => void;
     const gate = new Promise<string>((_, rej) => {
@@ -81,6 +88,13 @@ describe('LoadingProvider', () => {
     expect(container.querySelector('.loading-veil')).toBeTruthy();
     await act(async () => {
       reject(new Error('boom'));
+    });
+    act(() => {
+      vi.advanceTimersByTime(200);
+    });
+    expect(container.querySelector('.loading-veil')).toBeTruthy();
+    act(() => {
+      vi.advanceTimersByTime(300);
     });
     expect(container.querySelector('.loading-veil')).toBeNull();
   });
