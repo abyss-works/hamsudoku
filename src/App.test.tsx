@@ -111,7 +111,7 @@ describe('화면 전환', () => {
       throw new Error(`unexpected ${url}`);
     });
     render(<App />);
-    expect(await screen.findByText('씨앗 5개')).toBeTruthy();
+    expect(await screen.findByRole('status', { name: '씨앗 5개' })).toBeTruthy();
     fireEvent.click(await screen.findByRole('button', { name: '랭킹' }));
     expect(await screen.findByRole('dialog', { name: '랭킹' })).toBeTruthy();
   });
