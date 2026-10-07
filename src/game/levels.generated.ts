@@ -1,4 +1,4 @@
-// 생성 산출물. 직접 수정 금지 — npx tsx tools/generate.ts --seed 7 --level all 로 재생성한다.
+// 생성 산출물. 직접 수정 금지 — pnpm exec tsx tools/generate.ts --seed 7 --level all 로 재생성한다.
 // 개수: 50
 // 가중치: w1
 // 밴드: {"1":{"size":5,"count":10,"maxTier":0,"t1":{"min":0,"max":0},"t2":{"min":0,"max":0},"t3":{"min":0,"max":0},"maxChain":0,"singles":{"min":1,"max":2},"score":{"min":0,"max":0}},"2":{"size":6,"count":10,"maxTier":1,"t1":{"min":1,"max":3},"t2":{"min":0,"max":0},"t3":{"min":0,"max":0},"maxChain":0,"singles":{"min":0,"max":1},"score":{"min":3,"max":9}},"3":{"size":6,"count":10,"maxTier":2,"t1":{"min":1,"max":4},"t2":{"min":1,"max":1},"t3":{"min":0,"max":0},"maxChain":0,"singles":{"min":0,"max":1},"score":{"min":10,"max":18}},"4":{"size":7,"count":10,"maxTier":2,"t1":{"min":1,"max":5},"t2":{"min":1,"max":3},"t3":{"min":0,"max":0},"maxChain":0,"singles":{"min":0,"max":1},"score":{"min":15,"max":30}},"5":{"size":7,"count":10,"maxTier":3,"t1":{"min":1,"max":6},"t2":{"min":0,"max":4},"t3":{"min":0,"max":2},"maxChain":4,"singles":{"min":0,"max":1},"score":{"min":31,"max":90}}}
