@@ -9,6 +9,7 @@
   --carrot: #e8823c;
   --carrot-deep: #c46426;
   --leaf: #6fa05a;
+  --sun: #f2c14e;
   --card: #fffdf6;
   --radius-lg: 20px;
   --radius-md: 14px;
@@ -62,4 +63,9 @@ body {
 .btn-sticker.btn-primary {
   background: var(--carrot);
   color: #fff;
+}
+
+.btn-sticker.btn-sun {
+  background: var(--sun);
+  color: var(--ink);
 }

@@ -1,5 +1,5 @@
 import fs from 'node:fs';
-import { countSingles, inBand, LEVEL_CONFIGS, poolTarget, type GeneratedLevel, type ShapeInfo } from '../src/game/levels';
+import { countSingles, ENDLESS_BAND, inBand, LEVEL_CONFIGS, poolTarget, type GeneratedLevel, type ShapeInfo } from '../src/game/levels';
 import { measure, WEIGHTS, type Measure } from '../src/game/logic';
 import type { Pos } from '../src/game/solver';
 import { checkIslands, countSolutions } from '../src/game/solver';
@@ -196,6 +196,28 @@ export function generateLevel(level: number, seed: number): { levels: GeneratedL
   };
 }
 
+export interface EndlessCandidate {
+  islands: number[][];
+  solution: Pos[];
+  tier: number;
+}
+
+export function generateEndlessPool(seed: number, target: number): EndlessCandidate[] {
+  const rand = mulberry32(seed + 1000);
+  const out: EndlessCandidate[] = [];
+  const seen = new Set<string>();
+  for (let attempt = 0; attempt < MAX_ATTEMPTS * 20 && out.length < target; attempt += 1) {
+    const cand = sampleCandidate(ENDLESS_BAND.size, rand);
+    if (!cand) continue;
+    const key = JSON.stringify(cand.islands);
+    if (seen.has(key)) continue;
+    if (!inBand(cand.m, cand.sh, ENDLESS_BAND)) continue;
+    seen.add(key);
+    out.push({ islands: cand.islands, solution: cand.solution, tier: cand.m.tier });
+  }
+  return out;
+}
+
 export function quantile(sorted: number[], p: number): number {
   if (sorted.length === 0) return NaN;
   const pos = (p / 100) * (sorted.length - 1);
@@ -302,7 +324,7 @@ function parseArgs(argv: string[]): Args {
 
 export function renderModule(levels: GeneratedLevel[], seed: number, infos: PoolInfo[]): string {
   const lines = [
-    `// 생성 산출물. 직접 수정 금지 — npx tsx tools/generate.ts --seed ${seed} --level all 로 재생성한다.`,
+    `// 생성 산출물. 직접 수정 금지 — pnpm exec tsx tools/generate.ts --seed ${seed} --level all 로 재생성한다.`,
     `// 개수: ${levels.length}`,
     `// 가중치: ${WEIGHTS.version}`,
     `// 밴드: ${JSON.stringify(LEVEL_CONFIGS)}`,

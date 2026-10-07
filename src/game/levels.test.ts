@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest';
-import { countSingles, inBand, LEVEL_CONFIGS, poolTarget, type LevelConfig } from './levels';
+import { countSingles, ENDLESS_BAND, inBand, LEVEL_CONFIGS, poolTarget, type LevelConfig } from './levels';
 import type { Measure } from './logic';
 
 const base: Measure = {
@@ -73,5 +73,21 @@ describe('LEVEL_CONFIGS', () => {
       const c = LEVEL_CONFIGS[l];
       if (c.t3.max === 0) expect(c.maxChain).toBe(0);
     }
+  });
+});
+
+describe('ENDLESS_BAND', () => {
+  const m7: Measure = {
+    size: 7, tier: 2, t0: 30, t1: 3, t2: 1, t3: 0, t3Attempts: 0, chains: [], maxChain: 0, score: 20,
+  };
+  it('레벨 4·5 수준 후보를 통과시킨다', () => {
+    expect(inBand(m7, shape, ENDLESS_BAND)).toBe(true);
+    expect(inBand({ ...m7, tier: 3, t1: 4, t2: 2, t3: 1, maxChain: 3, score: 60 }, shape, ENDLESS_BAND)).toBe(true);
+  });
+  it('범위 밖 후보를 거른다', () => {
+    expect(inBand({ ...m7, size: 6 }, shape, ENDLESS_BAND)).toBe(false);
+    expect(inBand({ ...m7, tier: 4 }, shape, ENDLESS_BAND)).toBe(false);
+    expect(inBand({ ...m7, score: 100 }, shape, ENDLESS_BAND)).toBe(false);
+    expect(inBand({ ...m7, score: 14 }, shape, ENDLESS_BAND)).toBe(false);
   });
 });

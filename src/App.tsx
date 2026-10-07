@@ -5,13 +5,14 @@ import { useAccount } from './game/useAccount';
 import { fetchAttemptKey, pull, pushClear, reconcile } from './game/sync';
 import type { ClearEntry } from './game/save';
 import { useStages } from './game/useStages';
+import { EndlessGameScreen } from './screens/EndlessGameScreen';
 import { GameScreen } from './screens/GameScreen';
 import { HomeScreen } from './screens/HomeScreen';
 import { LoginScreen } from './screens/LoginScreen';
 import { SelectScreen } from './screens/SelectScreen';
 import { SetPasswordScreen } from './screens/SetPasswordScreen';
 
-export type Screen = 'home' | 'select' | 'game' | 'login' | 'recovery';
+export type Screen = 'home' | 'select' | 'game' | 'login' | 'recovery' | 'endless';
 
 function initialScreen(): Screen {
   if (typeof window === 'undefined') return 'home';
@@ -24,7 +25,7 @@ function App() {
   const [stageId, setStageId] = useState<string | null>(null);
   // 마지막으로 들어간 스테이지의 레벨. 선택 화면이 다시 열릴 때 그 레벨 탭을 유지한다.
   const [chapterId, setChapterId] = useState<string | null>(null);
-  const { clears, record, replace, mergeIn, reset, resumeId } = useClears();
+  const { clears, record, replace, mergeIn, reset } = useClears();
   const account = useAccount();
   const { chapters, loading, error } = useStages();
   const attemptKeys = useRef(new Map<string, string>());
@@ -35,8 +36,6 @@ function App() {
 
   const stages = chapters.flatMap((c) => c.stages);
   const stage = stages.find((s) => s.id === stageId) ?? null;
-  const resumeCode = resumeId(stages.map((s) => s.code));
-  const resumeStage = stages.find((s) => s.code === resumeCode) ?? null;
 
   const goLoginExpired = () => {
     void account.signout();
@@ -81,14 +80,6 @@ function App() {
     void fetchAttemptKey(s.code).then((key) => {
       if (key) attemptKeys.current.set(s.id, key);
     });
-  };
-
-  const resume = (s: Stage | null) => {
-    if (s) {
-      enter(s);
-    } else {
-      setScreen('select');
-    }
   };
 
   const handleRecord = (code: string, elapsedSec: number) => {
@@ -141,9 +132,9 @@ function App() {
       {screen === 'home' && (
         <HomeScreen
           loading={loading}
-          lastStage={resumeStage}
-          onResume={resume}
           onBrowse={() => setScreen('select')}
+          onEndless={() => setScreen('endless')}
+          endlessEnabled={account.cloud}
           email={account.email}
           nickname={account.nickname}
           onSaveNickname={account.saveNickname}
@@ -171,6 +162,7 @@ function App() {
           onRecord={handleRecord}
         />
       )}
+      {screen === 'endless' && <EndlessGameScreen onBack={() => setScreen('home')} />}
       {screen === 'login' && (
         <LoginScreen
           signup={account.signup}
