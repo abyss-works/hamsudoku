@@ -36,3 +36,46 @@ describe('DbPort', () => {
     expect(await db.listUsers()).toEqual([{ userId: 'u1', email: 'e@x.y', hasProfile: true }]);
   });
 });
+
+describe('endless DbPort', () => {
+  const stage = (id: string) => ({ id, size: 7, regions: '0'.repeat(49), solution: '0,0', tier: 2, seed: 1 });
+
+  it('안 깬 판을 뽑고 다 깨면 null이다', async () => {
+    const db = createMemoryDb();
+    await db.insertStage(stage('e-1'));
+    expect((await db.pickUnclearedStage('u1'))?.id).toBe('e-1');
+    await db.commitEndlessClear('u1', 'e-1', { earned: 2, season: '2026-W41', seedLeft: 2, elapsedMs: 30000, suspicious: false });
+    expect(await db.pickUnclearedStage('u1')).toBeNull();
+  });
+
+  it('클리어는 지갑·진행·스트릭을 반영한다', async () => {
+    const db = createMemoryDb();
+    await db.insertStage(stage('e-1'));
+    const s = await db.commitEndlessClear('u1', 'e-1', { earned: 3, season: '2026-W41', seedLeft: 3, elapsedMs: 30000, suspicious: false });
+    expect(s).toMatchObject({ balance: 3, clearedCount: 1, streak: { current: 1, best: 1 } });
+  });
+
+  it('비무오답 클리어는 current만 리셋하고 best는 유지한다', async () => {
+    const db = createMemoryDb();
+    await db.insertStage(stage('e-1'));
+    await db.insertStage(stage('e-2'));
+    await db.commitEndlessClear('u1', 'e-1', { earned: 3, season: '2026-W41', seedLeft: 3, elapsedMs: 30000, suspicious: false });
+    const s = await db.commitEndlessClear('u1', 'e-2', { earned: 1, season: '2026-W41', seedLeft: 1, elapsedMs: 40000, suspicious: false });
+    expect(s.streak).toEqual({ current: 0, best: 1 });
+  });
+
+  it('실패는 attempts를 올리고 current를 리셋한다', async () => {
+    const db = createMemoryDb();
+    await db.insertStage(stage('e-1'));
+    await db.commitEndlessClear('u1', 'e-1', { earned: 3, season: '2026-W41', seedLeft: 3, elapsedMs: 30000, suspicious: false });
+    const { streak } = await db.commitEndlessFail('u1', 'e-1');
+    expect(streak).toEqual({ current: 0, best: 1 });
+  });
+
+  it('미검증 이벤트는 반영하지 않는다', async () => {
+    const db = createMemoryDb();
+    await db.appendEndlessEvent('u1', 'e-1', { seedLeft: 1, elapsedMs: 1000, verified: false, suspicious: false, reason: '하한 미달' });
+    const s = await db.getEndlessSummary('u1');
+    expect(s).toMatchObject({ balance: 0, clearedCount: 0, streak: { current: 0, best: 0 } });
+  });
+});
