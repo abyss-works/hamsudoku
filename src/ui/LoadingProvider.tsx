@@ -28,8 +28,9 @@ export function LoadingProvider({ children }: { children: ReactNode }) {
       },
     );
   }, []);
-  // 베일은 끝나면 즉시 치운다. 임계(80ms) 덕분에 짧은 작업은 뜨지도 않는다.
-  const show = useDelayedLoading(pending > 0, 80, 0);
+  // 베일은 전환(다음 판·재도전) 전용이다. 진입 게이트와 겹치지 않게
+  // 임계를 길게 둬서 일반적인 전환은 베일 없이 지나간다.
+  const show = useDelayedLoading(pending > 0, 200, 0);
 
   return (
     <LoadingContext.Provider value={{ track }}>

@@ -41,14 +41,10 @@ body {
 }
 
 #boot-static {
-  min-height: 100dvh;
-  display: flex;
-  align-items: center;
-  justify-content: center;
-}
-
-#boot-static .boot-splash {
-  min-height: auto;
+  width: 100%;
+  max-width: 480px;
+  margin: 0 auto;
+  padding: 16px 16px max(16px, env(safe-area-inset-bottom));
 }
 
 .boot-actions {

@@ -109,8 +109,9 @@ export function EndlessGameScreen({ onBack }: { onBack: () => void }) {
   useEffect(() => {
     if (startedRef.current) return;
     startedRef.current = true;
-    void track(session.start());
-  }, [session, track]);
+    // 첫 진입은 게이트 스플래시가 맡으므로 track하지 않는다.
+    void session.start();
+  }, [session]);
 
   if (!session.puzzle) {
     if (session.error) {

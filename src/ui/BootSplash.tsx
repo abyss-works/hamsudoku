@@ -2,7 +2,8 @@ import { useState } from 'react';
 import { PawPrint } from 'lucide-react';
 import { pickMascot } from './mascots';
 
-// 홈과 같은 뼈대의 정적 부분만 둔다. 진행 표시는 전역 베일(LoadingProvider)이 맡는다.
+// 진입 게이트 전용. 진행 표시는 여기서 맡고, 베일과 겹치지 않게
+// 진입 시작은 track하지 않는다(다음 판·재도전 같은 전환만 track).
 export function BootSplash() {
   // 홈과 같은 풀에서 고른다. 부팅 때마다 바뀔 수 있다.
   const [mascot] = useState(pickMascot);
@@ -17,6 +18,13 @@ export function BootSplash() {
       <p className="home-sub" aria-hidden="true">
         숨은 햄스터를 찾아라
       </p>
+      <div className="boot-actions" aria-hidden="true">
+        <div className="boot-dots">
+          <span />
+          <span />
+          <span />
+        </div>
+      </div>
     </div>
   );
 }
