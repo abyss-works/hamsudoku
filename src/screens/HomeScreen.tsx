@@ -35,6 +35,12 @@ export function HomeScreen({ loading, email, nickname, onSaveNickname, onBrowse,
           <Settings size={22} aria-hidden="true" />
         </Button>
       </div>
+      {endlessEnabled && (
+        <div className="seed-box" role="status" aria-label={`씨앗 ${summary.me?.wallet.balance ?? 0}개`}>
+          <Sprout size={20} aria-hidden="true" />
+          <span className="seed-count">{summary.me?.wallet.balance ?? 0}</span>
+        </div>
+      )}
       <div className="home-mascot" aria-hidden="true">
         <HamsterFace />
       </div>
@@ -42,31 +48,34 @@ export function HomeScreen({ loading, email, nickname, onSaveNickname, onBrowse,
         <PawPrint size={34} aria-hidden="true" /> hamsudoku
       </h1>
       <p className="home-sub">숨은 햄스터를 찾아라</p>
-      {endlessEnabled && (
-        <div className="home-status">
-          <span className="home-wallet">
-            <Sprout size={18} aria-hidden="true" /> 씨앗 {summary.me?.wallet.balance ?? 0}개
-          </span>
-          <Button
-            variant="sticker"
-            className="home-rank"
-            onClick={() => {
-              setRankOpen(true);
-              void summary.refresh();
-            }}
-          >
-            <Trophy size={18} aria-hidden="true" /> {summary.rank?.me.rank ? `${summary.rank.me.rank}위` : '랭킹'}
-          </Button>
-        </div>
-      )}
       <div className="home-actions">
         {loading && <p>불러오는 중…</p>}
         <Button variant="sticker" className="btn-primary" onClick={onBrowse}>
           스테이지
         </Button>
-        <Button variant="sticker" className="btn-sun" disabled={!endlessEnabled} onClick={onEndless}>
-          무한모드
-        </Button>
+        <div className="home-endless-row">
+          <Button
+            variant="sticker"
+            className="btn-sun home-endless-main"
+            disabled={!endlessEnabled}
+            onClick={onEndless}
+          >
+            무한모드
+          </Button>
+          {endlessEnabled && (
+            <Button
+              variant="sticker"
+              className="btn-icon home-trophy"
+              aria-label="랭킹"
+              onClick={() => {
+                setRankOpen(true);
+                void summary.refresh();
+              }}
+            >
+              <Trophy size={22} aria-hidden="true" />
+            </Button>
+          )}
+        </div>
         {!endlessEnabled && <p className="home-note">무한모드는 온라인 연결이 필요해요</p>}
       </div>
       {settingsOpen && <SettingsDialog onClose={() => setSettingsOpen(false)} />}
