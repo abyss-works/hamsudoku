@@ -7,6 +7,8 @@ import { Overlay } from '../ui/Overlay';
 interface RankDialogProps {
   rank: RankResponse | null;
   uid: string | null;
+  /** 로그인 사용자 여부. 게스트는 목록만 본다(내 순위·실시간 배지 없음). */
+  signedIn: boolean;
   onClose: () => void;
 }
 
@@ -17,8 +19,9 @@ function formatSnapshotAge(snapshotAt: string): string | null {
   return sec < 60 ? `${sec}초 전` : `${Math.floor(sec / 60)}분 전`;
 }
 
-export function RankDialog({ rank, uid, onClose }: RankDialogProps) {
-  const merged = rank && uid ? mergeRankEntries(rank, uid) : null;
+export function RankDialog({ rank, uid, signedIn, onClose }: RankDialogProps) {
+  const merged = rank && uid && signedIn ? mergeRankEntries(rank, uid) : null;
+  const entries = merged?.entries ?? rank?.top ?? [];
 
   return (
     <Overlay label="랭킹">
@@ -31,10 +34,13 @@ export function RankDialog({ rank, uid, onClose }: RankDialogProps) {
           {rank && <span className="rank-season">{rank.season}</span>}
         </p>
         {rank && (
-          <p className="rank-snapshot">순위표 기준: {formatSnapshotAge(rank.snapshotAt) ?? '알 수 없음'} · 내 점수는 실시간이에요</p>
+          <p className="rank-snapshot">
+            순위표 기준: {formatSnapshotAge(rank.snapshotAt) ?? '알 수 없음'}
+            {signedIn && ' · 내 점수는 실시간이에요'}
+          </p>
         )}
-        <ol className="rank-list">
-          {(merged?.entries ?? []).map((e, i) => (
+        <ol className="rank-list rank-scroll">
+          {entries.map((e, i) => (
             <li key={e.userId} className={e.userId === uid ? 'rank-row me' : 'rank-row'}>
               <span className="rank-no" aria-hidden="true">
                 {i + 1}
@@ -49,9 +55,9 @@ export function RankDialog({ rank, uid, onClose }: RankDialogProps) {
               </span>
             </li>
           ))}
-          {rank && (merged?.entries.length ?? 0) === 0 && <li className="rank-row empty">아직 기록이 없어요</li>}
+          {rank && entries.length === 0 && <li className="rank-row empty">아직 기록이 없어요</li>}
         </ol>
-        {rank && (
+        {rank && signedIn && (
           <p className="rank-me">
             내 순위: {rank.me.rank === null ? '아직 없음' : `${merged?.meRank ?? rank.me.rank}위`} · {rank.me.score}개
           </p>
