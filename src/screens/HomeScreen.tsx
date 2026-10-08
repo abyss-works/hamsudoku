@@ -107,6 +107,10 @@ export function HomeScreen({ email, nickname, uid, summary, onSaveNickname, onSi
           signup={onSignup}
           signin={onSignin}
           reset={onReset}
+          fetchAccountSeeds={async () => {
+            await summary.refreshSoft();
+            return summary.me?.wallet.balance ?? 0;
+          }}
           guest={{ seeds: summary.me?.wallet.balance ?? 0, clears: summary.me?.clearedCount ?? 0 }}
           onBack={() => setAuthOpen(false)}
           onDone={() => setAuthOpen(false)}
@@ -131,6 +135,10 @@ export function HomeScreen({ email, nickname, uid, summary, onSaveNickname, onSi
                     signup={onSignup}
                     signin={onSignin}
                     reset={onReset}
+                    fetchAccountSeeds={async () => {
+                      await summary.refreshSoft();
+                      return summary.me?.wallet.balance ?? 0;
+                    }}
                     guest={{ seeds: summary.me?.wallet.balance ?? 0, clears: summary.me?.clearedCount ?? 0 }}
                     onBack={close}
                     onDone={close}

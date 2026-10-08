@@ -80,3 +80,23 @@ describe('HomeScreen 무한모드 게스트 게이트', () => {
     expect(onEndless).toHaveBeenCalled();
   });
 });
+
+describe('HomeScreen 게스트 안내 문구와 배치', () => {
+  it('안내 문구가 공정한 경쟁 안내를 쓴다', () => {
+    render(<HomeScreen {...makeProps({ email: null, endlessEnabled: true })} />);
+    fireEvent.click(screen.getByRole('button', { name: '무한모드' }));
+    expect(screen.getByText(/공정한 경쟁을 위해 로그인이 필요해요/)).toBeTruthy();
+  });
+
+  it('안내의 두 버튼이 가로 50:50으로 배치된다', () => {
+    render(<HomeScreen {...makeProps({ email: null, endlessEnabled: true })} />);
+    fireEvent.click(screen.getByRole('button', { name: '무한모드' }));
+    const actions = document.querySelector('.guest-gate-actions');
+    expect(actions).toBeTruthy();
+    const buttons = actions?.querySelectorAll('button') ?? [];
+    expect(buttons.length).toBe(2);
+    for (const b of buttons) {
+      expect((b as HTMLElement).className).toContain('guest-gate-fill');
+    }
+  });
+});

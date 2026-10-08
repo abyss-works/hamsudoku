@@ -797,3 +797,39 @@ body {
   flex: 1;
 }
 
+
+/* 게스트 무한모드 안내 */
+.guest-gate {
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+  width: min(320px, 86vw);
+  padding: 16px;
+  border: 3px solid var(--ink);
+  border-radius: var(--radius-md);
+  background: var(--paper);
+}
+
+.guest-gate-title {
+  margin: 0;
+  font-size: 18px;
+  text-align: center;
+}
+
+.guest-gate-sub {
+  margin: 0;
+  font-family: var(--font-help);
+  font-size: 13px;
+  text-align: center;
+  color: var(--ink-soft);
+}
+
+.guest-gate-actions {
+  display: flex;
+  gap: 8px;
+  width: 100%;
+}
+
+.guest-gate-fill {
+  flex: 1;
+}

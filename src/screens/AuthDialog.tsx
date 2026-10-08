@@ -12,18 +12,21 @@ interface AuthDialogProps {
   reset: AuthFn;
   /** 게스트 기기 값. 로그인 기준 선택 추천에 쓴다. null이면 선택 없이 진행한다. */
   guest: { seeds: number; clears: number } | null;
+  /** 계정 지갑의 씨앗 수를 읽어온다(로그인 세션이고 나서). 기준 선택 표시용. */
+  fetchAccountSeeds?: () => Promise<number>;
   onBack: () => void;
   onDone: () => void;
 }
 
 // 계정 연동 다이얼로그. 이메일·비밀번호로 회원가입을 먼저 시도하고,
 // 이미 가입된 이메일이면 기준 선택(기기 기준 / 계정 기준)을 거쳐 로그인한다.
-export function AuthDialog({ signup, signin, reset: _reset, guest, onBase, onBack, onDone }: AuthDialogProps) {
+export function AuthDialog({ signup, signin, reset: _reset, guest, fetchAccountSeeds, onBase, onBack, onDone }: AuthDialogProps) {
   const [email, setEmail] = useState('');
   const [password, setPassword] = useState('');
   const [error, setError] = useState<string | null>(null);
   const [okMessage, setOkMessage] = useState<string | null>(null);
   const [chooseBase, setChooseBase] = useState(false);
+  const [accountSeeds, setAccountSeeds] = useState<number | null>(null);
   const [busy, setBusy] = useState(false);
   const timer = useRef<ReturnType<typeof setTimeout> | null>(null);
 
@@ -65,6 +68,8 @@ export function AuthDialog({ signup, signin, reset: _reset, guest, onBase, onBac
       }
       if (r.code === 'email_exists' || r.code === 'user_already_exists') {
         setChooseBase(true);
+        // 계정 기준 버튼에 기존 지갑의 씨앗 수를 보여준다.
+        await fetchAccountSeeds?.().then(setAccountSeeds).catch(() => setAccountSeeds(null));
         return;
       }
       setError(r.msg ?? '실패했어요.');
@@ -121,11 +126,21 @@ export function AuthDialog({ signup, signin, reset: _reset, guest, onBase, onBac
               <p>이미 가입된 이메일이에요. 이 계정으로 로그인할까요?</p>
               {guest && (
                 <>
-                  <Button variant="sticker" className="btn-primary" onClick={() => void pickBase('device')} disabled={busy}>
+                  <Button
+                    variant="sticker"
+                    className={(accountSeeds ?? 0) <= guest.seeds ? 'btn-primary login-base-btn' : 'login-base-btn'}
+                    onClick={() => void pickBase('device')}
+                    disabled={busy}
+                  >
                     이 기기 기준 (씨앗 {guest.seeds}개)
                   </Button>
-                  <Button variant="sticker" onClick={() => void pickBase('account')} disabled={busy}>
-                    계정 기준
+                  <Button
+                    variant="sticker"
+                    className={accountSeeds !== null && accountSeeds > guest.seeds ? 'btn-primary login-base-btn' : 'login-base-btn'}
+                    onClick={() => void pickBase('account')}
+                    disabled={busy}
+                  >
+                    계정 기준{accountSeeds !== null ? ` (씨앗 ${accountSeeds}개)` : ''}
                   </Button>
                 </>
               )}
