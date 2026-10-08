@@ -22,6 +22,9 @@ function makeProps(overrides: Partial<Parameters<typeof HomeScreen>[0]> = {}): P
       refreshSoft: vi.fn(async () => {}),
     },
     onSaveNickname: async () => ({ ok: true }),
+    onSignup: async () => ({ ok: true }),
+    onSignin: async () => ({ ok: true }),
+    onReset: async () => ({ ok: true }),
     onBrowse: () => {},
     onEndless: () => {},
     endlessEnabled: true,
@@ -62,12 +65,12 @@ describe('HomeScreen 무한모드 게스트 게이트', () => {
     expect(onLogin).not.toHaveBeenCalled();
   });
 
-  it('안내에서 로그인을 누르면 로그인 화면으로 간다', () => {
-    const onLogin = vi.fn();
-    render(<HomeScreen {...guestProps({ onLogin })} />);
+  it('안내에서 로그인을 누르면 계정 연동 다이얼로그가 열린다', () => {
+    const onSignup = vi.fn(async () => ({ ok: true }));
+    render(<HomeScreen {...guestProps({ onSignup })} />);
     fireEvent.click(screen.getByRole('button', { name: '무한모드' }));
     fireEvent.click(screen.getByRole('button', { name: '로그인 안내 로그인' }));
-    expect(onLogin).toHaveBeenCalled();
+    expect(screen.getByRole('dialog', { name: '계정 연동' })).toBeTruthy();
   });
 
   it('로그인 사용자는 안내 없이 바로 진입한다', () => {
