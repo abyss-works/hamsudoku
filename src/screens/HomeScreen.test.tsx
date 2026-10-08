@@ -19,6 +19,7 @@ function makeProps(overrides: Partial<Parameters<typeof HomeScreen>[0]> = {}): P
       loading: false,
       error: null,
       refresh: vi.fn(async () => {}),
+      refreshSoft: vi.fn(async () => {}),
     },
     onSaveNickname: async () => ({ ok: true }),
     onBrowse: () => {},
