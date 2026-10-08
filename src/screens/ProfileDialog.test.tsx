@@ -6,6 +6,7 @@ import { ProfileDialog } from './ProfileDialog';
 afterEach(cleanup);
 
 const base = {
+  onGuestLink: () => {},
   email: 'e@x.y' as string | null,
   nickname: null as string | null,
   onSaveNickname: async () => ({ ok: true }),
@@ -59,15 +60,16 @@ describe('ProfileDialog 로그인 안내', () => {
     expect(screen.getByText('지금은 이 기기에만 기록돼요.')).toBeTruthy();
   });
 
-  it('계정 연동을 누르면 연동 다이얼로그를 연다', () => {
+  it('게스트가 계정 연동을 누르면 상위 열기 콜백을 부른다', () => {
+    const onGuestLink = vi.fn();
     render(
       <ProfileDialog
         {...base}
         email={null}
-        renderLogin={() => <div data-testid="auth-stub" role="dialog" aria-label="계정 연동" />}
+        onGuestLink={onGuestLink}
       />,
     );
     fireEvent.click(screen.getByRole('button', { name: '계정 연동' }));
-    expect(screen.getByTestId('auth-stub')).toBeTruthy();
+    expect(onGuestLink).toHaveBeenCalledTimes(1);
   });
 });
