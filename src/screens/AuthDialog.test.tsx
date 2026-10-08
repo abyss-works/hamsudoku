@@ -84,3 +84,41 @@ describe('AuthDialog 기준 표시와 배치', () => {
     });
   });
 });
+
+describe('AuthDialog 로그인 선행과 취소', () => {
+  it('이미 가입된 이메일이면 기준 선택 전에 로그인을 선행한다', async () => {
+    const signin = vi.fn(async () => ({ ok: true }));
+    const fetchAccountSeeds = vi.fn(async () => 70);
+    render(
+      <AuthDialog {...base} guest={{ seeds: 12, clears: 1 }} signup={vi.fn(async () => ({ ok: false, code: 'email_exists' }))} signin={signin} fetchAccountSeeds={fetchAccountSeeds} />,
+    );
+    fireEvent.change(screen.getByLabelText('이메일'), { target: { value: 'a@b.c' } });
+    fireEvent.change(screen.getByLabelText('비밀번호'), { target: { value: 'abcdef' } });
+    fireEvent.submit(screen.getByRole('button', { name: '이메일로 계속하기' }).closest('form')!);
+    await vi.waitFor(() => {
+      expect(signin).toHaveBeenCalledTimes(1);
+      expect(screen.getByText(/계정 기준/)).toBeTruthy();
+    });
+    expect(fetchAccountSeeds).toHaveBeenCalled();
+  });
+
+  it('기준 선택 중 닫으면 세션 취소 콜백을 실행한다', async () => {
+    const onCancel = vi.fn();
+    render(
+      <AuthDialog
+        {...base}
+        guest={{ seeds: 12, clears: 1 }}
+        signup={vi.fn(async () => ({ ok: false, code: 'email_exists' }))}
+        onBack={onCancel}
+      />,
+    );
+    fireEvent.change(screen.getByLabelText('이메일'), { target: { value: 'a@b.c' } });
+    fireEvent.change(screen.getByLabelText('비밀번호'), { target: { value: 'abcdef' } });
+    fireEvent.submit(screen.getByRole('button', { name: '이메일로 계속하기' }).closest('form')!);
+    await vi.waitFor(() => {
+      expect(screen.getByText(/계정 기준/)).toBeTruthy();
+    });
+    fireEvent.click(screen.getByRole('button', { name: '뒤로' }));
+    expect(onCancel).toHaveBeenCalledTimes(1);
+  });
+});
