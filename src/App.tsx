@@ -175,6 +175,9 @@ function App() {
               onEndless={() => setScreen('endless')}
               endlessEnabled={account.cloud}
               onSaveNickname={account.saveNickname}
+              onSignup={account.signup}
+              onSignin={signinThenSwitch}
+              onReset={account.reset}
               onLogin={() => setScreen('login')}
               onLogout={handleLogout}
             />

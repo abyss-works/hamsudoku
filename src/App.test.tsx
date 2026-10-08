@@ -192,7 +192,7 @@ describe('화면 전환', () => {
   it('프로필에서 계정 화면이 열리고 닫힌다', async () => {
     render(<App />);
     fireEvent.click(await screen.findByRole('button', { name: '프로필' }));
-    fireEvent.click(screen.getByRole('button', { name: '로그인' }));
+    fireEvent.click(screen.getByRole('button', { name: '계정 연동' }));
     expect(await screen.findByRole('button', { name: '이메일로 계속하기' })).toBeTruthy();
     fireEvent.click(screen.getByRole('button', { name: '뒤로' }));
     expect(await screen.findByRole('button', { name: '스테이지' })).toBeTruthy();
@@ -213,7 +213,7 @@ describe('화면 전환', () => {
     vi.stubGlobal('fetch', fetchMock);
     render(<App />);
     fireEvent.click(await screen.findByRole('button', { name: '프로필' }));
-    fireEvent.click(screen.getByRole('button', { name: '로그인' }));
+    fireEvent.click(screen.getByRole('button', { name: '계정 연동' }));
     fireEvent.change(screen.getByLabelText('이메일'), { target: { value: 'e@x.y' } });
     fireEvent.change(screen.getByLabelText('비밀번호'), { target: { value: '123' } });
     fireEvent.click(screen.getByRole('button', { name: '이메일로 계속하기' }));
@@ -245,7 +245,7 @@ describe('화면 전환', () => {
     });
     render(<App />);
     fireEvent.click(await screen.findByRole('button', { name: '프로필' }));
-    fireEvent.click(screen.getByRole('button', { name: '로그인' }));
+    fireEvent.click(screen.getByRole('button', { name: '계정 연동' }));
     fireEvent.change(screen.getByLabelText('이메일'), { target: { value: 'e@x.y' } });
     fireEvent.change(screen.getByLabelText('비밀번호'), { target: { value: '123456' } });
     fireEvent.click(screen.getByRole('button', { name: '이메일로 계속하기' }));
@@ -287,7 +287,7 @@ describe('화면 전환', () => {
     });
     render(<App />);
     fireEvent.click(await screen.findByRole('button', { name: '프로필' }));
-    fireEvent.click(screen.getByRole('button', { name: '로그인' }));
+    fireEvent.click(screen.getByRole('button', { name: '계정 연동' }));
     fireEvent.change(screen.getByLabelText('이메일'), { target: { value: 'e@x.y' } });
     fireEvent.change(screen.getByLabelText('비밀번호'), { target: { value: '123456' } });
     fireEvent.click(screen.getByRole('button', { name: '이메일로 계속하기' }));
@@ -314,7 +314,7 @@ describe('화면 전환', () => {
     );
     render(<App />);
     fireEvent.click(await screen.findByRole('button', { name: '프로필' }));
-    fireEvent.click(screen.getByRole('button', { name: '로그인' }));
+    fireEvent.click(screen.getByRole('button', { name: '계정 연동' }));
     fireEvent.change(screen.getByLabelText('이메일'), { target: { value: 'e@x.y' } });
     fireEvent.change(screen.getByLabelText('비밀번호'), { target: { value: '123456' } });
     fireEvent.click(screen.getByRole('button', { name: '이메일로 계속하기' }));
@@ -337,7 +337,7 @@ describe('화면 전환', () => {
     });
     render(<App />);
     fireEvent.click(await screen.findByRole('button', { name: '프로필' }));
-    fireEvent.click(screen.getByRole('button', { name: '로그인' }));
+    fireEvent.click(screen.getByRole('button', { name: '계정 연동' }));
     fireEvent.change(screen.getByLabelText('이메일'), { target: { value: 'e@x.y' } });
     fireEvent.click(screen.getByRole('button', { name: '비밀번호를 잊었어요' }));
     expect(await screen.findByText('재설정 메일을 보냈어요. 받은편지함을 확인하세요.')).toBeTruthy();

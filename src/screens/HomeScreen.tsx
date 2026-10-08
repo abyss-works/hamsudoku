@@ -6,6 +6,7 @@ import { ProfileDialog } from './ProfileDialog';
 import { RankDialog } from './RankDialog';
 import { SettingsDialog } from './SettingsDialog';
 import { GuestEndlessDialog } from './GuestEndlessDialog';
+import { AuthDialog } from './AuthDialog';
 
 interface HomeScreenProps {
   email: string | null;
@@ -13,6 +14,9 @@ interface HomeScreenProps {
   uid: string | null;
   summary: EndlessSummaryState;
   onSaveNickname: (name: string) => Promise<{ ok: boolean; msg?: string }>;
+  onSignup: (email: string, password: string) => Promise<{ ok: boolean; msg?: string; code?: string }>;
+  onSignin: (email: string, password: string) => Promise<{ ok: boolean; msg?: string; code?: string }>;
+  onReset: (email: string) => Promise<{ ok: boolean; msg?: string }>;
   onBrowse: () => void;
   onEndless: () => void;
   endlessEnabled: boolean;
@@ -20,12 +24,13 @@ interface HomeScreenProps {
   onLogout: () => void;
 }
 
-export function HomeScreen({ email, nickname, uid, summary, onSaveNickname, onBrowse, onEndless, endlessEnabled, onLogin, onLogout }: HomeScreenProps) {
+export function HomeScreen({ email, nickname, uid, summary, onSaveNickname, onSignup, onSignin, onReset, onBrowse, onEndless, endlessEnabled, onLogin, onLogout }: HomeScreenProps) {
   const [settingsOpen, setSettingsOpen] = useState(false);
   const [profileOpen, setProfileOpen] = useState(false);
   const [rankOpen, setRankOpen] = useState(false);
   const guest = endlessEnabled && uid !== null && email === null;
   const [guestGateOpen, setGuestGateOpen] = useState(false);
+  const [authOpen, setAuthOpen] = useState(false);
 
   // 홈에 들어올 때마다 요약(씨앗 잔액·내 순위)을 최신으로 맞춘다.
   // 조용한 재요청을 쓴다 — loading 토글이 부팅 게이트를 재고정하면 화면 전환 직후
@@ -93,8 +98,18 @@ export function HomeScreen({ email, nickname, uid, summary, onSaveNickname, onBr
           onClose={() => setGuestGateOpen(false)}
           onLogin={() => {
             setGuestGateOpen(false);
-            onLogin();
+            setAuthOpen(true);
           }}
+        />
+      )}
+      {authOpen && guest && (
+        <AuthDialog
+          signup={onSignup}
+          signin={onSignin}
+          reset={onReset}
+          guest={{ seeds: summary.me?.wallet.balance ?? 0, clears: summary.me?.clearedCount ?? 0 }}
+          onBack={() => setAuthOpen(false)}
+          onDone={() => setAuthOpen(false)}
         />
       )}
       {settingsOpen && <SettingsDialog onClose={() => setSettingsOpen(false)} />}
@@ -109,6 +124,20 @@ export function HomeScreen({ email, nickname, uid, summary, onSaveNickname, onBr
           }}
           onLogout={onLogout}
           onClose={() => setProfileOpen(false)}
+          renderLogin={
+            guest
+              ? (close) => (
+                  <AuthDialog
+                    signup={onSignup}
+                    signin={onSignin}
+                    reset={onReset}
+                    guest={{ seeds: summary.me?.wallet.balance ?? 0, clears: summary.me?.clearedCount ?? 0 }}
+                    onBack={close}
+                    onDone={close}
+                  />
+                )
+              : undefined
+          }
         />
       )}
       {rankOpen && <RankDialog rank={summary.rank} uid={uid} onClose={() => setRankOpen(false)} />}
