@@ -33,10 +33,10 @@ function makeProps(overrides: Partial<Parameters<typeof HomeScreen>[0]> = {}): P
 
 describe('HomeScreen 진입 갱신', () => {
   it('홈에 들어올 때마다 요약을 다시 요청한다', async () => {
-    const refresh = vi.fn(async () => {});
-    render(<HomeScreen {...makeProps({ summary: { ...makeProps().summary, refresh } })} />);
+    const refreshSoft = vi.fn(async () => {});
+    render(<HomeScreen {...makeProps({ summary: { ...makeProps().summary, refreshSoft } })} />);
     await waitFor(() => {
-      expect(refresh).toHaveBeenCalled();
+      expect(refreshSoft).toHaveBeenCalled();
     });
   });
 });
