@@ -13,6 +13,10 @@ export interface RankSnapshot {
 export interface RankStore {
   increment(season: string, userId: string, amount: number): Promise<void>;
   top(season: string, limit: number): Promise<RankSnapshot>;
+  /** 관리자용 전체 게임 스코어 목록(내림차순) — UPSTASH ZREVRANGE 원본. */
+  topAll(season: string, limit: number): Promise<RankSnapshot>;
+  /** 관리자용 엔트리 삭제 — UPSTASH ZREM. 실제 삭제된 수를 돌려준다. */
+  remove(season: string, userId: string): Promise<number>;
   rankOf(season: string, userId: string): Promise<{ rank: number | null; score: number }>;
   setScore(season: string, userId: string, score: number): Promise<void>;
 }
@@ -41,6 +45,17 @@ export function createRankStore(opts: { url: string; token: string; fetchImpl?: 
     async increment(season, userId, amount) {
       await cmd(['zincrby', key(season), amount, userId]);
       await cmd(['expire', key(season), SEASON_TTL_SEC]);
+    },
+    async topAll(season, limit) {
+      const flat = await cmd<(string | number)[]>(['zrevrange', key(season), 0, limit - 1, 'withscores']);
+      const entries: RankEntry[] = [];
+      for (let i = 0; i < flat.length; i += 2) {
+        entries.push({ userId: String(flat[i]), score: Number(flat[i + 1]) });
+      }
+      return { at: new Date().toISOString(), entries };
+    },
+    async remove(season, userId) {
+      return cmd<number>(['zrem', key(season), userId]);
     },
     async top(season, limit) {
       const cached = await cmd<string | null>(['get', topKey(season)]);
