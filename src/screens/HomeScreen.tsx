@@ -1,16 +1,22 @@
-import { useState } from 'react';
+import { useEffect, useState } from 'react';
 import { PawPrint, Settings, Sprout, Trophy, User } from 'lucide-react';
 import { Button } from '../ui/Button';
 import type { EndlessSummaryState } from '../game/useEndlessSummary';
 import { ProfileDialog } from './ProfileDialog';
 import { RankDialog } from './RankDialog';
 import { SettingsDialog } from './SettingsDialog';
+import { GuestEndlessDialog } from './GuestEndlessDialog';
+import { AuthDialog } from './AuthDialog';
 
 interface HomeScreenProps {
   email: string | null;
   nickname: string | null;
+  uid: string | null;
   summary: EndlessSummaryState;
   onSaveNickname: (name: string) => Promise<{ ok: boolean; msg?: string }>;
+  onSignup: (email: string, password: string) => Promise<{ ok: boolean; msg?: string; code?: string }>;
+  onSignin: (email: string, password: string) => Promise<{ ok: boolean; msg?: string; code?: string }>;
+  onReset: (email: string) => Promise<{ ok: boolean; msg?: string }>;
   onBrowse: () => void;
   onEndless: () => void;
   endlessEnabled: boolean;
@@ -18,10 +24,22 @@ interface HomeScreenProps {
   onLogout: () => void;
 }
 
-export function HomeScreen({ email, nickname, summary, onSaveNickname, onBrowse, onEndless, endlessEnabled, onLogin, onLogout }: HomeScreenProps) {
+export function HomeScreen({ email, nickname, uid, summary, onSaveNickname, onSignup, onSignin, onReset, onBrowse, onEndless, endlessEnabled, onLogin, onLogout }: HomeScreenProps) {
   const [settingsOpen, setSettingsOpen] = useState(false);
   const [profileOpen, setProfileOpen] = useState(false);
   const [rankOpen, setRankOpen] = useState(false);
+  const guest = endlessEnabled && uid !== null && email === null;
+  const [guestGateOpen, setGuestGateOpen] = useState(false);
+  const [authOpen, setAuthOpen] = useState(false);
+
+  // 홈에 들어올 때마다 요약(씨앗 잔액·내 순위)을 최신으로 맞춘다.
+  // 조용한 재요청을 쓴다 — loading 토글이 부팅 게이트를 재고정하면 화면 전환 직후
+  // 스플래시로 되돌아가는 결함이 생긴다.
+  useEffect(() => {
+    void summary.refreshSoft();
+    // summary 객체는 렌더마다 새로 만들어지므로 최초 1회만 본다.
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, []);
 
   return (
     <div className="home">
@@ -55,7 +73,7 @@ export function HomeScreen({ email, nickname, summary, onSaveNickname, onBrowse,
             variant="sticker"
             className="btn-sun home-endless-main"
             disabled={!endlessEnabled}
-            onClick={onEndless}
+            onClick={guest ? () => setGuestGateOpen(true) : onEndless}
           >
             무한모드
           </Button>
@@ -75,6 +93,25 @@ export function HomeScreen({ email, nickname, summary, onSaveNickname, onBrowse,
         </div>
         {!endlessEnabled && <p className="home-note">무한모드는 온라인 연결이 필요해요</p>}
       </div>
+      {guestGateOpen && (
+        <GuestEndlessDialog
+          onClose={() => setGuestGateOpen(false)}
+          onLogin={() => {
+            setGuestGateOpen(false);
+            setAuthOpen(true);
+          }}
+        />
+      )}
+      {authOpen && guest && (
+        <AuthDialog
+          signup={onSignup}
+          signin={onSignin}
+          reset={onReset}
+          guest={{ seeds: summary.me?.wallet.balance ?? 0, clears: summary.me?.clearedCount ?? 0 }}
+          onBack={() => setAuthOpen(false)}
+          onDone={() => setAuthOpen(false)}
+        />
+      )}
       {settingsOpen && <SettingsDialog onClose={() => setSettingsOpen(false)} />}
       {profileOpen && (
         <ProfileDialog
@@ -87,9 +124,23 @@ export function HomeScreen({ email, nickname, summary, onSaveNickname, onBrowse,
           }}
           onLogout={onLogout}
           onClose={() => setProfileOpen(false)}
+          renderLogin={
+            guest
+              ? (close) => (
+                  <AuthDialog
+                    signup={onSignup}
+                    signin={onSignin}
+                    reset={onReset}
+                    guest={{ seeds: summary.me?.wallet.balance ?? 0, clears: summary.me?.clearedCount ?? 0 }}
+                    onBack={close}
+                    onDone={close}
+                  />
+                )
+              : undefined
+          }
         />
       )}
-      {rankOpen && <RankDialog rank={summary.rank} onClose={() => setRankOpen(false)} />}
+      {rankOpen && <RankDialog rank={summary.rank} uid={uid} onClose={() => setRankOpen(false)} />}
     </div>
   );
 }

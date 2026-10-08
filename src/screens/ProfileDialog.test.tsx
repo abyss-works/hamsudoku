@@ -51,3 +51,23 @@ describe('ProfileDialog nickname', () => {
     await screen.findByText('닉네임은 2~12자로 입력하세요.');
   });
 });
+
+describe('ProfileDialog 로그인 안내', () => {
+  it('게스트는 계정 연동 버튼을 보여준다', () => {
+    render(<ProfileDialog {...base} email={null} />);
+    expect(screen.getByRole('button', { name: '계정 연동' })).toBeTruthy();
+    expect(screen.getByText('지금은 이 기기에만 기록돼요.')).toBeTruthy();
+  });
+
+  it('계정 연동을 누르면 연동 다이얼로그를 연다', () => {
+    render(
+      <ProfileDialog
+        {...base}
+        email={null}
+        renderLogin={() => <div data-testid="auth-stub" role="dialog" aria-label="계정 연동" />}
+      />,
+    );
+    fireEvent.click(screen.getByRole('button', { name: '계정 연동' }));
+    expect(screen.getByTestId('auth-stub')).toBeTruthy();
+  });
+});

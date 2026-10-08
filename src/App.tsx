@@ -169,11 +169,15 @@ function App() {
             <HomeScreen
               email={account.email}
               nickname={account.nickname}
+              uid={account.uid}
               summary={summary}
               onBrowse={() => setScreen('select')}
               onEndless={() => setScreen('endless')}
               endlessEnabled={account.cloud}
               onSaveNickname={account.saveNickname}
+              onSignup={account.signup}
+              onSignin={signinThenSwitch}
+              onReset={account.reset}
               onLogin={() => setScreen('login')}
               onLogout={handleLogout}
             />
