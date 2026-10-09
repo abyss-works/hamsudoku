@@ -3,6 +3,7 @@ import type { Stage } from '../api/stagesApi';
 import { Board } from '../game/Board';
 import { formatElapsed, useElapsed } from '../game/useElapsed';
 import { useHamSudoku } from '../game/useHamSudoku';
+import { playSfx } from '../game/sound';
 import { GameHelp } from '../game/GameHelp';
 import { Button } from '../ui/Button';
 
@@ -23,6 +24,7 @@ export function GameScreen({ stage, onBack, onNextMap, onRecord }: GameScreenPro
   useEffect(() => {
     if (cleared && !wasCleared.current) {
       wasCleared.current = true;
+      playSfx('clear');
       onRecord(stage.code, sec);
     } else if (!cleared) {
       wasCleared.current = false;

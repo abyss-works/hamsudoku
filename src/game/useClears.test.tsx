@@ -27,6 +27,16 @@ describe('useClears', () => {
     });
     expect(result.current.best('1-1')).toMatchObject({ elapsedSec: 50, attempts: 2 });
   });
+  it('sound 토글은 저장되고 유지된다', () => {
+    const { result } = renderHook(() => useClears());
+    expect(result.current.sound).toBe(true);
+    act(() => {
+      result.current.record('1-1', 90);
+      result.current.setSound(false);
+    });
+    expect(result.current.sound).toBe(false);
+    expect(result.current.best('1-1')?.elapsedSec).toBe(90);
+  });
   it('replace는 갈아끼우고 reset은 비운다', () => {
     const { result } = renderHook(() => useClears());
     act(() => {

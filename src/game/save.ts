@@ -87,6 +87,10 @@ export function recordClear(s: SaveV1, stageCode: string, elapsedSec: number, no
   };
 }
 
+export function setSound(s: SaveV1, on: boolean): SaveV1 {
+  return { ...s, settings: { ...s.settings, sound: on }, updatedAt: new Date().toISOString() };
+}
+
 export function nextStageId(clears: ClearEntry[], catalogIds: string[]): string | null {
   const done = new Set(clears.map((c) => c.stageCode));
   const open = catalogIds.filter((id) => !done.has(id));
