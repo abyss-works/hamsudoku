@@ -1,4 +1,4 @@
-import type { CellState, PenColor } from './puzzles';
+import type { CellState } from './puzzles';
 
 export type TapKind = 'single' | 'double';
 
@@ -9,14 +9,14 @@ export function delayForPointerType(t: string | null | undefined): number {
   return t === 'touch' ? SINGLE_TAP_MS_TOUCH : SINGLE_TAP_MS_MOUSE;
 }
 
-export function nextState(state: CellState, kind: TapKind, isCorrect: boolean, pen: PenColor = 'mark'): CellState {
-  if (state === 'wrong' || state === 'auto') return state;
+export function nextState(state: CellState, kind: TapKind, isCorrect: boolean): CellState {
+  if (state === 'wrong' || state === 'auto' || state === 'frag') return state;
   if (kind === 'single') {
-    if (state === 'empty') return pen;
-    if (state === 'mark' || state === 'hypo') return 'empty';
+    if (state === 'empty') return 'mark';
+    if (state === 'mark' || state === 'anchor') return 'empty';
     return 'empty';
   }
-  if (state === 'empty' || state === 'mark' || state === 'hypo') return isCorrect ? 'hamster' : 'wrong';
+  if (state === 'empty' || state === 'mark' || state === 'anchor') return isCorrect ? 'hamster' : 'wrong';
   return state;
 }
 
