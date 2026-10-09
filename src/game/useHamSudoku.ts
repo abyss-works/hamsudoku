@@ -155,11 +155,11 @@ export function useHamSudoku(puzzle: Puzzle): HamSudoku {
       else if (cur === 'anchor') recallAnchor(r, c);
       return;
     }
-    if (cur === 'frag') return;
     if (cur === 'anchor' && kind === 'single') {
       recallAnchor(r, c);
       return;
     }
+    // 조각 싱글은 X를 덮고, 조각 더블은 nextState가 잠근다.
     if (cur === 'anchor' && kind === 'double') {
       // 확정은 앵커를 먼저 지우고 빈칸에서 시도한다. 조각이 남지 않는다.
       recallAnchor(r, c);
@@ -167,6 +167,11 @@ export function useHamSudoku(puzzle: Puzzle): HamSudoku {
     const after = latest.current;
     const result = nextState(after[r][c], kind, isSolutionCell(puzzle, r, c));
     if (result === after[r][c]) return;
+    // 조각에 X를 덮으면 소유권을 끊는다. 회수가 건드리지 않는다.
+    if (cur === 'frag' && result === 'mark') {
+      links.current.delete(keyOf(r, c));
+      underlay.current.delete(keyOf(r, c));
+    }
     const next = after.map((line) => [...line]);
     next[r][c] = result;
     if (result === 'hamster') {
@@ -236,9 +241,13 @@ export function useHamSudoku(puzzle: Puzzle): HamSudoku {
   const paintOne = (st: Stroke, r: number, c: number) => {
     const cur = latest.current[r][c];
     if (st.toMark) {
-      if (cur !== 'empty') return;
+      if (cur !== 'empty' && cur !== 'frag') return;
       const next = latest.current.map((line) => [...line]);
       next[r][c] = 'mark';
+      if (cur === 'frag') {
+        links.current.delete(keyOf(r, c));
+        underlay.current.delete(keyOf(r, c));
+      }
       commit(next, new Map(), null);
       playSfx('mark');
       return;

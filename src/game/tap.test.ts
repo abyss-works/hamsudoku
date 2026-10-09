@@ -10,8 +10,8 @@ describe('nextState', () => {
   it('싱글클릭은 앵커를 지운다', () => {
     expect(nextState('anchor', 'single', false)).toBe('empty');
   });
-  it('싱글클릭은 조각을 건드리지 않는다', () => {
-    expect(nextState('frag', 'single', false)).toBe('frag');
+  it('싱글클릭은 조각에 X를 덮는다', () => {
+    expect(nextState('frag', 'single', false)).toBe('mark');
   });
   it('싱글클릭은 햄스터를 회수하고 오답은 잠근다', () => {
     expect(nextState('hamster', 'single', false)).toBe('empty');

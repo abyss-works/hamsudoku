@@ -230,6 +230,26 @@ describe('probe', () => {
     expect(result.current.probeSlots).toBe(2);
   });
 
+  it('조각에 X를 덮으면 소유권이 끊긴다', () => {
+    const { result } = renderHook(() => useHamSudoku(PUZZLES[0]));
+    act(() => {
+      result.current.setProbeActive(true);
+      result.current.tapCell(2, 2, 'single');
+      result.current.setProbeActive(false);
+    });
+    expect(at(result.current.cells, 2, 0)).toBe('frag');
+    act(() => {
+      result.current.tapCell(2, 0, 'single');
+    });
+    expect(at(result.current.cells, 2, 0)).toBe('mark');
+    act(() => {
+      result.current.tapCell(2, 2, 'single');
+    });
+    expect(at(result.current.cells, 2, 2)).toBe('empty');
+    expect(at(result.current.cells, 2, 0)).toBe('mark');
+    expect(result.current.probeSlots).toBe(3);
+  });
+
   it('앵커 살포는 덮인 X를 간직했다가 회수 때 되돌린다', () => {
     const { result } = renderHook(() => useHamSudoku(PUZZLES[0]));
     act(() => {
