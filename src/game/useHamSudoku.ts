@@ -194,8 +194,8 @@ export function useHamSudoku(puzzle: Puzzle): HamSudoku {
         const fails = wrongRef.current + 1;
         wrongRef.current = fails;
         correctRef.current = 0;
-        // 실패할 때마다 두음씩 오른다(최대 2배).
-        playSfx('bad', 2 ** ((2 * Math.min(fails, 6)) / 12));
+        // 실패할 때마다 두음씩 오른다(최대 2배). 작게 시작한다.
+        playSfx('bad', 2 ** ((2 * Math.min(fails, 6)) / 12), 0.7);
       } else if (result === 'empty') {
         playSfx('erase');
       } else if (result === 'mark') {

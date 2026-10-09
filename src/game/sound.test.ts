@@ -14,9 +14,10 @@ import {
 } from './sound';
 
 vi.mock('howler', () => ({
-  Howl: vi.fn(function (this: { play?: unknown; rate?: unknown }) {
+  Howl: vi.fn(function (this: { play?: unknown; rate?: unknown; volume?: unknown }) {
     this.play = vi.fn(() => 7);
     this.rate = vi.fn();
+    this.volume = vi.fn();
   }),
   Howler: { ctx: null as unknown },
 }));
@@ -162,11 +163,11 @@ describe('progression', () => {
     const scheduled: ScheduledNote[] = [];
     useCtx(fakeCtx(scheduled, []));
     playGoodProgression(1);
-    expect(scheduled.map((s) => s.freq)).toEqual([cascadeFrequencies(1)[0]]);
+    expect(scheduled.map((s) => s.freq)).toEqual(cascadeFrequencies(2));
     scheduled.length = 0;
     playGoodProgression(3);
-    expect(scheduled.map((s) => s.freq)).toEqual(cascadeFrequencies(5).slice(2));
-    expect(scheduled.map((s) => s.at)).toEqual([10, 10.09, 10.18]);
+    expect(scheduled.map((s) => s.freq)).toEqual(cascadeFrequencies(6).slice(2));
+    expect(scheduled.map((s) => s.at)).toEqual([10, 10.09, 10.18, 10.27]);
   });
 
   it('5음을 넘기지 않는다', () => {

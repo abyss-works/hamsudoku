@@ -154,12 +154,12 @@ function liveCtx(): AudioContext | null {
   return ctx;
 }
 
-// 정답 연타 진행음. 맞힐 때마다 높아지고 한음씩 붙는다(최대 5음).
+// 정답 연타 진행음. 맞힐 때마다 높아지고 한음씩 붙는다. 2음 시작, 최대 5음.
 export function playGoodProgression(streak: number): void {
   const ctx = liveCtx();
   if (!ctx) return;
   const s = Math.max(1, Math.min(8, Math.floor(streak)));
-  const count = Math.min(s, 5);
+  const count = Math.min(s + 1, 5);
   const start = Math.min(s - 1, 12);
   const freqs = cascadeFrequencies(start + count).slice(start);
   const t0 = ctx.currentTime;
