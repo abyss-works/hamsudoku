@@ -45,6 +45,10 @@ body {
   font-family: var(--font-display);
   font-size: 17px;
   box-shadow: var(--shadow-hard-sm);
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  gap: 8px;
 }
 
 .btn-sticker:active:not(:disabled) {
