@@ -131,8 +131,8 @@ export function HomeScreen({ email, nickname, uid, summary, onSaveNickname, onSi
           signin={(e, p) => onSignin(e, p, true)}
           reset={onReset}
           fetchAccountSeeds={async () => {
-            await summary.refreshSoft();
-            return summary.me?.wallet.balance ?? 0;
+            const m = await summary.refreshSoft();
+            return m?.wallet.balance ?? 0;
           }}
           guest={guest ? { seeds: summary.me?.wallet.balance ?? 0, clears: summary.me?.clearedCount ?? 0 } : null}
           onBase={() => onBaseChosen?.()}

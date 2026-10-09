@@ -678,6 +678,8 @@ describe('계정 연동 유보 흐름', () => {
     fireEvent.click(screen.getByRole('button', { name: '이메일로 계속하기' }));
     // 선행 로그인 후 기준 선택이 뜬다 — 이 시점엔 로컬 기록이 그대로여야 한다.
     await screen.findByRole('button', { name: /계정 기준/ });
+    // 기준 선택에는 로그인한 계정의 씨앗(70개)이 보여야 한다. 게스트 값(12개)이 아니다.
+    expect(await screen.findByRole('button', { name: /계정 기준 \(씨앗 70개\)/ })).toBeTruthy();
     const mid = JSON.parse(localStorage.getItem('hamsudoku:save:v1') ?? '{}');
     expect(mid.clears).toEqual([{ stageCode: '2-1', clearedAt: 't0', elapsedSec: 10, attempts: 1 }]);
     // 닫기(뒤로) — 세션 취소, 데이터 무변경
