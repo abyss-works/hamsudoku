@@ -46,3 +46,6 @@ next-env.d.ts
 
 # prisma
 prisma/generated/
+
+*storybook.log
+storybook-static
