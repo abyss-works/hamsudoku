@@ -1,7 +1,7 @@
 import { useEffect, useRef, type ReactNode } from 'react';
 import { Board } from '../game/Board';
 import { GameHelp } from '../game/GameHelp';
-import { MarkerControls } from '../game/MarkerControls';
+import { ProbeButton } from '../game/ProbeButton';
 import { useEndlessSession } from '../game/useEndlessSession';
 import { useHamSudoku } from '../game/useHamSudoku';
 import type { Puzzle } from '../game/puzzles';
@@ -60,7 +60,7 @@ function EndlessBoard({ puzzle, onWrong, onFinish, clearOverlay }: EndlessBoardP
         onBrowse={() => {}}
         clearOverlay={clearOverlay}
       />
-      <MarkerControls pen={board.pen} onSelectPen={board.setPen} onClearColor={board.clearColor} />
+      <ProbeButton active={board.probeActive} slots={board.probeSlots} onToggle={() => board.setProbeActive(!board.probeActive)} />
     </>
   );
 }
@@ -153,7 +153,7 @@ export function EndlessGameScreen({ onBack }: { onBack: () => void }) {
           <span className="seed-count">{session.seeds}</span>
         </div>
       </div>
-      <GameHelp />
+      <GameHelp probe />
       <EndlessBoard
         key={session.stageId ?? 'loading'}
         puzzle={session.puzzle}

@@ -4,7 +4,6 @@ import { Board } from '../game/Board';
 import { formatElapsed, useElapsed } from '../game/useElapsed';
 import { useHamSudoku } from '../game/useHamSudoku';
 import { GameHelp } from '../game/GameHelp';
-import { MarkerControls } from '../game/MarkerControls';
 import { Button } from '../ui/Button';
 
 interface GameScreenProps {
@@ -15,7 +14,7 @@ interface GameScreenProps {
 }
 
 export function GameScreen({ stage, onBack, onNextMap, onRecord }: GameScreenProps) {
-  const { cells, violations, cleared, hamsterCount, pulse, hitKey, shake, pen, setPen, tapCell, beginStroke, strokeEnter, endStroke, reset, clearColor } =
+  const { cells, violations, cleared, hamsterCount, pulse, hitKey, shake, tapCell, beginStroke, strokeEnter, endStroke, reset } =
     useHamSudoku(stage.puzzle);
   const [runId, setRunId] = useState(0);
   const sec = useElapsed(!cleared, runId);
@@ -69,7 +68,6 @@ export function GameScreen({ stage, onBack, onNextMap, onRecord }: GameScreenPro
         onNextMap={onNextMap}
         onBrowse={onBack}
       />
-      <MarkerControls pen={pen} onSelectPen={setPen} onClearColor={clearColor} />
     </div>
   );
 }
