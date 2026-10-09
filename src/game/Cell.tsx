@@ -1,7 +1,8 @@
 import { useEffect, useRef } from 'react';
 import { AnimatePresence, motion } from 'framer-motion';
-import { Check, Heart, X } from 'lucide-react';
+import { Heart, X } from 'lucide-react';
 import { HamsterFace } from '../ui/HamsterFace';
+import { DotMark } from '../ui/HelpCard';
 import type { CellState } from './puzzles';
 import { delayForPointerType, type TapKind } from './tap';
 
@@ -123,7 +124,7 @@ export function Cell({ row, col, state, islandId, conflicted, hit, pulseDelay, o
                 ?
               </span>
             ) : state === 'mark' ? (
-              <Check className="mark-glyph mark-check" strokeWidth={3.5} aria-hidden="true" />
+              <DotMark size={22} />
             ) : (
               <X
                 className={`mark-glyph${state === 'wrong' ? ' mark-wrong' : ''}${state === 'auto' ? ' mark-auto' : ''}`}

@@ -90,9 +90,10 @@ describe('Cell 마크 애니메이션', () => {
 });
 
 describe('Cell 마커 모양', () => {
-  it('의심은 체크, 가설은 물음표로 그린다', async () => {
+  it('의심은 채워진 원, 가설은 물음표로 그린다', async () => {
     const { container, rerender } = renderCell('mark');
-    expect(container.querySelector('.mark-check')).not.toBeNull();
+    expect(container.querySelector('.mark-dot')).not.toBeNull();
+    expect(container.querySelector('.mark-check')).toBeNull();
     expect(container.querySelector('.mark-unknown')).toBeNull();
     rerender(
       <Cell row={0} col={0} state="hypo" islandId={0} conflicted={false} onTap={noop} onPress={noop} />,
@@ -100,8 +101,8 @@ describe('Cell 마커 모양', () => {
     const unknown = container.querySelector('.mark-unknown');
     expect(unknown).not.toBeNull();
     expect(unknown?.textContent).toBe('?');
-    // 이전 체크는 퇴장 애니메이션 뒤에 사라진다
-    await waitFor(() => expect(container.querySelector('.mark-check')).toBeNull(), { timeout: 2000 });
+    // 이전 원은 퇴장 애니메이션 뒤에 사라진다
+    await waitFor(() => expect(container.querySelector('.mark-dot')).toBeNull(), { timeout: 2000 });
   });
 
   it('상태를 접근성 라벨로 구분한다', () => {

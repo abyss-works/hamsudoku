@@ -1,4 +1,5 @@
-import { Check, RotateCcw } from 'lucide-react';
+import { RotateCcw } from 'lucide-react';
+import { DotMark } from '../ui/HelpCard';
 import type { PenColor } from './puzzles';
 
 interface MarkerControlsProps {
@@ -32,7 +33,7 @@ export function MarkerControls({ pen, onSelectPen, onClearColor }: MarkerControl
             {selected ? (
               <RotateCcw size={22} aria-hidden="true" />
             ) : p.color === 'mark' ? (
-              <Check size={24} strokeWidth={3.5} aria-hidden="true" />
+              <DotMark size={22} />
             ) : (
               <span className="pen-glyph" aria-hidden="true">
                 ?

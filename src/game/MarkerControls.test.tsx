@@ -25,6 +25,12 @@ describe('MarkerControls', () => {
     expect(onSelectPen).not.toHaveBeenCalled();
   });
 
+  it('의심 펜은 체크가 아닌 채워진 원으로 보인다', () => {
+    const { container } = render(<MarkerControls pen="hypo" onSelectPen={vi.fn()} onClearColor={vi.fn()} />);
+    const idle = screen.getByRole('button', { name: '의심 펜으로 바꾸기' });
+    expect(idle.querySelector('.mark-dot')).not.toBeNull();
+    expect(container.querySelector('.lucide-check')).toBeNull();
+  });
   it('버튼에 아이콘 하나만 보이고 글씨는 없다', () => {
     const { container } = render(<MarkerControls pen="mark" onSelectPen={vi.fn()} onClearColor={vi.fn()} />);
     const selected = screen.getByRole('button', { name: '의심만 지우기' });

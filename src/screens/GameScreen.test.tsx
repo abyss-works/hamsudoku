@@ -36,13 +36,18 @@ describe('GameScreen', () => {
   it('도움말은 한 장씩 좌우로 돌려본다', () => {
     const { container } = render(<GameScreen stage={SIX} onBack={vi.fn()} onNextMap={vi.fn()} onRecord={vi.fn()} />);
     expect(container.querySelectorAll('.help-card')).toHaveLength(1);
-    const rules = screen.getByLabelText('기본 규칙');
-    expect(rules.querySelectorAll('.help-col')).toHaveLength(3);
+    // 조작부의 마커 펜 그룹과 이름이 겹치므로 카드 범위로 좁혀 판정한다
+    const card = () => container.querySelector('.help-card') as HTMLElement;
+    expect(card().getAttribute('aria-label')).toBe('기본 규칙');
+    expect(card().querySelectorAll('.help-col')).toHaveLength(3);
     fireEvent.click(screen.getByRole('button', { name: '다음 도움말' }));
-    const controls = screen.getByLabelText('기본 조작');
-    expect(controls.querySelectorAll('.help-col')).toHaveLength(3);
+    expect(card().getAttribute('aria-label')).toBe('기본 조작');
+    expect(card().querySelectorAll('.help-col')).toHaveLength(3);
     fireEvent.click(screen.getByRole('button', { name: '다음 도움말' }));
-    expect(screen.getByLabelText('기본 규칙')).toBeTruthy();
+    expect(card().getAttribute('aria-label')).toBe('마커 펜');
+    expect(card().querySelectorAll('.help-col')).toHaveLength(2);
+    fireEvent.click(screen.getByRole('button', { name: '다음 도움말' }));
+    expect(card().getAttribute('aria-label')).toBe('기본 규칙');
   });
 
   it('다시하기를 누르면 시간이 0으로 돌아간다', async () => {
