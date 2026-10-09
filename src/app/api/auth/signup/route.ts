@@ -12,6 +12,11 @@ export async function POST(req: Request) {
   if (result.ok) {
     const { uid } = await getSessionUser();
     if (uid) await createPrismaDb().ensureUser(uid, parsed.data.email);
+    return NextResponse.json(result, { status: 200 });
   }
-  return NextResponse.json(result, { status: result.ok ? 200 : 400 });
+  // 중복 이메일은 요청 형식이 아니라 상태 충돌이므로 409를 내린다.
+  if (result.code === 'email_exists' || result.code === 'user_already_exists') {
+    return NextResponse.json(result, { status: 409 });
+  }
+  return NextResponse.json(result, { status: 400 });
 }

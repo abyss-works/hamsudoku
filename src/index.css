@@ -560,6 +560,82 @@ body {
   grid-template-columns: repeat(3, 1fr);
 }
 
+/* 도움말 캐러셀. 전환 버튼은 카드 안 좌우에 겹쳐 둔다.
+   카드 높이는 가장 tall은 장에 맞춰 고정한다. 페이지 전환에 컨테이너가 요동치지 않는다. */
+.help-carousel {
+  display: flex;
+  flex-direction: column;
+}
+
+.help-carousel .help-card {
+  position: relative;
+  display: flex;
+  flex-direction: column;
+  min-height: 104px;
+  padding-left: 34px;
+  padding-right: 34px;
+}
+
+.help-cols {
+  flex: 1;
+  display: grid;
+  grid-template-columns: repeat(3, 1fr);
+}
+
+.help-card.cols-2 .help-cols {
+  grid-template-columns: repeat(2, 1fr);
+}
+
+.help-arrow {
+  position: absolute;
+  top: 50%;
+  translate: 0 -50%;
+  width: 40px;
+  height: 40px;
+  padding: 0;
+  border: none;
+  border-radius: 50%;
+  background: transparent;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  color: var(--ink);
+  cursor: pointer;
+}
+
+.help-prev {
+  left: 0;
+}
+
+.help-next {
+  right: 0;
+}
+
+/* 캐러셀 도트. 현재 장만 당근색으로 보인다. */
+.help-dots {
+  display: flex;
+  justify-content: center;
+  gap: 6px;
+  padding: 4px 0 0;
+}
+
+.help-dots i {
+  width: 8px;
+  height: 8px;
+  border-radius: 50%;
+  background: rgb(74 49 40 / 0.25);
+}
+
+.help-dots i.on {
+  background: var(--carrot);
+}
+
+.help-unknown {
+  font-family: var(--font-display);
+  font-size: 22px;
+  line-height: 1;
+}
+
 .help-col {
   display: flex;
   flex-direction: column;
@@ -571,6 +647,14 @@ body {
 
 .help-col + .help-col {
   border-left: 2px dashed rgb(74 49 40 / 0.18);
+}
+
+/* 항목 아이콘 자리 고정. 크기가 달라도 설명 행이 어긋나지 않는다. */
+.help-icon {
+  height: 40px;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
 }
 
 .help-col p {
@@ -626,12 +710,6 @@ body {
   background: var(--carrot);
 }
 
-.mode-status {
-  display: flex;
-  justify-content: flex-end;
-  width: 100%;
-}
-
 .seed-box {
   display: inline-flex;
   align-items: center;
@@ -650,6 +728,18 @@ body {
   font-size: 24px;
   letter-spacing: 1px;
   color: var(--ink);
+}
+
+/* HUD 우측 씨앗 묶음. 보유 씨앗 박스 안에 현재 목숨을 덧댄다. */
+.game .hud .seed-box {
+  justify-self: end;
+  margin-top: 0;
+}
+
+.seed-lives {
+  font-family: var(--font-help);
+  font-size: 13px;
+  color: var(--leaf);
 }
 
 .home-endless-row {
@@ -835,7 +925,7 @@ body {
 }
 
 .rank-scroll {
-  max-height: calc(5 * 44px);
+  max-height: calc(7.5 * 44px);
   overflow-y: auto;
 }
 

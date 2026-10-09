@@ -7,6 +7,12 @@ describe('nextState', () => {
     expect(nextState('empty', 'single', false)).toBe('mark');
     expect(nextState('mark', 'single', false)).toBe('empty');
   });
+  it('싱글클릭은 앵커를 지운다', () => {
+    expect(nextState('anchor', 'single', false)).toBe('empty');
+  });
+  it('싱글클릭은 조각을 건드리지 않는다', () => {
+    expect(nextState('frag', 'single', false)).toBe('frag');
+  });
   it('싱글클릭은 햄스터를 회수하고 오답은 잠근다', () => {
     expect(nextState('hamster', 'single', false)).toBe('empty');
     expect(nextState('wrong', 'single', false)).toBe('wrong');
@@ -14,8 +20,14 @@ describe('nextState', () => {
   it('더블클릭은 정답이면 햄스터, 오답이면 고정 빨강이다', () => {
     expect(nextState('empty', 'double', true)).toBe('hamster');
     expect(nextState('mark', 'double', true)).toBe('hamster');
+    expect(nextState('anchor', 'double', true)).toBe('hamster');
     expect(nextState('empty', 'double', false)).toBe('wrong');
     expect(nextState('mark', 'double', false)).toBe('wrong');
+    expect(nextState('anchor', 'double', false)).toBe('wrong');
+  });
+  it('더블클릭은 조각을 건드리지 않는다', () => {
+    expect(nextState('frag', 'double', true)).toBe('frag');
+    expect(nextState('frag', 'double', false)).toBe('frag');
   });
   it('더블클릭은 햄스터와 오답을 바꾸지 않는다', () => {
     const states: CellState[] = ['hamster', 'wrong', 'auto'];

@@ -15,7 +15,7 @@ describe('useEndlessSummary', () => {
         if (url === '/api/endless/me')
           return Response.json({ wallet: { balance: 5 }, clearedCount: 2, streak: { current: 1, best: 3 }, season: '2026-W41' });
         if (url === '/api/endless/rank')
-          return Response.json({ season: '2026-W41', top: [], snapshotAt: '2026-10-07T00:00:00.000Z', me: { rank: 3, score: 12 } });
+          return Response.json({ season: '2026-W41', top: [], snapshotAt: '2026-10-07T00:00:00.000Z', me: { rank: 3, score: 12 }, frozen: false });
         throw new Error(`unexpected ${url}`);
       }),
     );
@@ -24,6 +24,29 @@ describe('useEndlessSummary', () => {
       expect(result.current.me?.wallet.balance).toBe(5);
     });
     expect(result.current.rank?.me.rank).toBe(3);
+  });
+
+  it('내 순위는 열 때 따로 가져온다', async () => {
+    vi.stubGlobal(
+      'fetch',
+      vi.fn(async (url: string) => {
+        if (url === '/api/endless/me')
+          return Response.json({ wallet: { balance: 5 }, clearedCount: 2, streak: { current: 1, best: 3 }, season: '2026-W41' });
+        if (url === '/api/endless/rank')
+          return Response.json({ season: '2026-W41', top: [], snapshotAt: '2026-10-07T00:00:00.000Z', me: { rank: 3, score: 12 }, frozen: false });
+        if (url === '/api/endless/me-rank') return Response.json({ rank: 2, score: 52, nickname: '햄찌' });
+        throw new Error(`unexpected ${url}`);
+      }),
+    );
+    const { result } = renderHook(() => useEndlessSummary(true));
+    await waitFor(() => {
+      expect(result.current.me?.wallet.balance).toBe(5);
+    });
+    expect(result.current.myRank).toBeNull();
+    await act(async () => {
+      await result.current.refreshMyRank();
+    });
+    expect(result.current.myRank).toEqual({ rank: 2, score: 52, nickname: '햄찌' });
   });
 
   it('비활성이면 요청하지 않는다', async () => {
@@ -52,7 +75,7 @@ describe('useEndlessSummary', () => {
         if (url === '/api/endless/me')
           return Response.json({ wallet: { balance }, clearedCount: 2, streak: { current: 1, best: 3 }, season: '2026-W41' });
         if (url === '/api/endless/rank')
-          return Response.json({ season: '2026-W41', top: [], snapshotAt: '2026-10-07T00:00:00.000Z', me: { rank: 3, score: 12 } });
+          return Response.json({ season: '2026-W41', top: [], snapshotAt: '2026-10-07T00:00:00.000Z', me: { rank: 3, score: 12 }, frozen: false });
         throw new Error(`unexpected ${url}`);
       }),
     );
@@ -75,7 +98,7 @@ describe('useEndlessSummary', () => {
         if (url === '/api/endless/me')
           return Response.json({ wallet: { balance }, clearedCount: 2, streak: { current: 1, best: 3 }, season: '2026-W41' });
         if (url === '/api/endless/rank')
-          return Response.json({ season: '2026-W41', top: [], snapshotAt: '2026-10-07T00:00:00.000Z', me: { rank: 3, score: 12 } });
+          return Response.json({ season: '2026-W41', top: [], snapshotAt: '2026-10-07T00:00:00.000Z', me: { rank: 3, score: 12 }, frozen: false });
         throw new Error(`unexpected ${url}`);
       }),
     );

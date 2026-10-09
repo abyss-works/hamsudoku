@@ -62,6 +62,7 @@ describe('계약 스키마', () => {
       top: [],
       snapshotAt: '2026-10-07T00:00:00.000Z',
       me: { rank: null, score: 0 },
+      frozen: false,
     });
     expect(parsed.success).toBe(true);
   });

@@ -58,6 +58,14 @@ export const rankResponseSchema = z.object({
   top: z.array(rankEntrySchema),
   snapshotAt: z.iso.datetime(),
   me: z.object({ rank: z.number().int().min(1).nullable(), score: z.number().int().min(0) }),
+  frozen: z.boolean(),
+});
+
+/** 내 순위 별도 조회 응답. 스냅샷을 거치지 않은 실시간 값이다. */
+export const myRankResponseSchema = z.object({
+  rank: z.number().int().min(1).nullable(),
+  score: z.number().int().min(0),
+  nickname: z.string().nullable(),
 });
 
 export const meResponseSchema = z.object({
@@ -86,5 +94,6 @@ export type FailRequest = z.infer<typeof failRequestSchema>;
 export type FailResponse = z.infer<typeof failResponseSchema>;
 export type RankEntry = z.infer<typeof rankEntrySchema>;
 export type RankResponse = z.infer<typeof rankResponseSchema>;
+export type MyRankResponse = z.infer<typeof myRankResponseSchema>;
 export type MeResponse = z.infer<typeof meResponseSchema>;
 export type EndlessMirror = z.infer<typeof endlessMirrorSchema>;

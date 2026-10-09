@@ -1,10 +1,9 @@
 import { useEffect, useRef, useState } from 'react';
 import type { Stage } from '../api/stagesApi';
 import { Board } from '../game/Board';
-import { ControlsHelp } from '../game/ControlsHelp';
 import { formatElapsed, useElapsed } from '../game/useElapsed';
 import { useHamSudoku } from '../game/useHamSudoku';
-import { RulesHelp } from '../game/RulesHelp';
+import { GameHelp } from '../game/GameHelp';
 import { Button } from '../ui/Button';
 
 interface GameScreenProps {
@@ -15,7 +14,7 @@ interface GameScreenProps {
 }
 
 export function GameScreen({ stage, onBack, onNextMap, onRecord }: GameScreenProps) {
-  const { cells, violations, cleared, hamsterCount, pulse, hitKey, shake, tapCell, beginStroke, strokeEnter, endStroke, reset, clearMarks } =
+  const { cells, violations, cleared, hamsterCount, pulse, hitKey, shake, tapCell, beginStroke, strokeEnter, endStroke, reset } =
     useHamSudoku(stage.puzzle);
   const [runId, setRunId] = useState(0);
   const sec = useElapsed(!cleared, runId);
@@ -45,16 +44,14 @@ export function GameScreen({ stage, onBack, onNextMap, onRecord }: GameScreenPro
         <span className="hud-code">
           {stage.code} · {formatElapsed(sec)}
         </span>
-        <Button variant="sticker" onClick={clearMarks}>
-          리셋
-        </Button>
+        <span />
       </div>
       <div className="dots" role="status" aria-label={`햄스터 ${hamsterCount}/${stage.puzzle.size}`}>
         {Array.from({ length: stage.puzzle.size }, (_, i) => (
           <span key={i} className={i < hamsterCount ? 'dot on' : 'dot'} aria-hidden="true" />
         ))}
       </div>
-      <RulesHelp />
+      <GameHelp />
       <Board
         puzzle={stage.puzzle}
         cells={cells}
@@ -71,7 +68,6 @@ export function GameScreen({ stage, onBack, onNextMap, onRecord }: GameScreenPro
         onNextMap={onNextMap}
         onBrowse={onBack}
       />
-      <ControlsHelp />
     </div>
   );
 }

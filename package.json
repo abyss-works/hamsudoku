@@ -1,35 +1,57 @@
 {
   "name": "project",
-  "version": "0.3.6",
+  "version": "0.4.0",
   "private": true,
   "packageManager": "pnpm@11.21.0",
+  "msw": {
+    "workerDirectory": [
+      "public"
+    ]
+  },
   "scripts": {
     "dev": "next dev",
-    "build": "next build",
+    "build": "prisma generate && next build",
     "start": "next start",
     "lint": "oxlint",
-    "test": "vitest run"
+    "test": "vitest run",
+    "db:generate": "prisma generate",
+    "db:migrate": "dotenv -e .env.local -- prisma migrate dev",
+    "db:deploy": "dotenv -e .env.local -- prisma migrate deploy",
+    "db:studio": "dotenv -e .env.local -- prisma studio",
+    "storybook": "storybook dev -p 6006",
+    "build-storybook": "storybook build"
   },
   "dependencies": {
-    "@prisma/client": "^6.19.3",
+    "@prisma/adapter-pg": "7.10.0",
+    "@prisma/client": "7.10.0",
     "@sentry/nextjs": "^11.4.0",
     "@supabase/ssr": "^0.12.7",
     "@supabase/supabase-js": "^2.117.2",
+    "dotenv": "18.0.6",
     "framer-motion": "^14.0.0",
     "lucide-react": "^1.52.0",
     "next": "16.3.8",
+    "pg": "8.23.1",
     "react": "19.2.8",
     "react-dom": "19.2.8",
     "zod": "^4.6.5"
   },
   "devDependencies": {
+    "@storybook/addon-a11y": "^10.6.1",
+    "@storybook/addon-docs": "^10.6.1",
+    "@storybook/nextjs": "^10.6.1",
     "@testing-library/react": "^16.3.3",
     "@types/node": "^24.19.1",
+    "@types/pg": "8.23.1",
     "@types/react": "^19",
     "@types/react-dom": "^19",
+    "dotenv-cli": "11.0.0",
     "jsdom": "^30.1.2",
+    "msw": "^3.0.2",
+    "msw-storybook-addon": "^3.0.3",
     "oxlint": "^1.86.0",
-    "prisma": "^6.19.3",
+    "prisma": "7.10.0",
+    "storybook": "^10.6.1",
     "tsx": "^4.23.15",
     "typescript": "^5",
     "vitest": "^5.0.3"
