@@ -88,11 +88,6 @@
   color: var(--ink);
 }
 
-.cell[data-state='wrong'] {
-  outline: 3px solid #e5484d;
-  outline-offset: -3px;
-}
-
 .mark-glyph.mark-wrong {
   color: #e5484d;
 }
@@ -138,6 +133,23 @@
   font-size: 11px;
   line-height: 18px;
   text-align: center;
+}
+
+/* 버튼 안 미니 앵커. 보드 위 앵커와 같은 얼굴이다. */
+.probe-face {
+  position: relative;
+  display: inline-flex;
+}
+
+.probe-face svg {
+  width: 30px;
+  height: 30px;
+}
+
+.probe-face .anchor-badge {
+  font-size: 14px;
+  right: -2px;
+  bottom: -4px;
 }
 
 .cell-hit {

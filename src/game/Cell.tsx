@@ -116,7 +116,7 @@ export function Cell({ row, col, state, islandId, conflicted, hit, pulseDelay, o
             aria-hidden="true"
             initial={{ scale: 0.3, opacity: 0 }}
             animate={{ scale: 1, opacity: 1 }}
-            exit={{ scale: 0.3, opacity: 0, transition: { duration: 0.15, delay: 0 } }}
+            exit={{ scale: 0.3, opacity: 0, transition: { duration: 0.15, delay: (pulseDelay ?? 0) / 1000 } }}
             transition={{ duration: 0.25, delay: (pulseDelay ?? 0) / 1000 }}
           >
             <HamsterFace />
@@ -131,7 +131,7 @@ export function Cell({ row, col, state, islandId, conflicted, hit, pulseDelay, o
             aria-hidden="true"
             initial={{ scale: 0.3, opacity: 0 }}
             animate={{ scale: 1, opacity: 1 }}
-            exit={{ scale: 0.3, opacity: 0, transition: { duration: 0.15, delay: 0 } }}
+            exit={{ scale: 0.3, opacity: 0, transition: { duration: 0.15, delay: (pulseDelay ?? 0) / 1000 } }}
             transition={{ duration: 0.25, delay: (pulseDelay ?? 0) / 1000 }}
           >
             {state === 'frag' ? (
