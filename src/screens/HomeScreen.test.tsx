@@ -19,7 +19,7 @@ function makeProps(overrides: Partial<Parameters<typeof HomeScreen>[0]> = {}): P
       loading: false,
       error: null,
       refresh: vi.fn(async () => {}),
-      refreshSoft: vi.fn(async () => {}),
+      refreshSoft: vi.fn(async () => null),
     },
     onSaveNickname: async () => ({ ok: true }),
     onSignup: async () => ({ ok: true }),
@@ -36,7 +36,7 @@ function makeProps(overrides: Partial<Parameters<typeof HomeScreen>[0]> = {}): P
 
 describe('HomeScreen 진입 갱신', () => {
   it('홈에 들어올 때마다 요약을 다시 요청한다', async () => {
-    const refreshSoft = vi.fn(async () => {});
+    const refreshSoft = vi.fn(async () => null);
     render(<HomeScreen {...makeProps({ summary: { ...makeProps().summary, refreshSoft } })} />);
     await waitFor(() => {
       expect(refreshSoft).toHaveBeenCalled();

@@ -66,4 +66,30 @@ describe('useEndlessSummary', () => {
     });
     expect(result.current.me?.wallet.balance).toBe(9);
   });
+
+  it('조용한 재요청은 가져온 요약을 그대로 돌려준다', async () => {
+    let balance = 5;
+    vi.stubGlobal(
+      'fetch',
+      vi.fn(async (url: string) => {
+        if (url === '/api/endless/me')
+          return Response.json({ wallet: { balance }, clearedCount: 2, streak: { current: 1, best: 3 }, season: '2026-W41' });
+        if (url === '/api/endless/rank')
+          return Response.json({ season: '2026-W41', top: [], snapshotAt: '2026-10-07T00:00:00.000Z', me: { rank: 3, score: 12 } });
+        throw new Error(`unexpected ${url}`);
+      }),
+    );
+    const { result } = renderHook(() => useEndlessSummary(true));
+    await waitFor(() => {
+      expect(result.current.me?.wallet.balance).toBe(5);
+    });
+    balance = 72;
+    let returned: number | null = null;
+    await act(async () => {
+      const m = await result.current.refreshSoft();
+      returned = m?.wallet.balance ?? null;
+    });
+    // 상태가 바뀌기 전 렌더의 값이 아니라 방금 가져온 값을 쓴다.
+    expect(returned).toBe(72);
+  });
 });
