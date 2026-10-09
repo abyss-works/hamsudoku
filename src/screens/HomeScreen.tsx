@@ -6,6 +6,7 @@ import { ProfileDialog } from './ProfileDialog';
 import { RankDialog } from './RankDialog';
 import { SettingsDialog } from './SettingsDialog';
 import { GuestEndlessDialog } from './GuestEndlessDialog';
+import { NicknameGateDialog } from './NicknameGateDialog';
 import { AuthDialog } from './AuthDialog';
 
 interface HomeScreenProps {
@@ -40,6 +41,9 @@ export function HomeScreen({ email, nickname, uid, summary, onSaveNickname, onSi
   const [rankOpen, setRankOpen] = useState(false);
   const guest = endlessEnabled && uid !== null && email === null;
   const [guestGateOpen, setGuestGateOpen] = useState(false);
+  // 로그인 상태인데 닉네임이 없으면 진입 전에 정하도록 안내한다.
+  const needsNickname = endlessEnabled && email !== null && !nickname;
+  const [nicknameGateOpen, setNicknameGateOpen] = useState(false);
   const [authOpen, setAuthOpen] = useState(false);
 
   // 홈에 들어올 때마다 요약(씨앗 잔액·내 순위)을 최신으로 맞춘다.
@@ -86,7 +90,7 @@ export function HomeScreen({ email, nickname, uid, summary, onSaveNickname, onSi
             variant="sticker"
             className="btn-sun home-endless-main"
             disabled={!endlessEnabled}
-            onClick={guest ? () => setGuestGateOpen(true) : onEndless}
+            onClick={guest ? () => setGuestGateOpen(true) : needsNickname ? () => setNicknameGateOpen(true) : onEndless}
           >
             무한모드
           </Button>
@@ -112,6 +116,19 @@ export function HomeScreen({ email, nickname, uid, summary, onSaveNickname, onSi
           onLogin={() => {
             setGuestGateOpen(false);
             setAuthOpen(true);
+          }}
+        />
+      )}
+      {nicknameGateOpen && (
+        <NicknameGateDialog
+          onSaveNickname={onSaveNickname}
+          onEnter={() => {
+            setNicknameGateOpen(false);
+            onEndless();
+          }}
+          onLater={() => {
+            setNicknameGateOpen(false);
+            onEndless();
           }}
         />
       )}
