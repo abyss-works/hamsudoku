@@ -8,6 +8,7 @@ import {
   playCascade,
   playSfx,
   recoverAudio,
+  resetSoundForTests,
   setSfxEnabled,
   type SfxName,
 } from './sound';
@@ -23,6 +24,7 @@ const NAMES: SfxName[] = ['ui-click', 'mark', 'erase', 'good', 'bad', 'clear', '
 
 afterEach(() => {
   vi.clearAllMocks();
+  resetSoundForTests();
   setSfxEnabled(true);
 });
 
@@ -54,6 +56,13 @@ describe('sound', () => {
       globalThis.window = w;
     }
   });
+
+  it('미리 받아두면 첫 재생이 막히지 않는다', async () => {
+    vi.resetModules();
+    const fresh = await import('./sound');
+    fresh.preloadSfx();
+    expect(Howl).toHaveBeenCalledTimes(NAMES.length);
+  });
 });
 
 interface ScheduledNote {
@@ -70,7 +79,7 @@ interface FakeCtx {
   createGain: () => unknown;
 }
 
-function fakeCtx(scheduled: ScheduledNote[], state = 'running'): FakeCtx {
+function fakeCtx(scheduled: ScheduledNote[], gains: number[], state = 'running'): FakeCtx {
   class FakeOsc {
     type = '';
     frequency = { value: 0 };
@@ -81,7 +90,12 @@ function fakeCtx(scheduled: ScheduledNote[], state = 'running'): FakeCtx {
     stop() {}
   }
   class FakeGain {
-    gain = { setValueAtTime() {}, exponentialRampToValueAtTime() {} };
+    gain = {
+      setValueAtTime: (v: number) => {
+        gains.push(v);
+      },
+      exponentialRampToValueAtTime() {},
+    };
     connect() {}
   }
   return {
@@ -115,19 +129,28 @@ describe('cascade', () => {
     expect(cascadeFrequencies(30)).toHaveLength(24);
   });
 
-  it('전파 딜레이마다 음을 올린다', () => {
+  it('전파 박자마다 한음씩 늘어난 화음을 올린다', () => {
     const scheduled: ScheduledNote[] = [];
-    useCtx(fakeCtx(scheduled));
+    const gains: number[] = [];
+    useCtx(fakeCtx(scheduled, gains));
     playCascade([180, 60, 120]);
-    expect(scheduled).toHaveLength(3);
-    expect(scheduled.map((s) => s.at)).toEqual([10.06, 10.12, 10.18]);
-    const freqs = scheduled.map((s) => s.freq);
-    for (let i = 1; i < freqs.length; i += 1) expect(freqs[i]).toBeGreaterThan(freqs[i - 1]);
+    // 0박 2음, 1박 3음, 2박 4음
+    expect(scheduled).toHaveLength(9);
+    expect(scheduled.map((s) => s.at)).toEqual([10.06, 10.06, 10.12, 10.12, 10.12, 10.18, 10.18, 10.18, 10.18]);
+    const byBeat = [scheduled.slice(0, 2), scheduled.slice(2, 5), scheduled.slice(5)];
+    for (const beat of byBeat) {
+      const freqs = beat.map((s) => s.freq);
+      for (let i = 1; i < freqs.length; i += 1) expect(freqs[i]).toBeGreaterThan(freqs[i - 1]);
+    }
+    // 박자 합이 일정해서 먹지 않는다
+    expect(gains.slice(0, 2).reduce((a, b) => a + b, 0)).toBeCloseTo(0.25, 5);
+    expect(gains.slice(2, 5).reduce((a, b) => a + b, 0)).toBeCloseTo(0.25, 5);
+    expect(gains.slice(5).reduce((a, b) => a + b, 0)).toBeCloseTo(0.25, 5);
   });
 
   it('끄면 스케줄하지 않는다', () => {
     const scheduled: ScheduledNote[] = [];
-    useCtx(fakeCtx(scheduled));
+    useCtx(fakeCtx(scheduled, []));
     setSfxEnabled(false);
     playCascade([60]);
     expect(scheduled).toHaveLength(0);
@@ -135,7 +158,7 @@ describe('cascade', () => {
 
   it('끊기면 깨우고 이번은 건너뛴다', () => {
     const scheduled: ScheduledNote[] = [];
-    const ctx = fakeCtx(scheduled, 'suspended');
+    const ctx = fakeCtx(scheduled, [], 'suspended');
     useCtx(ctx);
     playCascade([60]);
     expect(ctx.resume).toHaveBeenCalled();
@@ -149,21 +172,21 @@ describe('recoverAudio', () => {
   });
 
   it('끊긴 컨텍스트를 깨운다', () => {
-    const ctx = fakeCtx([], 'suspended');
+    const ctx = fakeCtx([], [], 'suspended');
     useCtx(ctx);
     recoverAudio();
     expect(ctx.resume).toHaveBeenCalled();
   });
 
   it('돌아가는 컨텍스트는 건드리지 않는다', () => {
-    const ctx = fakeCtx([], 'running');
+    const ctx = fakeCtx([], [], 'running');
     useCtx(ctx);
     recoverAudio();
     expect(ctx.resume).not.toHaveBeenCalled();
   });
 
   it('복귀하면 재연결한다', () => {
-    const ctx = fakeCtx([], 'suspended');
+    const ctx = fakeCtx([], [], 'suspended');
     useCtx(ctx);
     const off = installAudioRecovery();
     Object.defineProperty(document, 'visibilityState', { value: 'visible', configurable: true });
