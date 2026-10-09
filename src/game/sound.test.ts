@@ -7,7 +7,6 @@ import {
   isSfxEnabled,
   playCascade,
   playSfx,
-  preloadSfx,
   recoverAudio,
   resetSoundForTests,
   setSfxEnabled,
