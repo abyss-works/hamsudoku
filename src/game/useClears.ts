@@ -1,6 +1,6 @@
 import { useState } from 'react';
 import { mergePulled } from '../shared/merge';
-import { loadSave, newSave, nextStageId, recordClear, storeSave, type ClearEntry } from './save';
+import { loadSave, newSave, nextStageId, recordClear, setSound, storeSave, type ClearEntry } from './save';
 
 export function useClears(): {
   clears: Map<string, ClearEntry>;
@@ -10,6 +10,8 @@ export function useClears(): {
   mergeIn: (entries: ClearEntry[]) => void;
   reset: () => void;
   resumeId: (catalogIds: string[]) => string | null;
+  sound: boolean;
+  setSound: (on: boolean) => void;
 } {
   const [save, setSave] = useState(loadSave);
 
@@ -66,6 +68,14 @@ export function useClears(): {
     });
   };
 
+  const setSoundEnabled = (on: boolean) => {
+    setSave((prev) => {
+      const next = setSound(prev, on);
+      storeSave(next);
+      return next;
+    });
+  };
+
   return {
     clears,
     best: (code: string) => clears.get(code),
@@ -74,5 +84,7 @@ export function useClears(): {
     mergeIn,
     reset,
     resumeId: (catalogIds: string[]) => nextStageId(save.clears, catalogIds),
+    sound: save.settings.sound,
+    setSound: setSoundEnabled,
   };
 }

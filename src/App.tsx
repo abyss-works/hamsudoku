@@ -1,6 +1,7 @@
 import { useEffect, useRef, useState } from 'react';
 import type { Stage } from './api/stagesApi';
 import { useClears } from './game/useClears';
+import { setSfxEnabled } from './game/sound';
 import { useAccount } from './game/useAccount';
 import { useEndlessSummary } from './game/useEndlessSummary';
 import { useDelayedLoading } from './ui/useDelayedLoading';
@@ -33,7 +34,7 @@ function App() {
   const [stageId, setStageId] = useState<string | null>(null);
   // 마지막으로 들어간 스테이지의 레벨. 선택 화면이 다시 열릴 때 그 레벨 탭을 유지한다.
   const [chapterId, setChapterId] = useState<string | null>(null);
-  const { clears, record, replace, mergeIn, reset } = useClears();
+  const { clears, record, replace, mergeIn, reset, sound, setSound } = useClears();
   const account = useAccount();
   const { chapters, loading, error } = useStages();
   const summary = useEndlessSummary(account.cloud);
@@ -191,6 +192,10 @@ function App() {
     if (ready) document.getElementById('boot-static')?.remove();
   }, [ready]);
 
+  useEffect(() => {
+    setSfxEnabled(sound);
+  }, [sound]);
+
   return (
     <LoadingProvider>
       <main className="app">
@@ -204,6 +209,8 @@ function App() {
               nickname={account.nickname}
               uid={account.uid}
               summary={summary}
+              sound={sound}
+              onToggleSound={() => setSound(!sound)}
               onBaseChosen={beginSwitch}
               onCancelSignin={cancelSignin}
               onBrowse={() => setScreen('select')}

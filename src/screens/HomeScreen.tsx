@@ -18,6 +18,8 @@ interface HomeScreenProps {
   nickname: string | null;
   uid: string | null;
   summary: EndlessSummaryState;
+  sound: boolean;
+  onToggleSound: () => void;
   onSaveNickname: (name: string) => Promise<{ ok: boolean; msg?: string }>;
   onSignup: (email: string, password: string) => Promise<{ ok: boolean; msg?: string; code?: string }>;
   onSignin: (
@@ -35,7 +37,7 @@ interface HomeScreenProps {
   onLogout: () => void;
 }
 
-export function HomeScreen({ email, nickname, uid, summary, onSaveNickname, onSignup, onSignin, onReset, onBaseChosen, onCancelSignin, onBrowse, onEndless, endlessEnabled, onWarmSession, onLogin, onLogout }: HomeScreenProps) {
+export function HomeScreen({ email, nickname, uid, summary, sound, onToggleSound, onSaveNickname, onSignup, onSignin, onReset, onBaseChosen, onCancelSignin, onBrowse, onEndless, endlessEnabled, onWarmSession, onLogin, onLogout }: HomeScreenProps) {
   const [settingsOpen, setSettingsOpen] = useState(false);
   const [profileOpen, setProfileOpen] = useState(false);
   const [rankOpen, setRankOpen] = useState(false);
@@ -133,7 +135,7 @@ export function HomeScreen({ email, nickname, uid, summary, onSaveNickname, onSi
           }}
         />
       )}
-      {settingsOpen && <SettingsDialog onClose={() => setSettingsOpen(false)} />}
+      {settingsOpen && <SettingsDialog sound={sound} onToggleSound={onToggleSound} onClose={() => setSettingsOpen(false)} />}
       {profileOpen && (
         <ProfileDialog
           email={email}

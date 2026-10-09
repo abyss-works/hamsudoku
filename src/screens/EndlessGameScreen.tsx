@@ -4,6 +4,7 @@ import { GameHelp } from '../game/GameHelp';
 import { ProbeButton } from '../game/ProbeButton';
 import { useEndlessSession } from '../game/useEndlessSession';
 import { useHamSudoku } from '../game/useHamSudoku';
+import { playSfx } from '../game/sound';
 import type { Puzzle } from '../game/puzzles';
 import { Button } from '../ui/Button';
 import { BootSplash } from '../ui/BootSplash';
@@ -124,6 +125,16 @@ export function EndlessGameScreen({ onBack }: { onBack: () => void }) {
     // 첫 진입은 게이트 스플래시가 맡으므로 track하지 않는다.
     void session.start();
   }, [session]);
+
+  useEffect(() => {
+    if (!session.finishResult) return;
+    playSfx('clear');
+    if (session.finishResult.earned > 0) playSfx('seed');
+  }, [session.finishResult]);
+
+  useEffect(() => {
+    if (session.phase === 'gameover') playSfx('gameover');
+  }, [session.phase]);
 
   if (!session.puzzle) {
     if (session.error) {
