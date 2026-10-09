@@ -1,6 +1,7 @@
 import { useRef, useState } from 'react';
 import { countHamsters, getViolations, isCleared, isSolutionCell, type Violations } from './rules';
 import type { CellState, Puzzle } from './puzzles';
+import { playSfx } from './sound';
 import { nextState, spreadMarks, type TapKind } from './tap';
 
 function blankBoard(size: number): CellState[][] {
@@ -105,6 +106,7 @@ export function useHamSudoku(puzzle: Puzzle): HamSudoku {
       }
     }
     commit(next, delays, null);
+    playSfx('mark');
   };
 
   // 앵커와 자기 조각을 거둔다. 덮인 X마커는 되돌리고 먼 조각부터 역순으로 사라진다.
@@ -136,6 +138,7 @@ export function useHamSudoku(puzzle: Puzzle): HamSudoku {
       delays.set(key, i * 60);
     });
     commit(next, delays, null);
+    playSfx('erase');
   };
 
   const tapCell = (r: number, c: number, kind: TapKind) => {
@@ -175,9 +178,17 @@ export function useHamSudoku(puzzle: Puzzle): HamSudoku {
         }
       }
       commit(next, delays, keyOf(r, c));
+      playSfx('good');
     } else {
       commit(next, new Map(), null);
-      if (result === 'wrong' && kind === 'double') setShake((n) => n + 1);
+      if (result === 'wrong' && kind === 'double') {
+        setShake((n) => n + 1);
+        playSfx('bad');
+      } else if (result === 'empty') {
+        playSfx('erase');
+      } else if (result === 'mark') {
+        playSfx('mark');
+      }
     }
   };
 
