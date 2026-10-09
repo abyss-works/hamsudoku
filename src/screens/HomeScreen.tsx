@@ -110,6 +110,21 @@ export function HomeScreen({ email, nickname, uid, summary, onSaveNickname, onSi
           }}
         />
       )}
+      {settingsOpen && <SettingsDialog onClose={() => setSettingsOpen(false)} />}
+      {profileOpen && (
+        <ProfileDialog
+          email={email}
+          nickname={nickname}
+          onSaveNickname={onSaveNickname}
+          onLogin={() => {
+            setProfileOpen(false);
+            onLogin();
+          }}
+          onLogout={onLogout}
+          onClose={() => setProfileOpen(false)}
+          onGuestLink={() => setAuthOpen(true)}
+        />
+      )}
       {authOpen && (
         <AuthDialog
           signup={onSignup}
@@ -126,21 +141,6 @@ export function HomeScreen({ email, nickname, uid, summary, onSaveNickname, onSi
             setAuthOpen(false);
           }}
           onDone={() => setAuthOpen(false)}
-        />
-      )}
-      {settingsOpen && <SettingsDialog onClose={() => setSettingsOpen(false)} />}
-      {profileOpen && (
-        <ProfileDialog
-          email={email}
-          nickname={nickname}
-          onSaveNickname={onSaveNickname}
-          onLogin={() => {
-            setProfileOpen(false);
-            onLogin();
-          }}
-          onLogout={onLogout}
-          onClose={() => setProfileOpen(false)}
-          onGuestLink={() => setAuthOpen(true)}
         />
       )}
       {rankOpen && (

@@ -81,6 +81,19 @@ describe('HomeScreen 무한모드 게스트 게이트', () => {
   });
 });
 
+describe('HomeScreen 프로필 계정 연동 겹침', () => {
+  it('계정 연동 다이얼로그가 프로필 뒤가 아니라 위에 그려진다', () => {
+    render(<HomeScreen {...makeProps({ email: null })} />);
+    fireEvent.click(screen.getByRole('button', { name: '프로필' }));
+    fireEvent.click(screen.getByRole('button', { name: '계정 연동' }));
+    const profile = screen.getByRole('dialog', { name: '프로필' });
+    const auth = screen.getByRole('dialog', { name: '계정 연동' });
+    // 두 오버레이의 z-index가 같으므로 DOM 순서가 그리기 순서를 정한다.
+    // 계정 연동이 뒤에 있어야 프로필에 가려지지 않는다.
+    expect(profile.compareDocumentPosition(auth)).toBe(Node.DOCUMENT_POSITION_FOLLOWING);
+  });
+});
+
 describe('HomeScreen 게스트 안내 문구와 배치', () => {
   it('안내 문구가 공정한 경쟁 안내를 쓴다', () => {
     render(<HomeScreen {...makeProps({ email: null, endlessEnabled: true })} />);
