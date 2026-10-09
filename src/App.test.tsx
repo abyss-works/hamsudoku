@@ -439,13 +439,13 @@ describe('탭 UX', () => {
     fireEvent.click(await screen.findByRole('button', { name: '스테이지' }));
     await screen.findByText('레벨 선택');
     fireEvent.click(screen.getByRole('button', { name: '1' }));
-    const marks = () => screen.queryAllByRole('button', { name: /X 표시|자동 표시/ });
+    const marks = () => screen.queryAllByRole('button', { name: /의심 표시|자동 표시/ });
     fireEvent.click(screen.getAllByRole('button', { name: /빈칸/ })[0]);
     fireEvent.click(screen.getAllByRole('button', { name: /빈칸/ })[1]);
     await new Promise((r) => setTimeout(r, 500));
     expect(marks()).toHaveLength(2);
   });
-  it('정답 더블클릭은 같은 줄 빈칸을 X로 채운다', async () => {
+  it('정답 더블클릭은 같은 줄 빈칸을 자동으로 채운다', async () => {
     const { container } = render(<App />);
     fireEvent.click(await screen.findByRole('button', { name: '스테이지' }));
     await screen.findByText('레벨 선택');
@@ -536,7 +536,7 @@ describe('드래그 칠하기', () => {
     fireEvent.pointerMove(board, { clientX: 10, clientY: 10 });
     fireEvent.pointerUp(board);
     restore();
-    expect(await screen.findAllByRole('button', { name: /X 표시/ })).toHaveLength(2);
+    expect(await screen.findAllByRole('button', { name: /의심 표시/ })).toHaveLength(2);
   });
 
   it('되돌아가도 지나간 칸은 그대로 마크로 남는다', async () => {
@@ -549,7 +549,7 @@ describe('드래그 칠하기', () => {
     fireEvent.pointerMove(board, { clientX: 13, clientY: 13 });
     fireEvent.pointerUp(board);
     restore();
-    expect(screen.getAllByRole('button', { name: /X 표시/ })).toHaveLength(4);
+    expect(screen.getAllByRole('button', { name: /의심 표시/ })).toHaveLength(4);
   });
 
   it('마크에서 시작한 드래그는 마크만 지우고 빈칸은 건드리지 않는다', async () => {
@@ -562,7 +562,7 @@ describe('드래그 칠하기', () => {
     fireEvent.pointerUp(board);
     restore();
     await new Promise((r) => setTimeout(r, 300));
-    expect(screen.queryAllByRole('button', { name: /X 표시/ })).toHaveLength(0);
+    expect(screen.queryAllByRole('button', { name: /의심 표시/ })).toHaveLength(0);
     expect(screen.getAllByRole('button', { name: /빈칸/ })).toHaveLength(25);
   });
 });
@@ -638,8 +638,8 @@ describe('레벨 탭 상태', () => {
   });
 });
 
-describe('리셋 버튼', () => {
-  it('마크만 지우고 햄스터는 남긴다', async () => {
+describe('펜 색별 지우기', () => {
+  it('고른 색만 지우고 햄스터는 남긴다', async () => {
     const { container } = render(<App />);
     fireEvent.click(await screen.findByRole('button', { name: '스테이지' }));
     await screen.findByText('레벨 선택');
@@ -650,9 +650,9 @@ describe('리셋 버튼', () => {
     expect(await screen.findByRole('button', { name: /햄스터/ })).toBeTruthy();
     const emptyIdx = cells().findIndex((c) => c.getAttribute('data-state') === 'empty');
     fireEvent.click(cells()[emptyIdx]);
-    await screen.findByRole('button', { name: /X 표시/ });
-    fireEvent.click(screen.getByRole('button', { name: '리셋' }));
-    expect(screen.queryAllByRole('button', { name: /X 표시/ })).toHaveLength(0);
+    await screen.findByRole('button', { name: /의심 표시/ });
+    fireEvent.click(screen.getByRole('button', { name: '의심만 지우기' }));
+    expect(screen.queryAllByRole('button', { name: /의심 표시/ })).toHaveLength(0);
     expect(screen.getAllByRole('button', { name: /햄스터/ })).toHaveLength(1);
   });
 });
