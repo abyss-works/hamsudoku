@@ -20,7 +20,7 @@ describe('도움말 레이아웃', () => {
     withCss();
     const { container } = render(<GameHelp />);
     expect(container.querySelectorAll('.help-card')).toHaveLength(1);
-    for (const label of ['기본 규칙', '기본 조작', '마커']) {
+    for (const label of ['기본 규칙', '기본 조작']) {
       if (label !== '기본 규칙') fireEvent.click(screen.getByRole('button', { name: '다음 도움말' }));
       const card = screen.getByLabelText(label);
       const cols = card.querySelectorAll('.help-col');

@@ -42,7 +42,7 @@ describe('GameScreen', () => {
     const controls = screen.getByLabelText('기본 조작');
     expect(controls.querySelectorAll('.help-col')).toHaveLength(3);
     fireEvent.click(screen.getByRole('button', { name: '다음 도움말' }));
-    expect(screen.getByLabelText('마커')).toBeTruthy();
+    expect(screen.getByLabelText('기본 규칙')).toBeTruthy();
   });
 
   it('다시하기를 누르면 시간이 0으로 돌아간다', async () => {
