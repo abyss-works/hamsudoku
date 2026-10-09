@@ -60,7 +60,12 @@ function EndlessBoard({ puzzle, onWrong, onFinish, clearOverlay }: EndlessBoardP
         onBrowse={() => {}}
         clearOverlay={clearOverlay}
       />
-      <ProbeButton active={board.probeActive} slots={board.probeSlots} onToggle={() => board.setProbeActive(!board.probeActive)} />
+      <ProbeButton
+        active={board.probeActive}
+        slots={board.probeSlots}
+        onToggle={() => board.setProbeActive(!board.probeActive)}
+        onResetMarks={() => board.resetMarks()}
+      />
     </>
   );
 }

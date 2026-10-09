@@ -102,7 +102,29 @@
 /* 임시 정답 아이템. 보드 아래 중앙에 하나 둔다. */
 .probe-controls {
   display: flex;
+  width: 100%;
+  align-items: center;
+}
+
+.probe-cell {
+  flex: 1;
+  display: flex;
   justify-content: center;
+}
+
+.probe-reset {
+  flex: 0 0 auto;
+  width: 56px;
+  height: 56px;
+  border-radius: 50%;
+  border: 3px solid var(--ink);
+  background: var(--paper);
+  box-shadow: var(--shadow-hard);
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  color: var(--ink);
+  cursor: pointer;
 }
 
 .probe-btn {
