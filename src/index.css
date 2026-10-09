@@ -560,7 +560,8 @@ body {
   grid-template-columns: repeat(3, 1fr);
 }
 
-/* 도움말 캐러셀. 전환 버튼은 카드 안 좌우에 겹쳐 둔다. */
+/* 도움말 캐러셀. 전환 버튼은 카드 안 좌우에 겹쳐 둔다.
+   카드 높이는 가장 tall은 장에 맞춰 고정한다. 페이지 전환에 컨테이너가 요동치지 않는다. */
 .help-carousel {
   display: flex;
   flex-direction: column;
@@ -568,8 +569,13 @@ body {
 
 .help-carousel .help-card {
   position: relative;
+  min-height: 92px;
   padding-left: 34px;
   padding-right: 34px;
+}
+
+.help-card.cols-2 {
+  grid-template-columns: repeat(2, 1fr);
 }
 
 .help-arrow {
