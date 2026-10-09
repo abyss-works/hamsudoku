@@ -1,5 +1,7 @@
 import fs from 'node:fs';
-import { PrismaClient } from '@prisma/client';
+import { PrismaPg } from '@prisma/adapter-pg';
+import { Pool } from 'pg';
+import { PrismaClient } from '../prisma/generated/prisma/client';
 import { generateEndlessPool } from './generate';
 
 function loadEnvLocal() {
@@ -34,7 +36,11 @@ async function main() {
   console.error(`풀 생성 시작: 시드 ${seed}, 목표 ${count}`);
   const candidates = generateEndlessPool(seed, count);
   console.error(`생성 완료: ${candidates.length}개`);
-  const prisma = new PrismaClient();
+  // 관리 스크립트이므로 직접 연결을 쓴다. 없으면 즉시 실패한다.
+  const connectionString = process.env.DIRECT_URL;
+  if (!connectionString) throw new Error('DIRECT_URL이 필요하다');
+  const pool = new Pool({ connectionString });
+  const prisma = new PrismaClient({ adapter: new PrismaPg(pool) });
   const rows = candidates.map((c, i) => ({
     id: stageId(seed, i),
     size: c.islands.length,
