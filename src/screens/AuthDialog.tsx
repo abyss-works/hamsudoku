@@ -182,7 +182,7 @@ export function AuthDialog({ signup, signin, reset, guest, fetchAccountSeeds, on
           {okMessage && <p className="login-ok">{okMessage}</p>}
           {chooseBase ? (
             <div className="login-confirm">
-              <p>이미 가입된 이메일이에요. 이 계정으로 로그인할까요?</p>
+              {pendingBase === null && <p>이미 가입된 이메일이에요. 이 계정으로 로그인할까요?</p>}
               {pendingBase === null ? (
                 <>
                   {guestSnapshot && (
