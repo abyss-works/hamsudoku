@@ -1,4 +1,6 @@
-import { PrismaClient } from '@prisma/client';
+import { PrismaPg } from '@prisma/adapter-pg';
+import { Pool } from 'pg';
+import { PrismaClient } from '../../prisma/generated/prisma/client';
 import { mergeClear, type ClearRecord } from '../shared/merge';
 
 export interface Attempt {
@@ -240,7 +242,29 @@ export function createMemoryDb(): DbPort {
   };
 }
 
-const prisma = new PrismaClient();
+const globalForPrisma = globalThis as unknown as {
+  prisma?: PrismaClient;
+  pool?: Pool;
+};
+
+// 서버리스 인스턴스당 커넥션 1개로 제한한다. 웜 컨테이너는 풀을 재사용한다.
+const pool =
+  globalForPrisma.pool ??
+  new Pool({
+    connectionString: process.env.DATABASE_URL,
+    max: 1,
+    idleTimeoutMillis: 20000,
+    connectionTimeoutMillis: 5000,
+  });
+
+const adapter = new PrismaPg(pool);
+
+const prisma = globalForPrisma.prisma ?? new PrismaClient({ adapter });
+
+if (process.env.NODE_ENV !== 'production') {
+  globalForPrisma.prisma = prisma;
+  globalForPrisma.pool = pool;
+}
 
 // P2002는 코드 속성으로 판정한다. PrismaClientKnownRequestError의
 // instanceof 대신 code를 보는 이유는 복사본이 다른 클라이언트에서도

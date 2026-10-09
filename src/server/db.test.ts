@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest';
-import type { PrismaClient } from '@prisma/client';
+import type { PrismaClient } from '../../prisma/generated/prisma/client';
 import { createMemoryDb, createPrismaDb } from './db';
 
 describe('DbPort', () => {
