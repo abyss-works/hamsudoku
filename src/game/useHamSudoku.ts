@@ -1,7 +1,7 @@
 import { useRef, useState } from 'react';
 import { countHamsters, getViolations, isCleared, isSolutionCell, type Violations } from './rules';
 import type { CellState, Puzzle } from './puzzles';
-import { playSfx } from './sound';
+import { playCascade, playSfx } from './sound';
 import { nextState, spreadMarks, type TapKind } from './tap';
 
 function blankBoard(size: number): CellState[][] {
@@ -179,6 +179,7 @@ export function useHamSudoku(puzzle: Puzzle): HamSudoku {
       }
       commit(next, delays, keyOf(r, c));
       playSfx('good');
+      playCascade([...delays.values()]);
     } else {
       commit(next, new Map(), null);
       if (result === 'wrong' && kind === 'double') {

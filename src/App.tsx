@@ -1,7 +1,7 @@
 import { useEffect, useRef, useState } from 'react';
 import type { Stage } from './api/stagesApi';
 import { useClears } from './game/useClears';
-import { setSfxEnabled } from './game/sound';
+import { installAudioRecovery, setSfxEnabled } from './game/sound';
 import { useAccount } from './game/useAccount';
 import { useEndlessSummary } from './game/useEndlessSummary';
 import { useDelayedLoading } from './ui/useDelayedLoading';
@@ -195,6 +195,8 @@ function App() {
   useEffect(() => {
     setSfxEnabled(sound);
   }, [sound]);
+
+  useEffect(() => installAudioRecovery(), []);
 
   return (
     <LoadingProvider>
