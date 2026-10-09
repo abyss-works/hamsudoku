@@ -209,6 +209,7 @@ function App() {
               onBrowse={() => setScreen('select')}
               onEndless={() => setScreen('endless')}
               endlessEnabled={account.cloud}
+              onWarmSession={() => void account.warmSession()}
               onSaveNickname={account.saveNickname}
               onSignup={account.signup}
               onSignin={signinThenSwitch}

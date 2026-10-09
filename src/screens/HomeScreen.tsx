@@ -28,11 +28,13 @@ interface HomeScreenProps {
   onBrowse: () => void;
   onEndless: () => void;
   endlessEnabled: boolean;
+  /** 프로필 진입점 예열 — 게스트의 익명 세션을 미리 확보한다. */
+  onWarmSession: () => void;
   onLogin: () => void;
   onLogout: () => void;
 }
 
-export function HomeScreen({ email, nickname, uid, summary, onSaveNickname, onSignup, onSignin, onReset, onBaseChosen, onCancelSignin, onBrowse, onEndless, endlessEnabled, onLogin, onLogout }: HomeScreenProps) {
+export function HomeScreen({ email, nickname, uid, summary, onSaveNickname, onSignup, onSignin, onReset, onBaseChosen, onCancelSignin, onBrowse, onEndless, endlessEnabled, onWarmSession, onLogin, onLogout }: HomeScreenProps) {
   const [settingsOpen, setSettingsOpen] = useState(false);
   const [profileOpen, setProfileOpen] = useState(false);
   const [rankOpen, setRankOpen] = useState(false);
@@ -52,7 +54,10 @@ export function HomeScreen({ email, nickname, uid, summary, onSaveNickname, onSi
   return (
     <div className="home">
       <div className="home-top">
-        <Button variant="sticker" aria-label="프로필" onClick={() => setProfileOpen(true)}>
+        <Button variant="sticker" aria-label="프로필" onClick={() => {
+          onWarmSession();
+          setProfileOpen(true);
+        }}>
           <User size={22} aria-hidden="true" />
         </Button>
         <Button variant="sticker" aria-label="설정" onClick={() => setSettingsOpen(true)}>
@@ -92,7 +97,7 @@ export function HomeScreen({ email, nickname, uid, summary, onSaveNickname, onSi
               aria-label="랭킹"
               onClick={() => {
                 setRankOpen(true);
-                void summary.refresh();
+                void summary.refreshSoft();
               }}
             >
               <Trophy size={22} aria-hidden="true" />
