@@ -83,7 +83,6 @@ export function useHamSudoku(puzzle: Puzzle): HamSudoku {
   };
 
   // 앵커를 놓고 십자·주변에 조각을 살포한다. 빈칸·회색X만 바뀌고 잠금·햄스터·남의 조각은 통과한다.
-  // 3개를 다 쓰면 토글이 풀린다.
   const placeAnchor = (r: number, c: number) => {
     const prev = latest.current;
     if (anchorCount(prev) >= PROBE_SLOTS) return;
@@ -99,7 +98,6 @@ export function useHamSudoku(puzzle: Puzzle): HamSudoku {
       }
     }
     commit(next, delays, null);
-    if (anchorCount(next) >= PROBE_SLOTS) setProbeActive(false);
   };
 
   // 앵커와 자기 조각을 거둔다. 먼 조각부터 역순으로 사라진다.
@@ -145,14 +143,19 @@ export function useHamSudoku(puzzle: Puzzle): HamSudoku {
       recallAnchor(r, c);
       return;
     }
-    const result = nextState(cur, kind, isSolutionCell(puzzle, r, c));
-    if (result === prev[r][c]) return;
-    const next = prev.map((line) => [...line]);
+    if (cur === 'anchor' && kind === 'double') {
+      // 확정은 앵커를 먼저 지우고 빈칸에서 시도한다. 조각이 남지 않는다.
+      recallAnchor(r, c);
+    }
+    const after = latest.current;
+    const result = nextState(after[r][c], kind, isSolutionCell(puzzle, r, c));
+    if (result === after[r][c]) return;
+    const next = after.map((line) => [...line]);
     next[r][c] = result;
     if (result === 'hamster') {
       const delays = new Map<string, number>();
       // 빈 타일·회색X·조각을 정답마커로 바꾼다. 남의 앵커는 건드리지 않는다.
-      for (const m of spreadMarks(prev.length, r, c)) {
+      for (const m of spreadMarks(after.length, r, c)) {
         const target = next[m.r][m.c];
         if (target === 'empty' || target === 'mark' || target === 'frag') {
           next[m.r][m.c] = 'auto';
