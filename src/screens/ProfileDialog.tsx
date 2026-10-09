@@ -1,4 +1,4 @@
-import { useEffect, useState, type ReactNode } from 'react';
+import { useEffect, useState } from 'react';
 import { Button } from '../ui/Button';
 import { Overlay } from '../ui/Overlay';
 import { Panel } from '../ui/Panel';
@@ -12,15 +12,14 @@ interface ProfileDialogProps {
   onLogin: () => void;
   onLogout: () => void;
   onClose: () => void;
-  /** 게스트일 때 계정 연동 버튼이 그릴 로그인 UI. 주면 내부에서 오버레이로 연다. */
-  renderLogin?: (close: () => void) => ReactNode;
+  /** 게스트일 때 계정 연동 클릭 — 상위(AuthDialog)를 연다. */
+  onGuestLink: () => void;
 }
 
-export function ProfileDialog({ email, nickname, onSaveNickname, onLogin, onLogout, onClose, renderLogin }: ProfileDialogProps) {
+export function ProfileDialog({ email, nickname, onSaveNickname, onLogin, onLogout, onClose, onGuestLink }: ProfileDialogProps) {
   const [draft, setDraft] = useState(nickname ?? '');
   const [msg, setMsg] = useState<string | null>(null);
   const [saving, setSaving] = useState(false);
-  const [loginOpen, setLoginOpen] = useState(false);
 
   useEffect(() => {
     setDraft(nickname ?? '');
@@ -51,7 +50,7 @@ export function ProfileDialog({ email, nickname, onSaveNickname, onLogin, onLogo
             ) : (
               <>
                 <p className="login-note">지금은 이 기기에만 기록돼요.</p>
-                <Button variant="sticker" onClick={() => (renderLogin ? setLoginOpen(true) : onLogin())}>
+                <Button variant="sticker" onClick={() => (onGuestLink ? onGuestLink() : onLogin())}>
                   계정 연동
                 </Button>
               </>
@@ -79,7 +78,6 @@ export function ProfileDialog({ email, nickname, onSaveNickname, onLogin, onLogo
             닫기
           </Button>
         </Panel>
-        {loginOpen && renderLogin?.(() => setLoginOpen(false))}
       </div>
     </Overlay>
   );

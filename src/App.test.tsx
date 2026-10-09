@@ -271,7 +271,7 @@ describe('화면 전환', () => {
     let signedIn = false;
     stubFetch(async (url: string) => {
       if (url.endsWith('/api/auth/me')) {
-        return Response.json(signedIn ? { uid: 'uB', email: 'e@x.y' } : { uid: null, email: null });
+        return Response.json(signedIn ? { uid: 'uB', email: 'e@x.y', cloud: true } : { uid: null, email: null, cloud: true });
       }
       if (url.endsWith('/api/auth/signup')) {
         return Response.json({ ok: false, msg: '이미 가입된 이메일이에요.', code: 'user_already_exists' });
@@ -628,5 +628,83 @@ describe('리셋 버튼', () => {
     fireEvent.click(screen.getByRole('button', { name: '리셋' }));
     expect(screen.queryAllByRole('button', { name: /X 표시/ })).toHaveLength(0);
     expect(screen.getAllByRole('button', { name: /햄스터/ })).toHaveLength(1);
+  });
+});
+
+describe('계정 연동 유보 흐름', () => {
+  it('기준 선택 전에는 로컬 기록이 교체되지 않는다', async () => {
+    localStorage.setItem(
+      'hamsudoku:save:v1',
+      JSON.stringify({
+        v: 1,
+        clears: [{ stageCode: '2-1', clearedAt: 't0', elapsedSec: 10, attempts: 1 }],
+        settings: { sound: true, vibration: true },
+        updatedAt: 't0',
+      }),
+    );
+    let signedIn = false;
+    stubFetch(async (url: string) => {
+      if (url.endsWith('/api/auth/me')) {
+        return Response.json(signedIn ? { uid: 'uB', email: 'e@x.y', cloud: true } : { uid: 'anon1', email: null, cloud: true });
+      }
+      if (url.endsWith('/api/auth/signup')) {
+        return Response.json({ ok: false, msg: '이미 가입된 이메일이에요.', code: 'user_already_exists' });
+      }
+      if (url.endsWith('/api/auth/signin')) {
+        signedIn = true;
+        return Response.json({ ok: true });
+      }
+      if (url.endsWith('/api/endless/me'))
+        return Response.json({
+          wallet: { balance: signedIn ? 70 : 12 },
+          clearedCount: 3,
+          streak: { current: 1, best: 2 },
+          season: '2026-W41',
+        });
+      if (url.endsWith('/api/endless/rank'))
+        return Response.json({ season: '2026-W41', top: [], snapshotAt: new Date().toISOString(), me: { rank: null, score: 0 } });
+      if (url.endsWith('/api/records')) return Response.json({ clears: [] });
+      if (url.endsWith('/api/auth/signout')) {
+        signedIn = false;
+        return Response.json({ ok: true });
+      }
+      throw new Error(`unexpected ${url}`);
+    });
+    render(<App />);
+    fireEvent.click(await screen.findByRole('button', { name: '프로필' }));
+    fireEvent.click(screen.getByRole('button', { name: '계정 연동' }));
+    fireEvent.change(screen.getByLabelText('이메일'), { target: { value: 'e@x.y' } });
+    fireEvent.change(screen.getByLabelText('비밀번호'), { target: { value: '123456' } });
+    fireEvent.click(screen.getByRole('button', { name: '이메일로 계속하기' }));
+    // 선행 로그인 후 기준 선택이 뜬다 — 이 시점엔 로컬 기록이 그대로여야 한다.
+    await screen.findByRole('button', { name: /계정 기준/ });
+    const mid = JSON.parse(localStorage.getItem('hamsudoku:save:v1') ?? '{}');
+    expect(mid.clears).toEqual([{ stageCode: '2-1', clearedAt: 't0', elapsedSec: 10, attempts: 1 }]);
+    // 닫기(뒤로) — 세션 취소, 데이터 무변경
+    const seq: unknown[] = [];
+    const snapIt = () => {
+      seq.push(JSON.parse(localStorage.getItem('hamsudoku:save:v1') ?? '{}'));
+    };
+    const origSet = Storage.prototype.setItem.bind(localStorage);
+    (localStorage as Storage).setItem = (k: string, v: string) => {
+      if (k === 'hamsudoku:save:v1' && !(JSON.parse(v) ?? {}).clears?.length) {
+        console.log('EMPTY-SAVE-WRITE', new Error().stack?.split('\n').slice(1, 6).join(' | '));
+      }
+      origSet(k, v);
+    };
+    snapIt(); // 기준선택 표시 직후
+    fireEvent.click(screen.getByRole('button', { name: '뒤로' }));
+    snapIt(); // 뒤로 직후
+    expect(await screen.findByRole('button', { name: '계정 연동' })).toBeTruthy();
+    snapIt(); // 계정연동 재표시 직후
+    await new Promise((res) => setTimeout(res, 250));
+    snapIt(); // 안정화 후
+    const after = JSON.parse(localStorage.getItem('hamsudoku:save:v1') ?? '{}');
+    try {
+      expect(after.clears).toEqual([{ stageCode: '2-1', clearedAt: 't0', elapsedSec: 10, attempts: 1 }]);
+    } catch (e) {
+      console.log('SEQ', JSON.stringify(seq));
+      throw e;
+    }
   });
 });

@@ -87,3 +87,23 @@ describe('rankStoreFromEnv', () => {
     expect(rankStoreFromEnv({ UPSTASH_REDIS_REST_URL: 'https://u', UPSTASH_REDIS_REST_TOKEN: 't' })).not.toBeNull();
   });
 });
+
+describe('createRankStore 관리자 기능', () => {
+  it('topAll은 전체 목록을 내림차순으로 돌려준다', async () => {
+    const calls: Call[] = [];
+    const store = makeStore([['u1', 12, 'u2', 3]], calls);
+    const snap = await store.topAll('2026-W41', 100);
+    expect(snap.entries).toEqual([
+      { userId: 'u1', score: 12 },
+      { userId: 'u2', score: 3 },
+    ]);
+    expect(calls[0].init.body).toContain('zrevrange');
+  });
+
+  it('remove는 zrem 명령을 보내고 삭제 수를 돌려준다', async () => {
+    const calls: Call[] = [];
+    const store = makeStore([1], calls);
+    expect(await store.remove('2026-W41', 'guest1')).toBe(1);
+    expect(String(calls[0].init.body)).toContain('zrem');
+  });
+});

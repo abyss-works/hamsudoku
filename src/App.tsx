@@ -46,6 +46,8 @@ function App() {
   clearsRef.current = [...clears.values()];
   const uidRef = useRef<string | null | undefined>(undefined);
   const switchedRef = useRef(false);
+  // 계정 연동 다이얼로그가 로그인을 선행하는 동안 데이터 교체(로컬·클라우드 어느쪽으로도)를 유보한다.
+  const holdSwitchRef = useRef(false);
 
   const stages = chapters.flatMap((c) => c.stages);
   const stage = stages.find((s) => s.id === stageId) ?? null;
@@ -60,6 +62,8 @@ function App() {
     const prev = uidRef.current;
     uidRef.current = account.uid;
     if (!account.uid || !account.cloud) return;
+    // 계정 연동(기준 선택 전 유보): signin이 먼저 세션만 바꾼 상태에서 데이터 교체를 막는다.
+    if (holdSwitchRef.current) return;
     if (switchedRef.current) {
       switchedRef.current = false;
       pull([])
@@ -112,11 +116,40 @@ function App() {
 
   // signin은 항상 계정 교체다. 성공 피드백 지연과 무관하게 uid가 바뀌기 전에
   // 교체 의도를 먼저 세워야 화해가 아니라 갈아끼우기가 탄다.
-  const signinThenSwitch = (email: string, password: string) => {
+  const signinThenSwitch = (email: string, password: string, hold = false) => {
+    if (hold) holdSwitchRef.current = true;
     switchedRef.current = true;
     return account.signin(email, password).then((r) => {
-      if (!r.ok) switchedRef.current = false;
+      if (!r.ok) {
+        switchedRef.current = false;
+        holdSwitchRef.current = false;
+      }
       return r;
+    });
+  };
+  // 기준 선택 확정 — 유보를 풀고 데이터 교체(클라우드 or 기기)를 진행한다.
+  // signin 선행으로 uid가 이미 바뀌어 effect가 재실행되지 않으므로, 여기서 교체를 직접 수행한다.
+  const beginSwitch = () => {
+    holdSwitchRef.current = false;
+    switchedRef.current = false;
+    if (uidRef.current) {
+      pull([])
+        .then(({ clears: merged, unauthorized }) => {
+          if (unauthorized) {
+            goLoginExpired();
+            return;
+          }
+          replace(merged);
+        })
+        .catch(() => {});
+    }
+  };
+  // 기준 선택 없이 닫기 — 세션을 취소(로그아웃)하고 로컬·클라우드 데이터 모두 그대로 둔다.
+  const cancelSignin = () => {
+    holdSwitchRef.current = false;
+    switchedRef.current = false;
+    void account.signout().then(() => {
+      summary.refreshSoft();
     });
   };
   const handleLogout = () => {
@@ -171,6 +204,8 @@ function App() {
               nickname={account.nickname}
               uid={account.uid}
               summary={summary}
+              onBaseChosen={beginSwitch}
+              onCancelSignin={cancelSignin}
               onBrowse={() => setScreen('select')}
               onEndless={() => setScreen('endless')}
               endlessEnabled={account.cloud}

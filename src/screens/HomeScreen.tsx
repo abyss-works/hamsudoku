@@ -9,13 +9,21 @@ import { GuestEndlessDialog } from './GuestEndlessDialog';
 import { AuthDialog } from './AuthDialog';
 
 interface HomeScreenProps {
+  /** 계정 연동 확정 — 유보를 풀고 데이터 교체를 진행한다. */
+  onBaseChosen?: () => void;
+  /** 기준 선택 없이 닫기 — 세션 취소(로그아웃), 데이터 무변경. */
+  onCancelSignin?: () => void;
   email: string | null;
   nickname: string | null;
   uid: string | null;
   summary: EndlessSummaryState;
   onSaveNickname: (name: string) => Promise<{ ok: boolean; msg?: string }>;
   onSignup: (email: string, password: string) => Promise<{ ok: boolean; msg?: string; code?: string }>;
-  onSignin: (email: string, password: string) => Promise<{ ok: boolean; msg?: string; code?: string }>;
+  onSignin: (
+    email: string,
+    password: string,
+    hold?: boolean,
+  ) => Promise<{ ok: boolean; msg?: string; code?: string }>;
   onReset: (email: string) => Promise<{ ok: boolean; msg?: string }>;
   onBrowse: () => void;
   onEndless: () => void;
@@ -24,7 +32,7 @@ interface HomeScreenProps {
   onLogout: () => void;
 }
 
-export function HomeScreen({ email, nickname, uid, summary, onSaveNickname, onSignup, onSignin, onReset, onBrowse, onEndless, endlessEnabled, onLogin, onLogout }: HomeScreenProps) {
+export function HomeScreen({ email, nickname, uid, summary, onSaveNickname, onSignup, onSignin, onReset, onBaseChosen, onCancelSignin, onBrowse, onEndless, endlessEnabled, onLogin, onLogout }: HomeScreenProps) {
   const [settingsOpen, setSettingsOpen] = useState(false);
   const [profileOpen, setProfileOpen] = useState(false);
   const [rankOpen, setRankOpen] = useState(false);
@@ -102,16 +110,6 @@ export function HomeScreen({ email, nickname, uid, summary, onSaveNickname, onSi
           }}
         />
       )}
-      {authOpen && guest && (
-        <AuthDialog
-          signup={onSignup}
-          signin={onSignin}
-          reset={onReset}
-          guest={{ seeds: summary.me?.wallet.balance ?? 0, clears: summary.me?.clearedCount ?? 0 }}
-          onBack={() => setAuthOpen(false)}
-          onDone={() => setAuthOpen(false)}
-        />
-      )}
       {settingsOpen && <SettingsDialog onClose={() => setSettingsOpen(false)} />}
       {profileOpen && (
         <ProfileDialog
@@ -124,23 +122,35 @@ export function HomeScreen({ email, nickname, uid, summary, onSaveNickname, onSi
           }}
           onLogout={onLogout}
           onClose={() => setProfileOpen(false)}
-          renderLogin={
-            guest
-              ? (close) => (
-                  <AuthDialog
-                    signup={onSignup}
-                    signin={onSignin}
-                    reset={onReset}
-                    guest={{ seeds: summary.me?.wallet.balance ?? 0, clears: summary.me?.clearedCount ?? 0 }}
-                    onBack={close}
-                    onDone={close}
-                  />
-                )
-              : undefined
-          }
+          onGuestLink={() => setAuthOpen(true)}
         />
       )}
-      {rankOpen && <RankDialog rank={summary.rank} uid={uid} onClose={() => setRankOpen(false)} />}
+      {authOpen && (
+        <AuthDialog
+          signup={onSignup}
+          signin={(e, p) => onSignin(e, p, true)}
+          reset={onReset}
+          fetchAccountSeeds={async () => {
+            await summary.refreshSoft();
+            return summary.me?.wallet.balance ?? 0;
+          }}
+          guest={guest ? { seeds: summary.me?.wallet.balance ?? 0, clears: summary.me?.clearedCount ?? 0 } : null}
+          onBase={() => onBaseChosen?.()}
+          onBack={() => {
+            onCancelSignin?.();
+            setAuthOpen(false);
+          }}
+          onDone={() => setAuthOpen(false)}
+        />
+      )}
+      {rankOpen && (
+        <RankDialog
+          rank={summary.rank}
+          uid={uid}
+          signedIn={email !== null}
+          onClose={() => setRankOpen(false)}
+        />
+      )}
     </div>
   );
 }

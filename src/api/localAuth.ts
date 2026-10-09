@@ -1,3 +1,4 @@
+import { createHash } from 'node:crypto';
 import { validateNickname } from '../game/nickname';
 import type { AuthApi, ProfileApi } from './stagesApi';
 
@@ -10,9 +11,9 @@ interface Stored {
   passHash: string;
 }
 
-async function sha256Hex(s: string): Promise<string> {
-  const digest = await globalThis.crypto.subtle.digest('SHA-256', new TextEncoder().encode(`hamsudoku:${s}`));
-  return [...new Uint8Array(digest)].map((b) => b.toString(16).padStart(2, '0')).join('');
+// 로컬 어댑터 전용 해시 — 브라우저 폴백 용도이며 webcrypto 대신 동기 해시로 통일한다.
+function sha256Hex(s: string): string {
+  return createHash('sha256').update(`hamsudoku:${s}`).digest('hex');
 }
 
 function valid(email: string, password: string): boolean {
@@ -54,7 +55,7 @@ export function createLocalAuthApi(store: Storage = localStorage): AuthApi {
         return { ok: false, msg: '이미 가입된 이메일이에요.', code: 'user_already_exists' };
       }
       const uid = `local-${globalThis.crypto.randomUUID()}`;
-      save({ uid, email, passHash: await sha256Hex(password) });
+      save({ uid, email, passHash: sha256Hex(password) });
       return { ok: true };
     },
     async signin(email: string, password: string) {
@@ -62,7 +63,7 @@ export function createLocalAuthApi(store: Storage = localStorage): AuthApi {
       const fail = { ok: false as const, msg: '이메일 또는 비밀번호가 틀렸어요.', code: 'invalid_credentials' };
       const a = load();
       if (!a || a.email !== email) return fail;
-      if ((await sha256Hex(password)) !== a.passHash) return fail;
+      if (sha256Hex(password) !== a.passHash) return fail;
       const next = { ...a, uid: a.uid ?? `local-${globalThis.crypto.randomUUID()}` };
       save(next);
       return { ok: true };
