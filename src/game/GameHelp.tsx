@@ -1,6 +1,7 @@
 import { useState } from 'react';
-import { ChevronLeft, ChevronRight, Plus, RotateCcw } from 'lucide-react';
+import { ChevronLeft, ChevronRight, RotateCcw } from 'lucide-react';
 import { HelpCard, HelpCol } from '../ui/HelpCard';
+import { HamsterFace } from '../ui/HamsterFace';
 import { ControlsPage } from './ControlsHelp';
 import { RulesPage } from './RulesHelp';
 
@@ -8,21 +9,16 @@ function ProbePage() {
   return (
     <>
       <HelpCol>
-        <Plus size={20} aria-hidden="true" />
-        <p>
-          켜고 빈칸에 놓기,
-          <br />
-          다시 톡하면 회수
-        </p>
-      </HelpCol>
-      <HelpCol>
-        <span className="help-unknown" aria-hidden="true">
-          ?
+        <span className="probe-face" aria-hidden="true">
+          <HamsterFace />
+          <span className="anchor-badge" aria-hidden="true">
+            ?
+          </span>
         </span>
         <p>
-          십자·주변에 살포,
+          임시 정답 켜고,
           <br />
-          3개까지·끄고 확정
+          톡으로 놓기·회수
         </p>
       </HelpCol>
       <HelpCol>
@@ -43,7 +39,7 @@ export function GameHelp({ probe = false }: { probe?: boolean }) {
     ? [
         { title: '기본 규칙', page: <RulesPage />, cols: 3 as const },
         { title: '기본 조작', page: <ControlsPage />, cols: 3 as const },
-        { title: '임시 정답', page: <ProbePage />, cols: 3 as const },
+        { title: '임시 정답', page: <ProbePage />, cols: 2 as const },
       ]
     : [
         { title: '기본 규칙', page: <RulesPage />, cols: 3 as const },
