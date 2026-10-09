@@ -10,9 +10,9 @@ export function delayForPointerType(t: string | null | undefined): number {
 }
 
 export function nextState(state: CellState, kind: TapKind, isCorrect: boolean): CellState {
-  if (state === 'wrong' || state === 'auto') return state;
+  if (state === 'wrong' || state === 'auto' || state === 'frag') return state;
   if (kind === 'single') {
-    if (state === 'empty' || state === 'frag') return 'mark';
+    if (state === 'empty') return 'mark';
     if (state === 'mark' || state === 'anchor') return 'empty';
     return 'empty';
   }

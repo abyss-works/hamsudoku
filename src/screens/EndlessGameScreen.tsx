@@ -47,6 +47,7 @@ function EndlessBoard({ puzzle, onWrong, onFinish, clearOverlay }: EndlessBoardP
       <Board
         puzzle={puzzle}
         cells={board.cells}
+        xMarks={board.xMarks}
         violations={board.violations}
         cleared={board.cleared}
         pulse={board.pulse}

@@ -230,7 +230,7 @@ describe('probe', () => {
     expect(result.current.probeSlots).toBe(2);
   });
 
-  it('조각에 X를 덮으면 소유권이 끊긴다', () => {
+  it('조각에 X를 올리면 조각은 살고 렌더만 X가 이긴다', () => {
     const { result } = renderHook(() => useHamSudoku(PUZZLES[0]));
     act(() => {
       result.current.setProbeActive(true);
@@ -241,13 +241,88 @@ describe('probe', () => {
     act(() => {
       result.current.tapCell(2, 0, 'single');
     });
-    expect(at(result.current.cells, 2, 0)).toBe('mark');
+    // 상태는 조각 그대로다
+    expect(at(result.current.cells, 2, 0)).toBe('frag');
+    // 회수하면 X가 남는다
     act(() => {
       result.current.tapCell(2, 2, 'single');
     });
     expect(at(result.current.cells, 2, 2)).toBe('empty');
     expect(at(result.current.cells, 2, 0)).toBe('mark');
     expect(result.current.probeSlots).toBe(3);
+  });
+
+  it('덮인 X를 걷으면 조각이 드러난다', () => {
+    const { result } = renderHook(() => useHamSudoku(PUZZLES[0]));
+    act(() => {
+      result.current.setProbeActive(true);
+      result.current.tapCell(2, 2, 'single');
+      result.current.setProbeActive(false);
+      result.current.tapCell(2, 0, 'single'); // X 올리기
+    });
+    expect(at(result.current.cells, 2, 0)).toBe('frag');
+    act(() => {
+      result.current.tapCell(2, 0, 'single'); // X 걷기
+    });
+    expect(at(result.current.cells, 2, 0)).toBe('frag');
+    act(() => {
+      result.current.tapCell(2, 2, 'single'); // 앵커 회수
+    });
+    expect(at(result.current.cells, 2, 0)).toBe('empty');
+    expect(result.current.probeSlots).toBe(3);
+  });
+
+  it('덮인 조각을 확정하면 X로 보고 시도한다', () => {
+    const { result } = renderHook(() => useHamSudoku(PUZZLES[0]));
+    act(() => {
+      result.current.setProbeActive(true);
+      result.current.tapCell(0, 3, 'single'); // 앵커
+      result.current.setProbeActive(false);
+      result.current.tapCell(0, 0, 'single'); // 조각에 X 올리기
+    });
+    expect(at(result.current.cells, 0, 0)).toBe('frag');
+    act(() => {
+      result.current.tapCell(0, 0, 'double');
+    });
+    expect(at(result.current.cells, 0, 0)).toBe('hamster');
+    expect(at(result.current.cells, 0, 3)).toBe('anchor');
+    expect(result.current.probeSlots).toBe(2);
+  });
+
+  it('덮인 조각에 앵커를 놓으면 차지한다', () => {
+    const { result } = renderHook(() => useHamSudoku(PUZZLES[0]));
+    act(() => {
+      result.current.setProbeActive(true);
+      result.current.tapCell(0, 4, 'single'); // B 앵커
+      result.current.setProbeActive(false);
+      result.current.tapCell(1, 3, 'single'); // B 조각에 X 올리기
+      result.current.setProbeActive(true);
+      result.current.tapCell(1, 3, 'single'); // A 앵커로 차지
+    });
+    expect(at(result.current.cells, 1, 3)).toBe('anchor');
+    act(() => {
+      result.current.tapCell(0, 4, 'single'); // B 회수
+    });
+    expect(at(result.current.cells, 0, 4)).toBe('empty');
+    expect(at(result.current.cells, 1, 3)).toBe('anchor');
+    expect(result.current.probeSlots).toBe(2);
+  });
+
+  it('스트로크 칠하기는 맨 조각을 건드리지 않는다', () => {
+    const { result } = renderHook(() => useHamSudoku(PUZZLES[0]));
+    act(() => {
+      result.current.setProbeActive(true);
+      result.current.tapCell(2, 2, 'single');
+      result.current.setProbeActive(false);
+    });
+    act(() => {
+      result.current.beginStroke(2, 0);
+      result.current.strokeEnter(2, 1);
+      result.current.endStroke();
+    });
+    expect(at(result.current.cells, 2, 0)).toBe('frag');
+    expect(at(result.current.cells, 2, 1)).toBe('frag');
+    expect(result.current.probeSlots).toBe(2);
   });
 
   it('앵커 살포는 덮인 X를 간직했다가 회수 때 되돌린다', () => {

@@ -15,7 +15,7 @@ interface GameScreenProps {
 }
 
 export function GameScreen({ stage, onBack, onNextMap, onRecord }: GameScreenProps) {
-  const { cells, violations, cleared, hamsterCount, pulse, hitKey, shake, tapCell, beginStroke, strokeEnter, endStroke, reset } =
+  const { cells, xMarks, violations, cleared, hamsterCount, pulse, hitKey, shake, tapCell, beginStroke, strokeEnter, endStroke, reset } =
     useHamSudoku(stage.puzzle);
   const [runId, setRunId] = useState(0);
   const sec = useElapsed(!cleared, runId);
@@ -57,6 +57,7 @@ export function GameScreen({ stage, onBack, onNextMap, onRecord }: GameScreenPro
       <Board
         puzzle={stage.puzzle}
         cells={cells}
+        xMarks={xMarks}
         violations={violations}
         cleared={cleared}
         pulse={pulse}
