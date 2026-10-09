@@ -1,7 +1,7 @@
 import { useRef, useState } from 'react';
 import { countHamsters, getViolations, isCleared, isSolutionCell, type Violations } from './rules';
 import type { CellState, Puzzle } from './puzzles';
-import { playCascade, playSfx } from './sound';
+import { playGoodProgression, playSfx } from './sound';
 import { nextState, spreadMarks, type TapKind } from './tap';
 
 function blankBoard(size: number): CellState[][] {
@@ -39,13 +39,12 @@ export interface HamSudoku {
 
 // 진행 중 드래그. 누른 칸이 마크·앵커면 지우기, 아니면 칠하기 모드다.
 // 처음 올라탄 칸만 모드대로 바꾸고, 한 번 지나간 칸은 다시 건드리지 않는다.
-// 방향마다 한 번씩만 틱이 난다.
+// 칠하고 지울 때마다 속도에 맞춰 겹쳐 난다.
 interface Stroke {
   sr: number;
   sc: number;
   toMark: boolean;
   engaged: boolean;
-  sounded: boolean;
   visited: Set<string>;
 }
 
@@ -76,6 +75,9 @@ export function useHamSudoku(puzzle: Puzzle): HamSudoku {
   const [pulse, setPulse] = useState<ReadonlyMap<string, number>>(new Map());
   const [hitKey, setHitKey] = useState<string | null>(null);
   const [shake, setShake] = useState(0);
+  // 연타·연속실패 횟수. 정답 진행음 상승과 오답 음높이에 쓴다. 렌더와 무관하다.
+  const correctRef = useRef(0);
+  const wrongRef = useRef(0);
 
   const violations = getViolations(cells, puzzle.islands);
   const cleared = isCleared(cells, puzzle.islands);
@@ -146,8 +148,9 @@ export function useHamSudoku(puzzle: Puzzle): HamSudoku {
   const tapCell = (r: number, c: number, kind: TapKind) => {
     const prev = latest.current;
     const cur = prev[r][c];
-    if (probeRef.current) {
-      // 아이템 켜짐: 놓기·회수만 하고 판정은 하지 않는다. 더블도 놓기로만 본다.
+    if (probeRef.current && kind === 'single') {
+      // 아이템 켜짐: 싱글톡은 놓기·회수만 하고 판정은 하지 않는다.
+      // 더블톡은 전역 확정으로 아래 일반 경로를 탄다.
       if (cur === 'empty' || cur === 'mark') placeAnchor(r, c);
       else if (cur === 'anchor') recallAnchor(r, c);
       return;
@@ -167,6 +170,9 @@ export function useHamSudoku(puzzle: Puzzle): HamSudoku {
     const next = after.map((line) => [...line]);
     next[r][c] = result;
     if (result === 'hamster') {
+      const streak = correctRef.current + 1;
+      correctRef.current = streak;
+      wrongRef.current = 0;
       const delays = new Map<string, number>();
       // 빈 타일·회색X·조각을 정답마커로 바꾼다. 남의 앵커는 건드리지 않는다.
       // 조각에 덮인 X마커는 함께 버린다.
@@ -180,13 +186,16 @@ export function useHamSudoku(puzzle: Puzzle): HamSudoku {
         }
       }
       commit(next, delays, keyOf(r, c));
-      playSfx('good');
-      playCascade([...delays.values()]);
+      playGoodProgression(streak);
     } else {
       commit(next, new Map(), null);
       if (result === 'wrong' && kind === 'double') {
         setShake((n) => n + 1);
-        playSfx('bad');
+        const fails = wrongRef.current + 1;
+        wrongRef.current = fails;
+        correctRef.current = 0;
+        // 실패할 때마다 두음씩 오른다(최대 2배).
+        playSfx('bad', 2 ** ((2 * Math.min(fails, 6)) / 12));
       } else if (result === 'empty') {
         playSfx('erase');
       } else if (result === 'mark') {
@@ -200,6 +209,8 @@ export function useHamSudoku(puzzle: Puzzle): HamSudoku {
     latest.current = blank;
     links.current.clear();
     underlay.current.clear();
+    correctRef.current = 0;
+    wrongRef.current = 0;
     strokeRef.current = null;
     setCells(blank);
     setPulse(new Map());
@@ -229,20 +240,14 @@ export function useHamSudoku(puzzle: Puzzle): HamSudoku {
       const next = latest.current.map((line) => [...line]);
       next[r][c] = 'mark';
       commit(next, new Map(), null);
-      if (!st.sounded) {
-        st.sounded = true;
-        playSfx('mark');
-      }
+      playSfx('mark');
       return;
     }
     if (cur === 'mark') {
       const next = latest.current.map((line) => [...line]);
       next[r][c] = 'empty';
       commit(next, new Map(), null);
-      if (!st.sounded) {
-        st.sounded = true;
-        playSfx('erase');
-      }
+      playSfx('erase');
       return;
     }
     if (cur === 'anchor') recallAnchor(r, c);
@@ -256,7 +261,7 @@ export function useHamSudoku(puzzle: Puzzle): HamSudoku {
     }
     const cur = latest.current[r][c];
     const toMark = cur !== 'mark' && cur !== 'anchor';
-    strokeRef.current = { sr: r, sc: c, toMark, engaged: false, sounded: false, visited: new Set([`${r},${c}`]) };
+    strokeRef.current = { sr: r, sc: c, toMark, engaged: false, visited: new Set([`${r},${c}`]) };
   };
 
   // 누른 칸에서 다른 칸으로 처음 움직일 때 드래그로 확정되며 누른 칸부터 모드대로 바꾼다.

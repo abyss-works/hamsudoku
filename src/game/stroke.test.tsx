@@ -7,8 +7,9 @@ import { useHamSudoku } from './useHamSudoku';
 import { PUZZLES } from './puzzles';
 
 vi.mock('howler', () => ({
-  Howl: vi.fn(function (this: { play?: unknown }) {
-    this.play = vi.fn();
+  Howl: vi.fn(function (this: { play?: unknown; rate?: unknown }) {
+    this.play = vi.fn(() => 7);
+    this.rate = vi.fn();
   }),
   Howler: { ctx: null as unknown },
 }));
@@ -48,7 +49,7 @@ describe('stroke', () => {
     expect(result.current.cells[0]).toEqual(['mark', 'mark', 'mark', 'mark', 'empty']);
   });
 
-  it('드래그 칠하기·지우기는 방향마다 한 번씩만 난다', () => {
+  it('드래그 칠하기·지우기는 칸마다 난다', () => {
     // 목 기록은 테스트마다 초기화되므로 세는 것은 한 테스트 안에서 한다.
     const { result } = renderHook(() => useHamSudoku(PUZZLES[0]));
     act(() => {
@@ -59,6 +60,7 @@ describe('stroke', () => {
       result.current.endStroke();
     });
     expect(result.current.cells[0]).toEqual(['mark', 'mark', 'mark', 'mark', 'empty']);
+    expect(playCount()).toBe(4);
     clearPlays();
     act(() => {
       result.current.beginStroke(0, 0);
@@ -68,15 +70,7 @@ describe('stroke', () => {
       result.current.endStroke();
     });
     expect(result.current.cells[0]).toEqual(['empty', 'empty', 'empty', 'empty', 'empty']);
-    expect(playCount()).toBe(1);
-    clearPlays();
-    act(() => {
-      result.current.beginStroke(0, 0);
-      result.current.strokeEnter(0, 1);
-      result.current.endStroke();
-    });
-    expect(result.current.cells[0]).toEqual(['mark', 'mark', 'empty', 'empty', 'empty']);
-    expect(playCount()).toBe(1);
+    expect(playCount()).toBe(4);
   });
 
   it('마크에서 시작하면 지나간 마크만 빈칸이 되고 빈칸은 그대로다 (1101 → 0000)', () => {
@@ -208,6 +202,25 @@ describe('probe', () => {
     expect(at(result.current.cells, 0, 2)).toBe('frag');
     expect(at(result.current.cells, 1, 1)).toBe('frag');
     expect(at(result.current.cells, 0, 0)).toBe('empty');
+  });
+
+  it('앵커를 회수해도 남의 조각은 그대로 둔다', () => {
+    const { result } = renderHook(() => useHamSudoku(PUZZLES[0]));
+    act(() => {
+      result.current.setProbeActive(true);
+      result.current.tapCell(0, 4, 'single'); // B 앵커, (1,3)을 덮는다
+      result.current.tapCell(2, 2, 'single'); // A 앵커
+    });
+    expect(at(result.current.cells, 0, 4)).toBe('anchor');
+    expect(at(result.current.cells, 2, 2)).toBe('anchor');
+    expect(at(result.current.cells, 1, 3)).toBe('frag');
+    act(() => {
+      result.current.tapCell(2, 2, 'single'); // A 회수
+    });
+    expect(at(result.current.cells, 2, 2)).toBe('empty');
+    expect(at(result.current.cells, 0, 4)).toBe('anchor');
+    expect(at(result.current.cells, 1, 3)).toBe('frag');
+    expect(result.current.probeSlots).toBe(2);
   });
 
   it('앵커 살포는 덮인 X를 간직했다가 회수 때 되돌린다', () => {
