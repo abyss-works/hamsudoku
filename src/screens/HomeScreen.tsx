@@ -102,6 +102,7 @@ export function HomeScreen({ email, nickname, uid, summary, onSaveNickname, onSi
               onClick={() => {
                 setRankOpen(true);
                 void summary.refreshSoft();
+                void summary.refreshMyRank();
               }}
             >
               <Trophy size={22} aria-hidden="true" />
@@ -168,6 +169,7 @@ export function HomeScreen({ email, nickname, uid, summary, onSaveNickname, onSi
       {rankOpen && (
         <RankDialog
           rank={summary.rank}
+          myRank={summary.myRank}
           uid={uid}
           signedIn={email !== null}
           onClose={() => setRankOpen(false)}

@@ -1,6 +1,6 @@
 import { afterEach, describe, expect, it, vi } from 'vitest';
 import { encryptSolution } from '../server/crypto';
-import { EndlessApiError, fetchMe, fetchRank, nextStage, parseSolution, reportFail, submitClear } from './endlessApi';
+import { EndlessApiError, fetchMe, fetchMyRank, fetchRank, nextStage, parseSolution, reportFail, submitClear } from './endlessApi';
 
 afterEach(() => {
   vi.unstubAllGlobals();
@@ -56,6 +56,13 @@ describe('fetchRank', () => {
       ),
     );
     expect((await fetchRank()).season).toBe('2026-W41');
+  });
+});
+
+describe('fetchMyRank', () => {
+  it('내 순위 응답을 파싱한다', async () => {
+    vi.stubGlobal('fetch', vi.fn(async () => Response.json({ rank: 2, score: 52, nickname: '햄찌' })));
+    expect(await fetchMyRank()).toEqual({ rank: 2, score: 52, nickname: '햄찌' });
   });
 });
 
