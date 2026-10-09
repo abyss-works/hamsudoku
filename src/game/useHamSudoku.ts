@@ -39,11 +39,13 @@ export interface HamSudoku {
 
 // 진행 중 드래그. 누른 칸이 마크·앵커면 지우기, 아니면 칠하기 모드다.
 // 처음 올라탄 칸만 모드대로 바꾸고, 한 번 지나간 칸은 다시 건드리지 않는다.
+// 방향마다 한 번씩만 틱이 난다.
 interface Stroke {
   sr: number;
   sc: number;
   toMark: boolean;
   engaged: boolean;
+  sounded: boolean;
   visited: Set<string>;
 }
 
@@ -227,12 +229,20 @@ export function useHamSudoku(puzzle: Puzzle): HamSudoku {
       const next = latest.current.map((line) => [...line]);
       next[r][c] = 'mark';
       commit(next, new Map(), null);
+      if (!st.sounded) {
+        st.sounded = true;
+        playSfx('mark');
+      }
       return;
     }
     if (cur === 'mark') {
       const next = latest.current.map((line) => [...line]);
       next[r][c] = 'empty';
       commit(next, new Map(), null);
+      if (!st.sounded) {
+        st.sounded = true;
+        playSfx('erase');
+      }
       return;
     }
     if (cur === 'anchor') recallAnchor(r, c);
@@ -246,7 +256,7 @@ export function useHamSudoku(puzzle: Puzzle): HamSudoku {
     }
     const cur = latest.current[r][c];
     const toMark = cur !== 'mark' && cur !== 'anchor';
-    strokeRef.current = { sr: r, sc: c, toMark, engaged: false, visited: new Set([`${r},${c}`]) };
+    strokeRef.current = { sr: r, sc: c, toMark, engaged: false, sounded: false, visited: new Set([`${r},${c}`]) };
   };
 
   // 누른 칸에서 다른 칸으로 처음 움직일 때 드래그로 확정되며 누른 칸부터 모드대로 바꾼다.

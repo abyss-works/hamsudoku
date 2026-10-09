@@ -1,12 +1,37 @@
 // @vitest-environment jsdom
-import { afterEach, describe, expect, it } from 'vitest';
+import { afterEach, describe, expect, it, vi } from 'vitest';
 import { act, cleanup, renderHook } from '@testing-library/react';
+import { Howl } from 'howler';
+import { resetSoundForTests } from './sound';
 import { useHamSudoku } from './useHamSudoku';
 import { PUZZLES } from './puzzles';
 
-afterEach(cleanup);
+vi.mock('howler', () => ({
+  Howl: vi.fn(function (this: { play?: unknown }) {
+    this.play = vi.fn();
+  }),
+  Howler: { ctx: null as unknown },
+}));
+
+afterEach(() => {
+  cleanup();
+  resetSoundForTests();
+});
 
 const at = (cells: string[][], r: number, c: number) => cells[r][c];
+
+function clearPlays() {
+  for (const inst of vi.mocked(Howl).mock.instances) {
+    (inst.play as unknown as { mockClear: () => void }).mockClear?.();
+  }
+}
+
+function playCount() {
+  return vi
+    .mocked(Howl)
+    .mock.instances.map((inst) => (inst.play as unknown as { mock: { calls: unknown[] } }).mock.calls.length)
+    .reduce((a, b) => a + b, 0);
+}
 
 describe('stroke', () => {
   it('빈칸에서 시작하면 지나간 빈칸만 마크가 되고 마크는 그대로다', () => {
@@ -21,6 +46,37 @@ describe('stroke', () => {
       result.current.strokeEnter(0, 3);
     });
     expect(result.current.cells[0]).toEqual(['mark', 'mark', 'mark', 'mark', 'empty']);
+  });
+
+  it('드래그 칠하기·지우기는 방향마다 한 번씩만 난다', () => {
+    // 목 기록은 테스트마다 초기화되므로 세는 것은 한 테스트 안에서 한다.
+    const { result } = renderHook(() => useHamSudoku(PUZZLES[0]));
+    act(() => {
+      result.current.beginStroke(0, 0);
+      result.current.strokeEnter(0, 1);
+      result.current.strokeEnter(0, 2);
+      result.current.strokeEnter(0, 3);
+      result.current.endStroke();
+    });
+    expect(result.current.cells[0]).toEqual(['mark', 'mark', 'mark', 'mark', 'empty']);
+    clearPlays();
+    act(() => {
+      result.current.beginStroke(0, 0);
+      result.current.strokeEnter(0, 1);
+      result.current.strokeEnter(0, 2);
+      result.current.strokeEnter(0, 3);
+      result.current.endStroke();
+    });
+    expect(result.current.cells[0]).toEqual(['empty', 'empty', 'empty', 'empty', 'empty']);
+    expect(playCount()).toBe(1);
+    clearPlays();
+    act(() => {
+      result.current.beginStroke(0, 0);
+      result.current.strokeEnter(0, 1);
+      result.current.endStroke();
+    });
+    expect(result.current.cells[0]).toEqual(['mark', 'mark', 'empty', 'empty', 'empty']);
+    expect(playCount()).toBe(1);
   });
 
   it('마크에서 시작하면 지나간 마크만 빈칸이 되고 빈칸은 그대로다 (1101 → 0000)', () => {

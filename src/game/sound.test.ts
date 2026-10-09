@@ -9,6 +9,7 @@ import {
   playSfx,
   preloadSfx,
   recoverAudio,
+  resetSoundForTests,
   setSfxEnabled,
   type SfxName,
 } from './sound';
@@ -24,6 +25,7 @@ const NAMES: SfxName[] = ['ui-click', 'mark', 'erase', 'good', 'bad', 'clear', '
 
 afterEach(() => {
   vi.clearAllMocks();
+  resetSoundForTests();
   setSfxEnabled(true);
 });
 

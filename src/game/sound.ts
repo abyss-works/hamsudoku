@@ -16,6 +16,12 @@ const FILES: Record<SfxName, string> = {
 let enabled = true;
 const cache = new Map<SfxName, Howl>();
 
+/** 테스트 전용. Howl 캐시를 비운다. 목 기록은 테스트마다 초기화되지만
+ * 캐시는 살아 있어서, 비우지 않으면 두 번째부터 재생이 안 보인다. */
+export function resetSoundForTests(): void {
+  cache.clear();
+}
+
 export function setSfxEnabled(on: boolean): void {
   enabled = on;
 }
