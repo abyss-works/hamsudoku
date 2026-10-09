@@ -6,6 +6,11 @@ describe('nextState', () => {
   it('싱글클릭은 빈칸과 마커를 토글한다', () => {
     expect(nextState('empty', 'single', false)).toBe('mark');
     expect(nextState('mark', 'single', false)).toBe('empty');
+    expect(nextState('hypo', 'single', false)).toBe('empty');
+  });
+  it('싱글클릭은 빈칸에 현재 펜 색을 찍는다', () => {
+    expect(nextState('empty', 'single', false, 'hypo')).toBe('hypo');
+    expect(nextState('empty', 'single', false, 'mark')).toBe('mark');
   });
   it('싱글클릭은 햄스터를 회수하고 오답은 잠근다', () => {
     expect(nextState('hamster', 'single', false)).toBe('empty');
@@ -14,8 +19,10 @@ describe('nextState', () => {
   it('더블클릭은 정답이면 햄스터, 오답이면 고정 빨강이다', () => {
     expect(nextState('empty', 'double', true)).toBe('hamster');
     expect(nextState('mark', 'double', true)).toBe('hamster');
+    expect(nextState('hypo', 'double', true)).toBe('hamster');
     expect(nextState('empty', 'double', false)).toBe('wrong');
     expect(nextState('mark', 'double', false)).toBe('wrong');
+    expect(nextState('hypo', 'double', false)).toBe('wrong');
   });
   it('더블클릭은 햄스터와 오답을 바꾸지 않는다', () => {
     const states: CellState[] = ['hamster', 'wrong', 'auto'];
