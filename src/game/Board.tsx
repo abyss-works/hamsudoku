@@ -10,6 +10,8 @@ import type { TapKind } from './tap';
 interface BoardProps {
   puzzle: Puzzle;
   cells: CellState[][];
+  /** 조각 위에 올린 X 집합. 해당 칸은 X로 그린다. */
+  xMarks?: ReadonlySet<string>;
   violations: Violations;
   cleared: boolean;
   pulse?: ReadonlyMap<string, number>;
@@ -28,6 +30,7 @@ interface BoardProps {
 export function Board({
   puzzle,
   cells,
+  xMarks = new Set(),
   violations,
   cleared,
   pulse = new Map(),
@@ -140,12 +143,14 @@ export function Board({
         {cells.map((line, r) =>
           line.map((state, c) => {
             const key = `${r},${c}`;
+            // 덮인 조각은 X로 보인다. 지우면 조각이 드러난다.
+            const shown = state === 'frag' && xMarks.has(key) ? 'mark' : state;
             return (
               <Cell
                 key={`${r}-${c}`}
                 row={r}
                 col={c}
-                state={state}
+                state={shown}
                 islandId={puzzle.islands[r][c]}
                 conflicted={cellConflicted(violations, puzzle.islands, r, c)}
                 hit={hitKey === key}
