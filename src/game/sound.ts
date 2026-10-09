@@ -46,26 +46,27 @@ export function preloadSfx(): void {
 
 // 설정이 꺼져 있거나 서버에서는 재생하지 않는다.
 // Howler가 첫 제스처에 오디오 잠금을 푼다.
-export function playSfx(name: SfxName, rate = 1): void {
+export function playSfx(name: SfxName, rate = 1, volume = 1): void {
   if (!enabled || typeof window === 'undefined') return;
   // 밀리면 버린다. 낡은 소리가 꼬리를 물면 더 이상하다. 진행 1 + 대기 5개까지.
   if (timer !== null && queue.length >= 5) return;
-  queue.push({ name, rate });
+  queue.push({ name, rate, volume });
   pump();
 }
 
-function playNow(name: SfxName, rate: number): void {
+function playNow(name: SfxName, rate: number, volume: number): void {
   let howl = cache.get(name);
   if (!howl) {
     howl = new Howl({ src: [FILES[name]], preload: true });
     cache.set(name, howl);
   }
-  if (rate === 1) {
+  if (rate === 1 && volume === 1) {
     howl.play();
     return;
   }
   const id = howl.play();
-  howl.rate(rate, id);
+  if (rate !== 1) howl.rate(rate, id);
+  if (volume !== 1) howl.volume(volume, id);
 }
 
 // 최소 간격으로 띄워 재생한다. 바로바로 붙으면 소리가 뭉개진다.
@@ -74,6 +75,7 @@ const MIN_GAP_MS = 90;
 interface Queued {
   name: SfxName;
   rate: number;
+  volume: number;
 }
 
 const queue: Queued[] = [];
@@ -88,7 +90,7 @@ function pump(): void {
   timer = setTimeout(() => {
     timer = null;
     lastStart = Date.now();
-    playNow(next.name, next.rate);
+    playNow(next.name, next.rate, next.volume);
     pump();
   }, wait);
 }

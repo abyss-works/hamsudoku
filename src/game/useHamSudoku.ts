@@ -100,7 +100,7 @@ export function useHamSudoku(puzzle: Puzzle): HamSudoku {
     if (prev[r][c] === 'mark') underlay.current.set(keyOf(r, c), 'mark');
     next[r][c] = 'anchor';
     const delays = new Map<string, number>();
-    for (const m of spreadMarks(prev.length, r, c)) {
+    for (const m of spreadMarks(prev.length, r, c, puzzle.islands)) {
       const cur = next[m.r][m.c];
       if (cur === 'empty' || cur === 'mark') {
         if (cur === 'mark') underlay.current.set(keyOf(m.r, m.c), 'mark');
@@ -176,7 +176,7 @@ export function useHamSudoku(puzzle: Puzzle): HamSudoku {
       const delays = new Map<string, number>();
       // 빈 타일·회색X·조각을 정답마커로 바꾼다. 남의 앵커는 건드리지 않는다.
       // 조각에 덮인 X마커는 함께 버린다.
-      for (const m of spreadMarks(after.length, r, c)) {
+      for (const m of spreadMarks(after.length, r, c, puzzle.islands)) {
         const target = next[m.r][m.c];
         if (target === 'empty' || target === 'mark' || target === 'frag') {
           next[m.r][m.c] = 'auto';
