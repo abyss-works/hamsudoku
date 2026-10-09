@@ -81,7 +81,8 @@ export function cascadeFrequencies(n: number): number[] {
   });
 }
 
-// 전파 딜레이마다 음을 올린다. 끊긴 상태면 깨우고 이번은 건너뛴다(묻지 않게).
+// 전파 박자마다 한음씩 늘어난 화음을 올린다. 0박 2음, 1박 3음, ….
+// 박자 합을 일정하게 나눠 먹지 않게 한다. 12박자까지 본다.
 export function playCascade(delaysMs: number[]): void {
   if (!enabled) return;
   const ctx = audioCtx();
@@ -90,20 +91,23 @@ export function playCascade(delaysMs: number[]): void {
     void ctx.resume();
     return;
   }
-  const ordered = [...delaysMs].sort((a, b) => a - b).slice(0, 24);
-  const freqs = cascadeFrequencies(ordered.length);
+  const ordered = [...delaysMs].sort((a, b) => a - b).slice(0, 12);
   const t0 = ctx.currentTime;
   ordered.forEach((ms, i) => {
     const t = t0 + ms / 1000;
-    const osc = ctx.createOscillator();
-    osc.type = 'triangle';
-    osc.frequency.value = freqs[i];
-    const gain = ctx.createGain();
-    gain.gain.setValueAtTime(0.12, t);
-    gain.gain.exponentialRampToValueAtTime(0.001, t + 0.25);
-    osc.connect(gain);
-    gain.connect(ctx.destination);
-    osc.start(t);
-    osc.stop(t + 0.3);
+    const freqs = cascadeFrequencies(2 * i + 2).slice(i);
+    const gainValue = 0.25 / freqs.length;
+    for (const freq of freqs) {
+      const osc = ctx.createOscillator();
+      osc.type = 'triangle';
+      osc.frequency.value = freq;
+      const gain = ctx.createGain();
+      gain.gain.setValueAtTime(gainValue, t);
+      gain.gain.exponentialRampToValueAtTime(0.001, t + 0.25);
+      osc.connect(gain);
+      gain.connect(ctx.destination);
+      osc.start(t);
+      osc.stop(t + 0.3);
+    }
   });
 }
