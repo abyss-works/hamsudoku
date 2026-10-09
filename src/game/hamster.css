@@ -69,19 +69,8 @@
   opacity: 1;
 }
 
-.mark-glyph.mark-wrong,
-.mark-glyph.mark-frag {
+.mark-glyph.mark-wrong {
   opacity: 1;
-}
-
-/* 조각 물음표. 직접 표시보다 작게 그린다. */
-.mark-glyph.mark-frag {
-  display: inline-flex;
-  align-items: center;
-  justify-content: center;
-  font-family: var(--font-display);
-  font-size: 30px;
-  line-height: 1;
 }
 
 /* 앵커 뱃지. 햄스터 우하단에 작은 물음표를 얹는다. */
