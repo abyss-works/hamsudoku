@@ -107,7 +107,7 @@ describe('화면 전환', () => {
       if (url.endsWith('/api/endless/me'))
         return Response.json({ wallet: { balance: 5 }, clearedCount: 1, streak: { current: 0, best: 1 }, season: '2026-W41' });
       if (url.endsWith('/api/endless/rank'))
-        return Response.json({ season: '2026-W41', top: [], snapshotAt: '2026-10-07T00:00:00.000Z', me: { rank: null, score: 0 } });
+        return Response.json({ season: '2026-W41', top: [], snapshotAt: '2026-10-07T00:00:00.000Z', me: { rank: null, score: 0 }, frozen: false });
       throw new Error(`unexpected ${url}`);
     });
     render(<App />);
@@ -126,7 +126,7 @@ describe('화면 전환', () => {
       if (url.endsWith('/api/records')) return Response.json({ clears: [] });
       if (url.endsWith('/api/endless/me')) return meGate;
       if (url.endsWith('/api/endless/rank'))
-        return Response.json({ season: '2026-W41', top: [], snapshotAt: '2026-10-07T00:00:00.000Z', me: { rank: null, score: 0 } });
+        return Response.json({ season: '2026-W41', top: [], snapshotAt: '2026-10-07T00:00:00.000Z', me: { rank: null, score: 0 }, frozen: false });
       throw new Error(`unexpected ${url}`);
     });
     render(<App />);
@@ -171,7 +171,7 @@ describe('화면 전환', () => {
       if (url.endsWith('/api/endless/me'))
         return Response.json({ wallet: { balance: 2 }, clearedCount: 1, streak: { current: 0, best: 1 }, season: '2026-W41' });
       if (url.endsWith('/api/endless/rank'))
-        return Response.json({ season: '2026-W41', top: [], snapshotAt: '2026-10-07T00:00:00.000Z', me: { rank: null, score: 0 } });
+        return Response.json({ season: '2026-W41', top: [], snapshotAt: '2026-10-07T00:00:00.000Z', me: { rank: null, score: 0 }, frozen: false });
       throw new Error(`unexpected ${url}`);
     });
     const { container } = render(<App />);
@@ -406,7 +406,7 @@ describe('화면 전환', () => {
       if (url.endsWith('/api/endless/me'))
         return Response.json({ wallet: { balance: 0 }, clearedCount: 0, streak: { current: 0, best: 0 }, season: '2026-W41' });
       if (url.endsWith('/api/endless/rank'))
-        return Response.json({ season: '2026-W41', top: [], snapshotAt: new Date().toISOString(), me: { rank: null, score: 0 } });
+        return Response.json({ season: '2026-W41', top: [], snapshotAt: new Date().toISOString(), me: { rank: null, score: 0 }, frozen: false });
       throw new Error(`unexpected ${url}`);
     });
     render(<App />);
@@ -688,7 +688,7 @@ describe('계정 연동 유보 흐름', () => {
           season: '2026-W41',
         });
       if (url.endsWith('/api/endless/rank'))
-        return Response.json({ season: '2026-W41', top: [], snapshotAt: new Date().toISOString(), me: { rank: null, score: 0 } });
+        return Response.json({ season: '2026-W41', top: [], snapshotAt: new Date().toISOString(), me: { rank: null, score: 0 }, frozen: false });
       if (url.endsWith('/api/records')) return Response.json({ clears: [] });
       if (url.endsWith('/api/auth/signout')) {
         signedIn = false;
