@@ -7,9 +7,10 @@ import { useHamSudoku } from './useHamSudoku';
 import { PUZZLES } from './puzzles';
 
 vi.mock('howler', () => ({
-  Howl: vi.fn(function (this: { play?: unknown; rate?: unknown }) {
+  Howl: vi.fn(function (this: { play?: unknown; rate?: unknown; volume?: unknown }) {
     this.play = vi.fn(() => 7);
     this.rate = vi.fn();
+    this.volume = vi.fn();
   }),
   Howler: { ctx: null as unknown },
 }));

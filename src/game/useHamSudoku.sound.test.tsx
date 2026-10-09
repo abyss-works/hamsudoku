@@ -17,7 +17,7 @@ const badRates = () =>
   vi
     .mocked(playSfx)
     .mock.calls.filter(([name]) => name === 'bad')
-    .map(([, rate]) => rate as number);
+    .map(([, rate, volume]) => [rate as number, volume as number]);
 const progCalls = () => vi.mocked(playGoodProgression).mock.calls.map(([s]) => s as number);
 
 describe('streak sounds', () => {
@@ -45,8 +45,10 @@ describe('streak sounds', () => {
     });
     expect(at(result.current.cells, 4, 4)).toBe('wrong');
     const [r1, r2] = badRates();
-    expect(r1).toBeCloseTo(2 ** (2 / 12), 5);
-    expect(r2).toBeCloseTo(2 ** (4 / 12), 5);
+    expect(r1[0]).toBeCloseTo(2 ** (2 / 12), 5);
+    expect(r2[0]).toBeCloseTo(2 ** (4 / 12), 5);
+    expect(r1[1]).toBe(0.7);
+    expect(r2[1]).toBe(0.7);
   });
 
   it('맞히면 오답 횟수가 돌아간다', () => {
@@ -61,9 +63,9 @@ describe('streak sounds', () => {
       result.current.tapCell(4, 4, 'double');
     });
     expect(at(result.current.cells, 4, 4)).toBe('wrong');
-    const [r1, r2] = badRates();
-    expect(r1).toBeCloseTo(2 ** (2 / 12), 5);
-    expect(r2).toBeCloseTo(2 ** (2 / 12), 5);
+    const [w1, w2] = badRates();
+    expect(w1[0]).toBeCloseTo(2 ** (2 / 12), 5);
+    expect(w2[0]).toBeCloseTo(2 ** (2 / 12), 5);
     expect(progCalls()).toEqual([1]);
   });
 });
