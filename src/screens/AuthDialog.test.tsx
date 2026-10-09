@@ -111,6 +111,8 @@ describe('AuthDialog 비추천 기준 확인', () => {
     expect(signin).toHaveBeenCalledTimes(1);
     fireEvent.click(screen.getByRole('button', { name: /계정 기준/ }));
     expect(screen.getByText(/되돌릴 수 없어요/)).toBeTruthy();
+    // 확인 화면에서는 선택 안내 문구를 뺀다.
+    expect(screen.queryByText(/이미 가입된 이메일이에요/)).toBeNull();
     expect(signin).toHaveBeenCalledTimes(1);
   });
 
