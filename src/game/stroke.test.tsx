@@ -49,7 +49,7 @@ describe('stroke', () => {
     expect(result.current.cells[0]).toEqual(['mark', 'mark', 'mark', 'mark', 'empty']);
   });
 
-  it('드래그 칠하기·지우기는 칸마다 난다', () => {
+  it('드래그 칠하기·지우기는 칸마다 난다', async () => {
     // 목 기록은 테스트마다 초기화되므로 세는 것은 한 테스트 안에서 한다.
     const { result } = renderHook(() => useHamSudoku(PUZZLES[0]));
     act(() => {
@@ -60,6 +60,9 @@ describe('stroke', () => {
       result.current.endStroke();
     });
     expect(result.current.cells[0]).toEqual(['mark', 'mark', 'mark', 'mark', 'empty']);
+    await act(async () => {
+      await new Promise((r) => setTimeout(r, 500));
+    });
     expect(playCount()).toBe(4);
     clearPlays();
     act(() => {
@@ -70,6 +73,9 @@ describe('stroke', () => {
       result.current.endStroke();
     });
     expect(result.current.cells[0]).toEqual(['empty', 'empty', 'empty', 'empty', 'empty']);
+    await act(async () => {
+      await new Promise((r) => setTimeout(r, 500));
+    });
     expect(playCount()).toBe(4);
   });
 

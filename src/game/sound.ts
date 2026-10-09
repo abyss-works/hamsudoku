@@ -16,10 +16,16 @@ const FILES: Record<SfxName, string> = {
 let enabled = true;
 const cache = new Map<SfxName, Howl>();
 
-/** 테스트 전용. Howl 캐시를 비운다. 목 기록은 테스트마다 초기화되지만
+/** 테스트 전용. Howl 캐시와 재생 큐를 비운다. 목 기록은 테스트마다 초기화되지만
  * 캐시는 살아 있어서, 비우지 않으면 두 번째부터 재생이 안 보인다. */
 export function resetSoundForTests(): void {
   cache.clear();
+  queue.length = 0;
+  if (timer !== null) {
+    clearTimeout(timer);
+    timer = null;
+  }
+  lastStart = 0;
 }
 
 export function setSfxEnabled(on: boolean): void {
@@ -42,6 +48,13 @@ export function preloadSfx(): void {
 // Howler가 첫 제스처에 오디오 잠금을 푼다.
 export function playSfx(name: SfxName, rate = 1): void {
   if (!enabled || typeof window === 'undefined') return;
+  // 밀리면 버린다. 낡은 소리가 꼬리를 물면 더 이상하다. 진행 1 + 대기 5개까지.
+  if (timer !== null && queue.length >= 5) return;
+  queue.push({ name, rate });
+  pump();
+}
+
+function playNow(name: SfxName, rate: number): void {
   let howl = cache.get(name);
   if (!howl) {
     howl = new Howl({ src: [FILES[name]], preload: true });
@@ -53,6 +66,31 @@ export function playSfx(name: SfxName, rate = 1): void {
   }
   const id = howl.play();
   howl.rate(rate, id);
+}
+
+// 최소 간격으로 띄워 재생한다. 바로바로 붙으면 소리가 뭉개진다.
+const MIN_GAP_MS = 90;
+
+interface Queued {
+  name: SfxName;
+  rate: number;
+}
+
+const queue: Queued[] = [];
+let timer: ReturnType<typeof setTimeout> | null = null;
+let lastStart = 0;
+
+function pump(): void {
+  if (timer !== null) return;
+  const next = queue.shift();
+  if (!next) return;
+  const wait = Math.max(0, MIN_GAP_MS - (Date.now() - lastStart));
+  timer = setTimeout(() => {
+    timer = null;
+    lastStart = Date.now();
+    playNow(next.name, next.rate);
+    pump();
+  }, wait);
 }
 
 function audioCtx(): AudioContext | null {

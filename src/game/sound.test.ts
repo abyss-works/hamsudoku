@@ -1,5 +1,5 @@
 // @vitest-environment jsdom
-import { afterEach, describe, expect, it, vi } from 'vitest';
+import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 import { Howl, Howler } from 'howler';
 import {
   cascadeFrequencies,
@@ -23,21 +23,49 @@ vi.mock('howler', () => ({
 
 const NAMES: SfxName[] = ['ui-click', 'mark', 'erase', 'good', 'bad', 'clear', 'gameover', 'seed'];
 
+beforeEach(() => {
+  vi.useFakeTimers();
+});
+
 afterEach(() => {
   vi.clearAllMocks();
   resetSoundForTests();
   setSfxEnabled(true);
+  vi.useRealTimers();
 });
+
+function totalPlays() {
+  return vi
+    .mocked(Howl)
+    .mock.instances.map((inst) => (inst.play as unknown as { mock: { calls: unknown[] } }).mock.calls.length)
+    .reduce((a, b) => a + b, 0);
+}
 
 describe('sound', () => {
   it('이름마다 대응 파일을 재생한다', () => {
-    for (const name of NAMES) playSfx(name);
+    for (const name of NAMES) {
+      playSfx(name);
+      vi.advanceTimersByTime(100);
+    }
     expect(Howl).toHaveBeenCalledTimes(NAMES.length);
     const urls = vi.mocked(Howl).mock.calls.map(([opts]) => (opts as { src: string[] }).src[0]);
     for (const name of NAMES) expect(urls).toContain(`/sfx/${name}.wav`);
-    for (const instance of vi.mocked(Howl).mock.instances) {
-      expect(instance.play).toHaveBeenCalledTimes(1);
-    }
+    expect(totalPlays()).toBe(NAMES.length);
+  });
+
+  it('최소 간격으로 띄워 재생한다', () => {
+    playSfx('mark');
+    playSfx('mark');
+    vi.advanceTimersByTime(50);
+    expect(totalPlays()).toBe(1);
+    vi.advanceTimersByTime(50);
+    expect(totalPlays()).toBe(2);
+  });
+
+  it('밀리면 버린다', () => {
+    for (let i = 0; i < 10; i += 1) playSfx('mark');
+    vi.advanceTimersByTime(2000);
+    expect(totalPlays()).toBe(6);
   });
 
   it('끄면 재생하지 않는다', () => {
@@ -169,6 +197,7 @@ describe('progression', () => {
 describe('bad rate', () => {
   it('배율을 올려 재생한다', () => {
     playSfx('bad', 1.12);
+    vi.advanceTimersByTime(100);
     const inst = vi.mocked(Howl).mock.instances[0] as unknown as { rate: { mock: { calls: unknown[][] } } };
     expect(inst.rate.mock.calls).toEqual([[1.12, 7]]);
   });
