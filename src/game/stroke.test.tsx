@@ -135,21 +135,64 @@ describe('stroke', () => {
   });
 });
 
-describe('clearMarks', () => {
-  it('마크만 전부 빈칸으로 되돌리고 햄스터·자동·오답은 그대로 둔다', () => {
+describe('pen', () => {
+  it('기본 펜은 의심이고 펜을 바꾸면 빈칸에 가설이 찍힌다', () => {
+    const { result } = renderHook(() => useHamSudoku(PUZZLES[0]));
+    expect(result.current.pen).toBe('mark');
+    act(() => {
+      result.current.tapCell(0, 0, 'single');
+    });
+    expect(at(result.current.cells, 0, 0)).toBe('mark');
+    act(() => {
+      result.current.setPen('hypo');
+      result.current.tapCell(0, 1, 'single');
+    });
+    expect(result.current.pen).toBe('hypo');
+    expect(at(result.current.cells, 0, 1)).toBe('hypo');
+  });
+
+  it('칠하기는 현재 펜 색으로, 지우기는 두 색 모두 빈칸으로 바꾼다', () => {
+    const { result } = renderHook(() => useHamSudoku(PUZZLES[0]));
+    act(() => {
+      result.current.setPen('hypo');
+      result.current.beginStroke(0, 0);
+      result.current.strokeEnter(0, 1);
+    });
+    expect(at(result.current.cells, 0, 0)).toBe('hypo');
+    expect(at(result.current.cells, 0, 1)).toBe('hypo');
+    act(() => {
+      result.current.setPen('mark');
+      result.current.tapCell(0, 3, 'single');
+    });
+    expect(at(result.current.cells, 0, 3)).toBe('mark');
+    act(() => {
+      result.current.beginStroke(0, 0);
+      result.current.strokeEnter(0, 1);
+      result.current.strokeEnter(0, 3);
+    });
+    expect(at(result.current.cells, 0, 0)).toBe('empty');
+    expect(at(result.current.cells, 0, 1)).toBe('empty');
+    expect(at(result.current.cells, 0, 3)).toBe('empty');
+  });
+});
+
+describe('clearColor', () => {
+  it('고른 색만 빈칸으로 되돌리고 다른 색·햄스터·자동·오답은 그대로 둔다', () => {
     const { result } = renderHook(() => useHamSudoku(PUZZLES[0]));
     act(() => {
       result.current.tapCell(0, 0, 'double'); // 햄스터, (0,2) 자동
       result.current.tapCell(4, 4, 'double'); // 오답
-      result.current.tapCell(2, 2, 'single');
-      result.current.tapCell(3, 1, 'single');
+      result.current.tapCell(2, 2, 'single'); // 의심
+      result.current.setPen('hypo');
+      result.current.tapCell(3, 1, 'single'); // 가설
     });
     expect(at(result.current.cells, 2, 2)).toBe('mark');
+    expect(at(result.current.cells, 3, 1)).toBe('hypo');
     act(() => {
-      result.current.clearMarks();
+      result.current.clearColor('hypo');
     });
-    expect(at(result.current.cells, 2, 2)).toBe('empty');
     expect(at(result.current.cells, 3, 1)).toBe('empty');
+    expect(at(result.current.cells, 2, 2)).toBe('mark');
     expect(at(result.current.cells, 0, 0)).toBe('hamster');
     expect(at(result.current.cells, 0, 2)).toBe('auto');
     expect(at(result.current.cells, 4, 4)).toBe('wrong');
@@ -173,6 +216,18 @@ describe('정답 전파', () => {
     expect(at(result.current.cells, 3, 0)).toBe('auto');
     expect(at(result.current.cells, 1, 1)).toBe('auto');
     expect(at(result.current.cells, 2, 2)).toBe('mark');
+  });
+
+  it('햄스터가 생기면 같은 줄·주변의 가설마커도 정답마커로 바뀐다', () => {
+    const { result } = renderHook(() => useHamSudoku(PUZZLES[0]));
+    act(() => {
+      result.current.setPen('hypo');
+      result.current.tapCell(0, 1, 'single'); // 같은 행의 가설마커
+    });
+    act(() => {
+      result.current.tapCell(0, 0, 'double'); // 정답
+    });
+    expect(at(result.current.cells, 0, 1)).toBe('auto');
   });
 
   it('오답마커는 정답 전파로 바뀌지 않는다', () => {

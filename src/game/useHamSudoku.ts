@@ -1,6 +1,6 @@
 import { useRef, useState } from 'react';
 import { countHamsters, getViolations, isCleared, isSolutionCell, type Violations } from './rules';
-import type { CellState, Puzzle } from './puzzles';
+import type { CellState, PenColor, Puzzle } from './puzzles';
 import { nextState, spreadMarks, type TapKind } from './tap';
 
 function blankBoard(size: number): CellState[][] {
@@ -15,12 +15,16 @@ export interface HamSudoku {
   pulse: ReadonlyMap<string, number>;
   hitKey: string | null;
   shake: number;
+  /** 현재 펜 색. 빈칸에 찍는 직접 표시의 색을 정한다. */
+  pen: PenColor;
+  setPen: (pen: PenColor) => void;
   tapCell: (r: number, c: number, kind: TapKind) => void;
   beginStroke: (r: number, c: number) => void;
   strokeEnter: (r: number, c: number) => void;
   endStroke: () => boolean;
   reset: () => void;
-  clearMarks: () => void;
+  /** 고른 색의 직접 표시만 빈칸으로 되돌린다. 햄스터·자동·오답·다른 색은 그대로 둔다. */
+  clearColor: (color: PenColor) => void;
 }
 
 // 진행 중 드래그. 누른 칸이 마크면 지우기, 아니면 칠하기 모드다.
@@ -35,6 +39,13 @@ interface Stroke {
 
 export function useHamSudoku(puzzle: Puzzle): HamSudoku {
   const [cells, setCells] = useState<CellState[][]>(() => blankBoard(puzzle.size));
+  // 현재 펜 색. ref 미러를 둬 지연 탭도 최신 펜을 쓴다.
+  const [pen, setPenState] = useState<PenColor>('mark');
+  const penRef = useRef<PenColor>('mark');
+  const setPen = (next: PenColor) => {
+    penRef.current = next;
+    setPenState(next);
+  };
   // 지연 탭(타이머 콜백)이 클릭 시점 스냅샷이 아닌 최신 판을 보도록 ref 미러를 둔다.
   // tapCell은 동기적으로 ref까지 갱신하므로 연타·더블클릭 경합에서도 덮어쓰기가 없다.
   const latest = useRef(cells);
@@ -50,16 +61,16 @@ export function useHamSudoku(puzzle: Puzzle): HamSudoku {
 
   const tapCell = (r: number, c: number, kind: TapKind) => {
     const prev = latest.current;
-    const result = nextState(prev[r][c], kind, isSolutionCell(puzzle, r, c));
+    const result = nextState(prev[r][c], kind, isSolutionCell(puzzle, r, c), penRef.current);
     if (result === prev[r][c]) return;
     const next = prev.map((line) => [...line]);
     next[r][c] = result;
     if (result === 'hamster') {
       const delays = new Map<string, number>();
-      // 빈 타일과 임시마커를 정답마커로 바꾼다. 오답마커·햄스터·기존 정답마커는 그대로 둔다.
+      // 빈 타일과 직접 표시(의심·가설)를 정답마커로 바꾼다. 오답마커·햄스터·기존 정답마커는 그대로 둔다.
       for (const m of spreadMarks(prev.length, r, c)) {
         const cur = next[m.r][m.c];
-        if (cur === 'empty' || cur === 'mark') {
+        if (cur === 'empty' || cur === 'mark' || cur === 'hypo') {
           next[m.r][m.c] = 'auto';
           delays.set(`${m.r},${m.c}`, m.delayMs);
         }
@@ -84,9 +95,9 @@ export function useHamSudoku(puzzle: Puzzle): HamSudoku {
     setHitKey(null);
   };
 
-  // 마크만 전부 빈칸으로 되돌린다. 햄스터·자동·오답은 그대로 둔다.
-  const clearMarks = () => {
-    const next = latest.current.map((line) => line.map((cell) => (cell === 'mark' ? 'empty' : cell)));
+  // 고른 색의 직접 표시만 빈칸으로 되돌린다. 햄스터·자동·오답·다른 색은 그대로 둔다.
+  const clearColor = (color: PenColor) => {
+    const next = latest.current.map((line) => line.map((cell) => (cell === color ? 'empty' : cell)));
     latest.current = next;
     strokeRef.current = null;
     setCells(next);
@@ -94,12 +105,12 @@ export function useHamSudoku(puzzle: Puzzle): HamSudoku {
     setHitKey(null);
   };
 
-  // 칠하기 모드는 빈칸만 마크로, 지우기 모드는 마크만 빈칸으로 바꾼다. 다른 상태는 손대지 않는다.
+  // 칠하기 모드는 빈칸만 현재 펜 색으로, 지우기 모드는 두 색의 직접 표시만 빈칸으로 바꾼다. 다른 상태는 손대지 않는다.
   const paintOne = (st: Stroke, r: number, c: number) => {
     const cur = latest.current[r][c];
-    if (st.toMark ? cur !== 'empty' : cur !== 'mark') return;
+    if (st.toMark ? cur !== 'empty' : cur !== 'mark' && cur !== 'hypo') return;
     const next = latest.current.map((line) => [...line]);
-    next[r][c] = st.toMark ? 'mark' : 'empty';
+    next[r][c] = st.toMark ? penRef.current : 'empty';
     latest.current = next;
     setCells(next);
     setPulse(new Map());
@@ -107,7 +118,8 @@ export function useHamSudoku(puzzle: Puzzle): HamSudoku {
   };
 
   const beginStroke = (r: number, c: number) => {
-    const toMark = latest.current[r][c] !== 'mark';
+    const cur = latest.current[r][c];
+    const toMark = cur !== 'mark' && cur !== 'hypo';
     strokeRef.current = { sr: r, sc: c, toMark, engaged: false, visited: new Set([`${r},${c}`]) };
   };
 
@@ -132,5 +144,5 @@ export function useHamSudoku(puzzle: Puzzle): HamSudoku {
     return engaged;
   };
 
-  return { cells, violations, cleared, hamsterCount, pulse, hitKey, shake, tapCell, beginStroke, strokeEnter, endStroke, reset, clearMarks };
+  return { cells, violations, cleared, hamsterCount, pulse, hitKey, shake, pen, setPen, tapCell, beginStroke, strokeEnter, endStroke, reset, clearColor };
 }
