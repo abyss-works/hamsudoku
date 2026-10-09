@@ -70,21 +70,45 @@ describe('Cell', () => {
 
 const noop = () => {};
 
-function renderCell(state: 'empty' | 'mark') {
+function renderCell(state: 'empty' | 'mark' | 'hypo') {
   return render(
     <Cell row={0} col={0} state={state} islandId={0} conflicted={false} onTap={noop} onPress={noop} />,
   );
 }
 
 describe('Cell 마크 애니메이션', () => {
-  it('마크가 사라질 때 X 가 바로 제거되지 않고 퇴장 애니메이션을 거친다', async () => {
+  it('마크가 사라질 때 체크가 바로 제거되지 않고 퇴장 애니메이션을 거친다', async () => {
     const { container, rerender } = renderCell('mark');
-    expect(container.querySelector('.mark-x')).not.toBeNull();
+    expect(container.querySelector('.mark-glyph')).not.toBeNull();
     rerender(
       <Cell row={0} col={0} state="empty" islandId={0} conflicted={false} onTap={noop} onPress={noop} />,
     );
-    // 상태가 empty 로 바뀐 직후에도 X 는 퇴장 중이라 아직 DOM 에 있다
-    expect(container.querySelector('.mark-x')).not.toBeNull();
-    await waitFor(() => expect(container.querySelector('.mark-x')).toBeNull(), { timeout: 2000 });
+    // 상태가 empty 로 바뀐 직후에도 체크는 퇴장 중이라 아직 DOM 에 있다
+    expect(container.querySelector('.mark-glyph')).not.toBeNull();
+    await waitFor(() => expect(container.querySelector('.mark-glyph')).toBeNull(), { timeout: 2000 });
+  });
+});
+
+describe('Cell 마커 모양', () => {
+  it('의심은 체크, 가설은 물음표로 그린다', async () => {
+    const { container, rerender } = renderCell('mark');
+    expect(container.querySelector('.mark-check')).not.toBeNull();
+    expect(container.querySelector('.mark-unknown')).toBeNull();
+    rerender(
+      <Cell row={0} col={0} state="hypo" islandId={0} conflicted={false} onTap={noop} onPress={noop} />,
+    );
+    const unknown = container.querySelector('.mark-unknown');
+    expect(unknown).not.toBeNull();
+    expect(unknown?.textContent).toBe('?');
+    // 이전 체크는 퇴장 애니메이션 뒤에 사라진다
+    await waitFor(() => expect(container.querySelector('.mark-check')).toBeNull(), { timeout: 2000 });
+  });
+
+  it('상태를 접근성 라벨로 구분한다', () => {
+    renderCell('mark');
+    expect(screen.getByRole('button', { name: /의심 표시/ })).toBeTruthy();
+    cleanup();
+    renderCell('hypo');
+    expect(screen.getByRole('button', { name: /가설 표시/ })).toBeTruthy();
   });
 });

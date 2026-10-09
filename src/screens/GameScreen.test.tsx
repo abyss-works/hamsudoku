@@ -33,13 +33,16 @@ describe('GameScreen', () => {
     expect(screen.getByRole('status').getAttribute('aria-label')).toBe('햄스터 0/6');
   });
 
-  it('도움말 섹션마다 한 장에 3열로 합쳐진다', () => {
+  it('도움말은 한 장씩 좌우로 돌려본다', () => {
     const { container } = render(<GameScreen stage={SIX} onBack={vi.fn()} onNextMap={vi.fn()} onRecord={vi.fn()} />);
-    expect(container.querySelectorAll('.help-card')).toHaveLength(2);
+    expect(container.querySelectorAll('.help-card')).toHaveLength(1);
     const rules = screen.getByLabelText('기본 규칙');
     expect(rules.querySelectorAll('.help-col')).toHaveLength(3);
+    fireEvent.click(screen.getByRole('button', { name: '다음 도움말' }));
     const controls = screen.getByLabelText('기본 조작');
     expect(controls.querySelectorAll('.help-col')).toHaveLength(3);
+    fireEvent.click(screen.getByRole('button', { name: '다음 도움말' }));
+    expect(screen.getByLabelText('마커')).toBeTruthy();
   });
 
   it('다시하기를 누르면 시간이 0으로 돌아간다', async () => {

@@ -1,4 +1,7 @@
-export type CellState = 'empty' | 'mark' | 'auto' | 'hamster' | 'wrong';
+export type CellState = 'empty' | 'mark' | 'hypo' | 'auto' | 'hamster' | 'wrong';
+
+/** 직접 찍는 표시(펜 색). 의심과 가설을 가른다. */
+export type PenColor = 'mark' | 'hypo';
 
 export interface Puzzle {
   name: string;

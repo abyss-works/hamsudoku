@@ -560,6 +560,49 @@ body {
   grid-template-columns: repeat(3, 1fr);
 }
 
+/* 도움말 캐러셀. 좌우 버튼으로 세 장을 돌려본다. */
+.help-carousel {
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+}
+
+.help-nav {
+  display: grid;
+  grid-template-columns: 1fr auto 1fr;
+  align-items: center;
+  gap: 8px;
+}
+
+.help-nav .help-arrow:first-child {
+  justify-self: start;
+}
+
+.help-nav .help-arrow:last-child {
+  justify-self: end;
+}
+
+.help-arrow {
+  width: 40px;
+  height: 32px;
+  padding: 0;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+}
+
+.help-count {
+  font-family: var(--font-help);
+  font-size: 12px;
+  color: var(--ink-soft);
+}
+
+.help-unknown {
+  font-family: var(--font-display);
+  font-size: 22px;
+  line-height: 1;
+}
+
 .help-col {
   display: flex;
   flex-direction: column;

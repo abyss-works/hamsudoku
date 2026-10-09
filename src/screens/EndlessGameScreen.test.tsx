@@ -161,7 +161,7 @@ describe('EndlessGameScreen', () => {
     expect(container.querySelector('.mode-status .seed-box')).toBeTruthy();
   });
 
-  it('리셋은 임시마커만 지우고 햄스터는 남긴다', async () => {
+  it('색별 지우기는 고른 색만 지우고 햄스터는 남긴다', async () => {
     stubFetch();
     const { container } = render(<EndlessGameScreen onBack={() => {}} />);
     await screen.findByRole('status', { name: '씨앗 3/3' });
@@ -173,9 +173,9 @@ describe('EndlessGameScreen', () => {
     const markCell = cells().find((c) => c.getAttribute('data-state') === 'empty' && !sol.has(at(c)));
     expect(markCell).toBeTruthy();
     fireEvent.click(markCell as Element);
-    expect(await screen.findAllByRole('button', { name: /X 표시/ })).not.toHaveLength(0);
-    fireEvent.click(screen.getByRole('button', { name: '리셋' }));
-    await waitFor(() => expect(screen.queryAllByRole('button', { name: /X 표시/ })).toHaveLength(0));
+    expect(await screen.findAllByRole('button', { name: /의심 표시/ })).not.toHaveLength(0);
+    fireEvent.click(screen.getByRole('button', { name: '의심만 지우기' }));
+    await waitFor(() => expect(screen.queryAllByRole('button', { name: /의심 표시/ })).toHaveLength(0));
     expect(screen.getAllByRole('button', { name: /햄스터/ })).not.toHaveLength(0);
   });
 });

@@ -1,6 +1,6 @@
 import { useEffect, useRef } from 'react';
 import { AnimatePresence, motion } from 'framer-motion';
-import { Heart, X } from 'lucide-react';
+import { Check, Heart, X } from 'lucide-react';
 import { HamsterFace } from '../ui/HamsterFace';
 import type { CellState } from './puzzles';
 import { delayForPointerType, type TapKind } from './tap';
@@ -19,7 +19,8 @@ interface CellProps {
 
 const LABEL: Record<CellState, string> = {
   empty: '빈칸',
-  mark: 'X 표시',
+  mark: '의심 표시',
+  hypo: '가설 표시',
   auto: '자동 표시',
   hamster: '햄스터',
   wrong: '틀린 칸',
@@ -107,7 +108,7 @@ export function Cell({ row, col, state, islandId, conflicted, hit, pulseDelay, o
               <Heart size={14} fill="currentColor" aria-hidden="true" />
             </motion.span>
           </motion.span>
-        ) : state === 'mark' || state === 'wrong' || state === 'auto' ? (
+        ) : state === 'mark' || state === 'hypo' || state === 'wrong' || state === 'auto' ? (
           <motion.span
             key={state}
             className="cell-glyph-item"
@@ -117,11 +118,19 @@ export function Cell({ row, col, state, islandId, conflicted, hit, pulseDelay, o
             exit={{ scale: 0.3, opacity: 0, transition: { duration: 0.15, delay: 0 } }}
             transition={{ duration: 0.25, delay: (pulseDelay ?? 0) / 1000 }}
           >
-            <X
-              className={`mark-x${state === 'wrong' ? ' mark-wrong' : ''}${state === 'auto' ? ' mark-auto' : ''}`}
-              strokeWidth={3}
-              aria-hidden="true"
-            />
+            {state === 'hypo' ? (
+              <span className="mark-glyph mark-unknown" aria-hidden="true">
+                ?
+              </span>
+            ) : state === 'mark' ? (
+              <Check className="mark-glyph mark-check" strokeWidth={3.5} aria-hidden="true" />
+            ) : (
+              <X
+                className={`mark-glyph${state === 'wrong' ? ' mark-wrong' : ''}${state === 'auto' ? ' mark-auto' : ''}`}
+                strokeWidth={3}
+                aria-hidden="true"
+              />
+            )}
           </motion.span>
         ) : null}
         </AnimatePresence>
