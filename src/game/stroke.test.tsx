@@ -299,10 +299,10 @@ describe('probe', () => {
     expect(at(result.current.cells, 2, 0)).toBe('empty');
     expect(at(result.current.cells, 0, 2)).toBe('empty');
     expect(result.current.probeSlots).toBe(3);
-    // 회수는 먼 조각부터 역순 딜레이로 사라진다(12조각, 최대 11*60ms)
+    // 회수는 먼 조각부터 역순 딜레이로 사라진다(13조각, 최대 12*60ms)
     const delays = [...result.current.pulse.values()];
-    expect(delays).toHaveLength(12);
-    expect(Math.max(...delays)).toBe(11 * 60);
+    expect(delays).toHaveLength(13);
+    expect(Math.max(...delays)).toBe(12 * 60);
   });
 
   it('슬롯이 없으면 놓기 시도를 무시한다', () => {

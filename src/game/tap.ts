@@ -27,7 +27,7 @@ export interface SpreadMark {
   delayMs: number;
 }
 
-export function spreadMarks(size: number, r: number, c: number): SpreadMark[] {
+export function spreadMarks(size: number, r: number, c: number, islands?: number[][]): SpreadMark[] {
   const out: SpreadMark[] = [];
   for (let i = 0; i < size; i += 1) {
     if (i !== c) out.push({ r, c: i, delayMs: 60 * Math.abs(i - c) });
@@ -40,6 +40,17 @@ export function spreadMarks(size: number, r: number, c: number): SpreadMark[] {
       const nc = c + dc;
       if (nr >= 0 && nc >= 0 && nr < size && nc < size) {
         out.push({ r: nr, c: nc, delayMs: 60 });
+      }
+    }
+  }
+  // 같은 섬 칸도 체비쇼프 거리로 낸다. 겹치면 앞선(줄·주변) 딜레이가 우선한다.
+  if (islands) {
+    const id = islands[r]?.[c];
+    for (let ir = 0; ir < size; ir += 1) {
+      for (let ic = 0; ic < size; ic += 1) {
+        if ((ir !== r || ic !== c) && islands[ir]?.[ic] === id) {
+          out.push({ r: ir, c: ic, delayMs: 60 * Math.max(Math.abs(ir - r), Math.abs(ic - c)) });
+        }
       }
     }
   }
