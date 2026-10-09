@@ -32,6 +32,8 @@ export interface HamSudoku {
   strokeEnter: (r: number, c: number) => void;
   endStroke: () => boolean;
   reset: () => void;
+  /** X마커·앵커·조각을 전부 빈칸으로 되돌린다. 햄스터·정답·오답마커는 그대로 둔다. */
+  resetMarks: () => void;
 }
 
 // 진행 중 드래그. 누른 칸이 마크·앵커면 지우기, 아니면 칠하기 모드다.
@@ -64,6 +66,8 @@ export function useHamSudoku(puzzle: Puzzle): HamSudoku {
   // 조각→앵커 소유자. 앵커를 지울 때 자기 조각만 회수한다.
   // 조각이 전파로 정답마커가 되면 항목이 stale해지며 reset에서 비운다.
   const links = useRef(new Map<string, string>());
+  // 조각·앵커에 덮인 X마커. 회수 때 되돌린다. 전파로 정답마커가 되면 함께 버린다.
+  const underlay = useRef(new Map<string, 'mark'>());
   // 진행 중 스트로크. 최신 판은 latest ref로만 읽어서 지연 이벤트 경합을 피한다.
   const strokeRef = useRef<Stroke | null>(null);
   const [pulse, setPulse] = useState<ReadonlyMap<string, number>>(new Map());
@@ -83,15 +87,18 @@ export function useHamSudoku(puzzle: Puzzle): HamSudoku {
   };
 
   // 앵커를 놓고 십자·주변에 조각을 살포한다. 빈칸·회색X만 바뀌고 잠금·햄스터·남의 조각은 통과한다.
+  // 덮인 X마커는 간직했다가 회수 때 되돌린다.
   const placeAnchor = (r: number, c: number) => {
     const prev = latest.current;
     if (anchorCount(prev) >= PROBE_SLOTS) return;
     const next = prev.map((line) => [...line]);
+    if (prev[r][c] === 'mark') underlay.current.set(keyOf(r, c), 'mark');
     next[r][c] = 'anchor';
     const delays = new Map<string, number>();
     for (const m of spreadMarks(prev.length, r, c)) {
       const cur = next[m.r][m.c];
       if (cur === 'empty' || cur === 'mark') {
+        if (cur === 'mark') underlay.current.set(keyOf(m.r, m.c), 'mark');
         next[m.r][m.c] = 'frag';
         links.current.set(keyOf(m.r, m.c), keyOf(r, c));
         delays.set(keyOf(m.r, m.c), m.delayMs);
@@ -100,7 +107,7 @@ export function useHamSudoku(puzzle: Puzzle): HamSudoku {
     commit(next, delays, null);
   };
 
-  // 앵커와 자기 조각을 거둔다. 먼 조각부터 역순으로 사라진다.
+  // 앵커와 자기 조각을 거둔다. 덮인 X마커는 되돌리고 먼 조각부터 역순으로 사라진다.
   const recallAnchor = (r: number, c: number) => {
     const prev = latest.current;
     const owner = keyOf(r, c);
@@ -112,7 +119,8 @@ export function useHamSudoku(puzzle: Puzzle): HamSudoku {
       }
     }
     const next = prev.map((line) => [...line]);
-    next[r][c] = 'empty';
+    next[r][c] = underlay.current.get(owner) ?? 'empty';
+    underlay.current.delete(owner);
     const delays = new Map<string, number>();
     const ordered = owned
       .map((key) => {
@@ -122,7 +130,8 @@ export function useHamSudoku(puzzle: Puzzle): HamSudoku {
       .sort((a, b) => b.dist - a.dist);
     ordered.forEach(({ key }, i) => {
       const [fr, fc] = key.split(',').map(Number);
-      next[fr][fc] = 'empty';
+      next[fr][fc] = underlay.current.get(key) ?? 'empty';
+      underlay.current.delete(key);
       links.current.delete(key);
       delays.set(key, i * 60);
     });
@@ -155,10 +164,13 @@ export function useHamSudoku(puzzle: Puzzle): HamSudoku {
     if (result === 'hamster') {
       const delays = new Map<string, number>();
       // 빈 타일·회색X·조각을 정답마커로 바꾼다. 남의 앵커는 건드리지 않는다.
+      // 조각에 덮인 X마커는 함께 버린다.
       for (const m of spreadMarks(after.length, r, c)) {
         const target = next[m.r][m.c];
         if (target === 'empty' || target === 'mark' || target === 'frag') {
           next[m.r][m.c] = 'auto';
+          links.current.delete(keyOf(m.r, m.c));
+          underlay.current.delete(keyOf(m.r, m.c));
           delays.set(keyOf(m.r, m.c), m.delayMs);
         }
       }
@@ -173,8 +185,23 @@ export function useHamSudoku(puzzle: Puzzle): HamSudoku {
     const blank = blankBoard(puzzle.size);
     latest.current = blank;
     links.current.clear();
+    underlay.current.clear();
     strokeRef.current = null;
     setCells(blank);
+    setPulse(new Map());
+    setHitKey(null);
+  };
+
+  // X마커·앵커·조각을 전부 빈칸으로 되돌린다. 햄스터·정답·오답마커는 그대로 둔다.
+  const resetMarks = () => {
+    const next = latest.current.map((line) =>
+      line.map((cell) => (cell === 'mark' || cell === 'anchor' || cell === 'frag' ? 'empty' : cell)),
+    );
+    latest.current = next;
+    links.current.clear();
+    underlay.current.clear();
+    strokeRef.current = null;
+    setCells(next);
     setPulse(new Map());
     setHitKey(null);
   };
@@ -231,5 +258,5 @@ export function useHamSudoku(puzzle: Puzzle): HamSudoku {
     return engaged;
   };
 
-  return { cells, violations, cleared, hamsterCount, pulse, hitKey, shake, probeActive, setProbeActive, probeSlots, tapCell, beginStroke, strokeEnter, endStroke, reset };
+  return { cells, violations, cleared, hamsterCount, pulse, hitKey, shake, probeActive, setProbeActive, probeSlots, tapCell, beginStroke, strokeEnter, endStroke, reset, resetMarks };
 }

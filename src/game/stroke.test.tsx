@@ -154,6 +154,64 @@ describe('probe', () => {
     expect(at(result.current.cells, 0, 0)).toBe('empty');
   });
 
+  it('앵커 살포는 덮인 X를 간직했다가 회수 때 되돌린다', () => {
+    const { result } = renderHook(() => useHamSudoku(PUZZLES[0]));
+    act(() => {
+      result.current.tapCell(2, 0, 'single'); // 회색 X
+      result.current.setProbeActive(true);
+      result.current.tapCell(2, 2, 'single'); // 앵커, (2,0)을 덮는다
+    });
+    expect(at(result.current.cells, 2, 0)).toBe('frag');
+    act(() => {
+      result.current.tapCell(2, 2, 'single');
+    });
+    expect(at(result.current.cells, 2, 2)).toBe('empty');
+    expect(at(result.current.cells, 2, 0)).toBe('mark');
+    expect(result.current.probeSlots).toBe(3);
+  });
+
+  it('전파로 정답마커가 된 조각은 회수 때 건드리지 않는다', () => {
+    const { result } = renderHook(() => useHamSudoku(PUZZLES[0]));
+    act(() => {
+      result.current.tapCell(2, 0, 'single'); // 회색 X
+      result.current.setProbeActive(true);
+      result.current.tapCell(2, 3, 'single'); // 앵커, (0,3)은 조각
+      result.current.setProbeActive(false);
+    });
+    expect(at(result.current.cells, 0, 3)).toBe('frag');
+    act(() => {
+      result.current.tapCell(0, 0, 'double'); // 정답 확정
+    });
+    expect(at(result.current.cells, 0, 3)).toBe('auto');
+    act(() => {
+      result.current.tapCell(2, 3, 'single'); // 앵커 회수
+    });
+    expect(at(result.current.cells, 2, 3)).toBe('empty');
+    expect(at(result.current.cells, 0, 3)).toBe('auto');
+  });
+
+  it('resetMarks는 정답마커 빼고 전부 지운다', () => {
+    const { result } = renderHook(() => useHamSudoku(PUZZLES[0]));
+    act(() => {
+      result.current.tapCell(0, 0, 'double'); // 햄스터+전파
+      result.current.tapCell(3, 3, 'single'); // 회색 X
+      result.current.setProbeActive(true);
+      result.current.tapCell(4, 1, 'single'); // 앵커+조각
+      result.current.setProbeActive(false);
+    });
+    expect(at(result.current.cells, 0, 0)).toBe('hamster');
+    expect(at(result.current.cells, 4, 1)).toBe('anchor');
+    act(() => {
+      result.current.resetMarks();
+    });
+    expect(at(result.current.cells, 0, 0)).toBe('hamster');
+    expect(at(result.current.cells, 0, 1)).toBe('auto');
+    expect(at(result.current.cells, 3, 3)).toBe('empty');
+    expect(at(result.current.cells, 4, 1)).toBe('empty');
+    expect(at(result.current.cells, 4, 2)).toBe('empty');
+    expect(at(result.current.cells, 4, 0)).toBe('auto');
+    expect(result.current.probeSlots).toBe(3);
+  });
   it('앵커를 톡하면 자기 조각만 회수되고 슬롯이 충전된다', () => {
     const { result } = renderHook(() => useHamSudoku(PUZZLES[0]));
     act(() => {
