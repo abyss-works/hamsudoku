@@ -165,6 +165,10 @@ describe('probe', () => {
     expect(at(result.current.cells, 2, 0)).toBe('empty');
     expect(at(result.current.cells, 0, 2)).toBe('empty');
     expect(result.current.probeSlots).toBe(3);
+    // 회수는 먼 조각부터 역순 딜레이로 사라진다(12조각, 최대 11*60ms)
+    const delays = [...result.current.pulse.values()];
+    expect(delays).toHaveLength(12);
+    expect(Math.max(...delays)).toBe(11 * 60);
   });
 
   it('슬롯이 없으면 놓기 시도를 무시한다', () => {
@@ -179,10 +183,12 @@ describe('probe', () => {
     expect(at(result.current.cells, 2, 2)).toBe('anchor');
     expect(at(result.current.cells, 1, 4)).toBe('anchor');
     expect(result.current.probeSlots).toBe(0);
+    // 3개를 다 쓰면 토글이 풀린다
+    expect(result.current.probeActive).toBe(false);
     act(() => {
       result.current.tapCell(4, 1, 'single');
     });
-    expect(at(result.current.cells, 4, 1)).toBe('empty');
+    expect(at(result.current.cells, 4, 1)).toBe('mark');
     expect(result.current.probeSlots).toBe(0);
   });
 

@@ -145,13 +145,15 @@ export function EndlessGameScreen({ onBack }: { onBack: () => void }) {
           뒤로
         </Button>
         <span className="hud-code">무한모드</span>
-        <span />
-      </div>
-      <div className="mode-status">
-        <div className="seed-box" role="status" aria-label={`씨앗 ${session.seeds}/3`}>
-          <Sprout size={20} aria-hidden="true" />
-          <span className="seed-count">{session.seeds}</span>
-        </div>
+        <span className="hud-seeds">
+          <span className="seed-box" role="status" aria-label={`씨앗 ${session.mirror.wallet.balance}개, 목숨 ${session.seeds}개`}>
+            <Sprout size={20} aria-hidden="true" />
+            <span className="seed-count">{session.mirror.wallet.balance}</span>
+          </span>
+          <span className="seed-lives" aria-hidden="true">
+            +{session.seeds}
+          </span>
+        </span>
       </div>
       <GameHelp probe />
       <EndlessBoard

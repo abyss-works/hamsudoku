@@ -83,6 +83,7 @@ export function useHamSudoku(puzzle: Puzzle): HamSudoku {
   };
 
   // 앵커를 놓고 십자·주변에 조각을 살포한다. 빈칸·회색X만 바뀌고 잠금·햄스터·남의 조각은 통과한다.
+  // 3개를 다 쓰면 토글이 풀린다.
   const placeAnchor = (r: number, c: number) => {
     const prev = latest.current;
     if (anchorCount(prev) >= PROBE_SLOTS) return;
@@ -98,6 +99,7 @@ export function useHamSudoku(puzzle: Puzzle): HamSudoku {
       }
     }
     commit(next, delays, null);
+    if (anchorCount(next) >= PROBE_SLOTS) setProbeActive(false);
   };
 
   // 앵커와 자기 조각을 거둔다. 먼 조각부터 역순으로 사라진다.

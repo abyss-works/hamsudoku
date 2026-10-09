@@ -10,9 +10,9 @@ function ProbePage() {
       <HelpCol>
         <Plus size={20} aria-hidden="true" />
         <p>
-          임시 정답 켜고,
+          켜고 빈칸에 놓기,
           <br />
-          빈칸에 놓기
+          다시 톡하면 회수
         </p>
       </HelpCol>
       <HelpCol>
@@ -20,9 +20,9 @@ function ProbePage() {
           ?
         </span>
         <p>
-          십자·주변에
+          십자·주변에 살포,
           <br />
-          물음표가 돋는다
+          3개까지·끄고 확정
         </p>
       </HelpCol>
     </>

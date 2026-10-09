@@ -671,12 +671,6 @@ body {
   background: var(--carrot);
 }
 
-.mode-status {
-  display: flex;
-  justify-content: flex-end;
-  width: 100%;
-}
-
 .seed-box {
   display: inline-flex;
   align-items: center;
@@ -695,6 +689,24 @@ body {
   font-size: 24px;
   letter-spacing: 1px;
   color: var(--ink);
+}
+
+/* HUD 우측 씨앗 묶음. 보유 씨앗 박스에 현재 목숨을 덧댄다. */
+.hud-seeds {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  justify-self: end;
+}
+
+.hud-seeds .seed-box {
+  margin-top: 0;
+}
+
+.seed-lives {
+  font-family: var(--font-help);
+  font-size: 13px;
+  color: var(--leaf);
 }
 
 .home-endless-row {
