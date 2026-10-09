@@ -4,7 +4,9 @@
   "private": true,
   "packageManager": "pnpm@11.21.0",
   "msw": {
-    "workerDirectory": ["public"]
+    "workerDirectory": [
+      "public"
+    ]
   },
   "scripts": {
     "dev": "next dev",
@@ -37,7 +39,7 @@
   "devDependencies": {
     "@storybook/addon-a11y": "^10.6.1",
     "@storybook/addon-docs": "^10.6.1",
-    "@storybook/nextjs-vite": "^10.6.1",
+    "@storybook/nextjs": "^10.6.1",
     "@testing-library/react": "^16.3.3",
     "@types/node": "^24.19.1",
     "@types/pg": "8.23.1",
@@ -52,7 +54,6 @@
     "storybook": "^10.6.1",
     "tsx": "^4.23.15",
     "typescript": "^5",
-    "vite": "^8.3.4",
     "vitest": "^5.0.3"
   }
 }

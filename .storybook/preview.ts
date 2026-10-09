@@ -1,4 +1,4 @@
-import type { Preview } from '@storybook/nextjs-vite';
+import type { Preview } from '@storybook/nextjs';
 import { mswLoader } from 'msw-storybook-addon/csf3';
 import '../src/theme.css';
 import '../src/index.css';
