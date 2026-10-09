@@ -1,9 +1,6 @@
 // @vitest-environment node
 import { afterEach, describe, expect, it, vi } from 'vitest';
 import { GET } from './route';
-import { getSessionUser } from '../../../../server/auth';
-import { createPrismaDb } from '../../../../server/db';
-import { rankStoreFromEnv } from '../../../../server/rank';
 
 vi.mock('../../../../server/auth', () => ({
   getSessionUser: vi.fn(async () => ({ uid: 'u1', email: null })),

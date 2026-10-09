@@ -1,7 +1,6 @@
 // @vitest-environment node
 import { afterEach, describe, expect, it, vi } from 'vitest';
 import { POST } from './route';
-import { submitEndlessClear } from '../../../../server/endless';
 import { rankStoreFromEnv } from '../../../../server/rank';
 
 vi.mock('../../../../server/auth', () => ({
