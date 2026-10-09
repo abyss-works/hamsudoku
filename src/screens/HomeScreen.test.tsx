@@ -18,10 +18,12 @@ function makeProps(overrides: Partial<Parameters<typeof HomeScreen>[0]> = {}): P
     summary: {
       me: { wallet: { balance: 5 }, clearedCount: 2, streak: { current: 1, best: 3 }, season: '2026-W41' },
       rank: null,
+      myRank: null,
       loading: false,
       error: null,
       refresh: vi.fn(async () => {}),
       refreshSoft: vi.fn(async () => null),
+      refreshMyRank: vi.fn(async () => {}),
     },
     onSaveNickname: async () => ({ ok: true }),
     onSignup: async () => ({ ok: true }),
@@ -113,11 +115,31 @@ describe('HomeScreen 프로필 세션 예열', () => {
   it('랭킹을 열 때 조용한 갱신을 쓴다', () => {
     const refresh = vi.fn(async () => {});
     const refreshSoft = vi.fn(async () => null);
-    render(<HomeScreen {...makeProps({ summary: { ...makeProps().summary, refresh, refreshSoft } })} />);
+    const refreshMyRank = vi.fn(async () => {});
+    render(<HomeScreen {...makeProps({ summary: { ...makeProps().summary, refresh, refreshSoft, refreshMyRank } })} />);
     fireEvent.click(screen.getByRole('button', { name: '랭킹' }));
     expect(screen.getByRole('dialog', { name: '랭킹' })).toBeTruthy();
     expect(refreshSoft).toHaveBeenCalled();
+    expect(refreshMyRank).toHaveBeenCalled();
     expect(refresh).not.toHaveBeenCalled();
+  });
+
+  it('랭킹 목록은 별도 조회 값으로 내 행을 그린다', () => {
+    const summary = {
+      ...makeProps().summary,
+      rank: {
+        season: '2026-W41',
+        top: [{ userId: 'u1', nickname: '햄찌', score: 60 }],
+        snapshotAt: '2026-10-07T00:00:00.000Z',
+        me: { rank: 2, score: 47 },
+        frozen: false,
+      },
+      myRank: { rank: 2, score: 52, nickname: '나' },
+    };
+    render(<HomeScreen {...makeProps({ summary })} />);
+    fireEvent.click(screen.getByRole('button', { name: '랭킹' }));
+    expect(screen.getByText('나')).toBeTruthy();
+    expect(screen.getByText(/내 순위: 2위/)).toBeTruthy();
   });
 });
 

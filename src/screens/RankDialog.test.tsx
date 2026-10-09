@@ -1,19 +1,11 @@
 // @vitest-environment jsdom
-import { afterAll, afterEach, beforeAll, describe, expect, it, vi } from 'vitest';
+import { afterEach, describe, expect, it, vi } from 'vitest';
 import { cleanup, fireEvent, render, screen } from '@testing-library/react';
 import { RankDialog } from './RankDialog';
 
 afterEach(() => {
   cleanup();
   vi.restoreAllMocks();
-});
-
-beforeAll(() => {
-  vi.useFakeTimers({ now: new Date('2026-10-07T00:00:30.000Z') });
-});
-
-afterAll(() => {
-  vi.useRealTimers();
 });
 
 const rank = {
@@ -42,7 +34,7 @@ describe('RankDialog', () => {
     expect(screen.getByText(/내 순위: 아직 없음/)).toBeTruthy();
   });
 
-  it('내 행은 실시간 점수로 다시 정렬돼 표시된다', () => {
+  it('내 행은 별도 조회 값으로 다시 정렬돼 표시된다', () => {
     const r = {
       season: '2026-W41',
       top: [
@@ -51,18 +43,26 @@ describe('RankDialog', () => {
         { userId: 'u3', nickname: '곰', score: 47 },
       ],
       snapshotAt: '2026-10-07T00:00:00.000Z',
-      me: { rank: 3, score: 52 },
+      me: { rank: 3, score: 47 },
       frozen: false,
     };
-    render(<RankDialog rank={r} uid="me" signedIn onClose={() => {}} />);
-    // 60(1위), 나 52(2위, 실시간), 토끼 51, 곰 47
+    render(<RankDialog rank={r} myRank={{ rank: 2, score: 52, nickname: '나' }} uid="me" signedIn onClose={() => {}} />);
+    // 60(1위), 나 52(2위), 토끼 51, 곰 47
     const list = document.querySelectorAll('.rank-row');
     expect(list).toHaveLength(4);
     expect(list[1].className).toContain('me');
     expect(list[1].textContent).toContain('52');
+    expect(list[1].textContent).toContain('나');
     expect(list[2].textContent).toContain('토끼');
-    expect(screen.getByText('실시간')).toBeTruthy();
-    expect(screen.getByText(/순위표 기준: 30초 전/)).toBeTruthy();
+    expect(screen.getByText(/내 순위: 2위/)).toBeTruthy();
+  });
+
+  it('갱신 시각 문구와 실시간 뱃지를 보여주지 않는다', () => {
+    render(<RankDialog rank={rank} myRank={{ rank: 2, score: 6, nickname: '햄찌' }} uid="u2" signedIn onClose={() => {}} />);
+    expect(screen.queryByText(/순위표 기준/)).toBeNull();
+    expect(screen.queryByText(/초 전|분 전/)).toBeNull();
+    expect(screen.queryByText('실시간')).toBeNull();
+    expect(document.querySelector('.rank-live')).toBeNull();
   });
 });
 
@@ -73,11 +73,10 @@ describe('RankDialog 마감 창', () => {
     frozen: true,
   };
 
-  it('마감 안내를 보여주고 최종 순위로 표시한다', () => {
-    render(<RankDialog rank={frozenRank} uid="u2" signedIn onClose={() => {}} />);
+  it('마감 안내를 보여준다', () => {
+    render(<RankDialog rank={frozenRank} myRank={{ rank: 2, score: 6, nickname: '햄찌' }} uid="u2" signedIn onClose={() => {}} />);
     expect(screen.getByText(/집계가 마감됐어요/)).toBeTruthy();
-    expect(screen.getByText('최종')).toBeTruthy();
-    expect(screen.queryByText('실시간')).toBeNull();
+    expect(document.querySelector('.rank-live')).toBeNull();
   });
 });
 

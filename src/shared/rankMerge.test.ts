@@ -56,4 +56,21 @@ describe('mergeRankEntries', () => {
     expect(entries[0].userId).toBe('me');
     expect(meRank).toBe(1);
   });
+
+  it('별도 조회 값이 있으면 스냅샷 대신 그 점수·닉네임으로 그린다', () => {
+    const r = rankResponse({
+      top: [
+        { userId: 'u1', nickname: '햄찌', score: 60 },
+        { userId: 'me', nickname: '옛이름', score: 47 },
+        { userId: 'u3', nickname: '토끼', score: 30 },
+      ],
+      me: { rank: 2, score: 47 },
+    });
+    const { entries, meRank } = mergeRankEntries(r, 'me', { score: 55, nickname: '새이름' });
+    expect(entries.filter((e) => e.userId === 'me')).toHaveLength(1);
+    expect(entries.map((e) => e.userId)).toEqual(['u1', 'me', 'u3']);
+    expect(entries[1].score).toBe(55);
+    expect(entries[1].nickname).toBe('새이름');
+    expect(meRank).toBe(2);
+  });
 });

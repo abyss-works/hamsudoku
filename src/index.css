@@ -835,7 +835,7 @@ body {
 }
 
 .rank-scroll {
-  max-height: calc(5 * 44px);
+  max-height: calc(7.5 * 44px);
   overflow-y: auto;
 }
 
