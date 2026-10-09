@@ -85,6 +85,63 @@ describe('AuthDialog 기준 표시와 배치', () => {
   });
 });
 
+describe('AuthDialog 비추천 기준 확인', () => {
+  const reachChoice = async (guestSeeds: number, accountSeeds: number) => {
+    const signin = vi.fn(async () => ({ ok: true }));
+    render(
+      <AuthDialog
+        {...base}
+        guest={{ seeds: guestSeeds, clears: 2 }}
+        signup={vi.fn(async () => ({ ok: false, code: 'email_exists' }))}
+        signin={signin}
+        fetchAccountSeeds={vi.fn(async () => accountSeeds)}
+      />,
+    );
+    fireEvent.change(screen.getByLabelText('이메일'), { target: { value: 'a@b.c' } });
+    fireEvent.change(screen.getByLabelText('비밀번호'), { target: { value: 'abcdef' } });
+    fireEvent.submit(screen.getByRole('button', { name: '이메일로 계속하기' }).closest('form')!);
+    await vi.waitFor(() => {
+      expect(screen.getByText(/이 기기 기준/)).toBeTruthy();
+    });
+    return signin;
+  };
+
+  it('씨앗이 적은 쪽을 누르면 바로 실행하지 않고 되돌릴 수 없음을 알린다', async () => {
+    const signin = await reachChoice(70, 12);
+    expect(signin).toHaveBeenCalledTimes(1);
+    fireEvent.click(screen.getByRole('button', { name: /계정 기준/ }));
+    expect(screen.getByText(/되돌릴 수 없어요/)).toBeTruthy();
+    expect(signin).toHaveBeenCalledTimes(1);
+  });
+
+  it('안내에서 연동하기를 누르면 실행된다', async () => {
+    const signin = await reachChoice(70, 12);
+    fireEvent.click(screen.getByRole('button', { name: /계정 기준/ }));
+    fireEvent.click(screen.getByRole('button', { name: '연동하기' }));
+    await vi.waitFor(() => {
+      expect(signin).toHaveBeenCalledTimes(2);
+    });
+  });
+
+  it('안내에서 다시 선택을 누르면 선택으로 돌아간다', async () => {
+    const signin = await reachChoice(70, 12);
+    fireEvent.click(screen.getByRole('button', { name: /계정 기준/ }));
+    fireEvent.click(screen.getByRole('button', { name: '다시 선택' }));
+    expect(screen.queryByText(/되돌릴 수 없어요/)).toBeNull();
+    expect(screen.getByRole('button', { name: /이 기기 기준/ })).toBeTruthy();
+    expect(signin).toHaveBeenCalledTimes(1);
+  });
+
+  it('씨앗이 많은 쪽은 바로 실행된다', async () => {
+    const signin = await reachChoice(7, 70);
+    fireEvent.click(screen.getByRole('button', { name: /계정 기준/ }));
+    expect(screen.queryByText(/되돌릴 수 없어요/)).toBeNull();
+    await vi.waitFor(() => {
+      expect(signin).toHaveBeenCalledTimes(2);
+    });
+  });
+});
+
 describe('AuthDialog 로그인 선행과 취소', () => {
   it('이미 가입된 이메일이면 기준 선택 전에 로그인을 선행한다', async () => {
     const signin = vi.fn(async () => ({ ok: true }));

@@ -35,6 +35,7 @@ export function AuthDialog({ signup, signin, reset, guest, fetchAccountSeeds, on
   const [okMessage, setOkMessage] = useState<string | null>(null);
   const [chooseBase, setChooseBase] = useState(false);
   const [accountSeeds, setAccountSeeds] = useState<number | null>(null);
+  const [pendingBase, setPendingBase] = useState<'device' | 'account' | null>(null);
   const [busy, setBusy] = useState(false);
   const timer = useRef<ReturnType<typeof setTimeout> | null>(null);
 
@@ -117,6 +118,26 @@ export function AuthDialog({ signup, signin, reset, guest, fetchAccountSeeds, on
   };
 
   // 실제 로그인은 기준 선택 이후 signin을 호출한다. 추천은 guest 씨앗 수 비교로 정한다.
+  // 씨앗이 많은 쪽이 추천이며, 적은 쪽을 고르면 되돌릴 수 없음을 먼저 알린다.
+  const isRecommended = (chosen: 'device' | 'account') => {
+    if (!guestSnapshot) return true;
+    if (chosen === 'device') return (accountSeeds ?? 0) <= guestSnapshot.seeds;
+    return accountSeeds !== null && accountSeeds > guestSnapshot.seeds;
+  };
+
+  const selectBase = (chosen: 'device' | 'account') => {
+    if (isRecommended(chosen)) {
+      void pickBase(chosen);
+      return;
+    }
+    setPendingBase(chosen);
+  };
+
+  const confirmBase = () => {
+    const chosen = pendingBase;
+    setPendingBase(null);
+    if (chosen) void pickBase(chosen);
+  };
 
   return (
     <Overlay label="계정 연동">
@@ -162,30 +183,44 @@ export function AuthDialog({ signup, signin, reset, guest, fetchAccountSeeds, on
           {chooseBase ? (
             <div className="login-confirm">
               <p>이미 가입된 이메일이에요. 이 계정으로 로그인할까요?</p>
-              {guestSnapshot && (
+              {pendingBase === null ? (
                 <>
-                  <Button
-                    variant="sticker"
-                    className={(accountSeeds ?? 0) <= guestSnapshot.seeds ? 'btn-primary login-base-btn' : 'login-base-btn'}
-                    onClick={() => void pickBase('device')}
-                    disabled={busy}
-                  >
-                    이 기기 기준 (씨앗 {guestSnapshot.seeds}개)
+                  {guestSnapshot && (
+                    <>
+                      <Button
+                        variant="sticker"
+                        className={(accountSeeds ?? 0) <= guestSnapshot.seeds ? 'btn-primary login-base-btn' : 'login-base-btn'}
+                        onClick={() => selectBase('device')}
+                        disabled={busy}
+                      >
+                        이 기기 기준 (씨앗 {guestSnapshot.seeds}개)
+                      </Button>
+                      <Button
+                        variant="sticker"
+                        className={accountSeeds !== null && accountSeeds > guestSnapshot.seeds ? 'btn-primary login-base-btn' : 'login-base-btn'}
+                        onClick={() => selectBase('account')}
+                        disabled={busy}
+                      >
+                        계정 기준{accountSeeds !== null ? ` (씨앗 ${accountSeeds}개)` : ''}
+                      </Button>
+                    </>
+                  )}
+                  {!guestSnapshot && (
+                    <Button variant="sticker" className="btn-primary" onClick={() => void pickBase('account')} disabled={busy}>
+                      로그인하기
+                    </Button>
+                  )}
+                </>
+              ) : (
+                <>
+                  <p>씨앗이 적은 쪽으로 연동하면 다른 쪽 기록은 되돌릴 수 없어요. 이 기준으로 연동할까요?</p>
+                  <Button variant="sticker" className="btn-primary login-base-btn" onClick={confirmBase} disabled={busy}>
+                    연동하기
                   </Button>
-                  <Button
-                    variant="sticker"
-                    className={accountSeeds !== null && accountSeeds > guestSnapshot.seeds ? 'btn-primary login-base-btn' : 'login-base-btn'}
-                    onClick={() => void pickBase('account')}
-                    disabled={busy}
-                  >
-                    계정 기준{accountSeeds !== null ? ` (씨앗 ${accountSeeds}개)` : ''}
+                  <Button variant="sticker" className="login-base-btn" onClick={() => setPendingBase(null)} disabled={busy}>
+                    다시 선택
                   </Button>
                 </>
-              )}
-              {!guestSnapshot && (
-                <Button variant="sticker" className="btn-primary" onClick={() => void pickBase('account')} disabled={busy}>
-                  로그인하기
-                </Button>
               )}
             </div>
           ) : (
