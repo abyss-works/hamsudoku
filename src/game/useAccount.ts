@@ -73,9 +73,11 @@ export function useAccount(): {
     },
     signout: async () => {
       await authApi.signout();
-      setUid(null);
-      setEmail(null);
-      setNickname(null);
+      // 로그아웃 뒤에는 게스트로 돌아온다. 익명 세션을 다시 세우지 않으면
+      // 세션 없는 상태가 남아 무한모드 게이트 같은 uid 전제가 어긋난다.
+      // 복원에 실패하면 로그아웃 상태 그대로 둔다.
+      await authApi.session();
+      await refresh();
     },
     reset: (email: string) => authApi.reset(email),
     setPassword: (password: string) => authApi.setPassword(password),
