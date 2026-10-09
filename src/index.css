@@ -582,21 +582,44 @@ body {
   position: absolute;
   top: 50%;
   translate: 0 -50%;
-  width: 26px;
-  height: 26px;
+  width: 40px;
+  height: 40px;
   padding: 0;
+  border: none;
   border-radius: 50%;
+  background: transparent;
   display: inline-flex;
   align-items: center;
   justify-content: center;
+  color: var(--ink);
+  cursor: pointer;
 }
 
 .help-prev {
-  left: 4px;
+  left: 0;
 }
 
 .help-next {
-  right: 4px;
+  right: 0;
+}
+
+/* 캐러셀 도트. 현재 장만 당근색으로 보인다. */
+.help-dots {
+  display: flex;
+  justify-content: center;
+  gap: 6px;
+  padding: 4px 0 0;
+}
+
+.help-dots i {
+  width: 8px;
+  height: 8px;
+  border-radius: 50%;
+  background: rgb(74 49 40 / 0.25);
+}
+
+.help-dots i.on {
+  background: var(--carrot);
 }
 
 .help-unknown {
