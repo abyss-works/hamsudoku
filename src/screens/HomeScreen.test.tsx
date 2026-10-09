@@ -82,6 +82,24 @@ describe('HomeScreen 무한모드 게스트 게이트', () => {
     fireEvent.click(screen.getByRole('button', { name: '무한모드' }));
     expect(onEndless).toHaveBeenCalled();
   });
+
+  it('로그인 상태인데 닉네임이 없으면 닉네임 안내가 나온다', () => {
+    const onEndless = vi.fn();
+    render(<HomeScreen {...makeProps({ email: 'a@b.c', nickname: null, onEndless })} />);
+    fireEvent.click(screen.getByRole('button', { name: '무한모드' }));
+    expect(screen.getByRole('dialog', { name: '닉네임 안내' })).toBeTruthy();
+    expect(onEndless).not.toHaveBeenCalled();
+  });
+
+  it('닉네임 안내에서 나중에 하기를 누르면 진입한다', () => {
+    const onEndless = vi.fn();
+    const onSaveNickname = vi.fn(async () => ({ ok: true }));
+    render(<HomeScreen {...makeProps({ email: 'a@b.c', nickname: null, onEndless, onSaveNickname })} />);
+    fireEvent.click(screen.getByRole('button', { name: '무한모드' }));
+    fireEvent.click(screen.getByRole('button', { name: '나중에 하기' }));
+    expect(onSaveNickname).not.toHaveBeenCalled();
+    expect(onEndless).toHaveBeenCalledTimes(1);
+  });
 });
 
 describe('HomeScreen 프로필 세션 예열', () => {
