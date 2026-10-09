@@ -53,27 +53,39 @@
 .cell[data-island='8'] { background: #f6cfd8; }
 .cell[data-island='9'] { background: #e3d9c2; }
 
-/* X·체크 글리프는 퇴장 애니메이션 동안 칸 상태가 먼저 바뀌므로 자기 클래스만으로 모양을 정한다 */
+/* X 글리프는 퇴장 애니메이션 동안 칸 상태가 먼저 바뀌므로 자기 클래스만으로 모양을 정한다.
+   직접 표시(회색 X)와 정답마커(검정 X)를 색으로 가른다. */
 .mark-glyph {
   width: 38px;
   height: 38px;
   max-width: 75%;
   max-height: 75%;
-  color: var(--ink);
-}
-
-.mark-glyph.mark-auto {
   color: var(--ink-soft);
 }
 
-/* 가설 물음표. Jua 한 글자로 체크·X와 같은 자리에 둔다. */
-.mark-glyph.mark-unknown {
+.mark-glyph.mark-auto {
+  color: var(--ink);
+}
+
+/* 조각 물음표. 직접 표시보다 작게 그린다. */
+.mark-glyph.mark-frag {
   display: inline-flex;
   align-items: center;
   justify-content: center;
   font-family: var(--font-display);
-  font-size: 40px;
+  font-size: 24px;
   line-height: 1;
+}
+
+/* 앵커 뱃지. 햄스터 우하단에 작은 물음표를 얹는다. */
+.anchor-badge {
+  position: absolute;
+  right: -4px;
+  bottom: -6px;
+  font-family: var(--font-display);
+  font-size: 20px;
+  line-height: 1;
+  color: var(--ink);
 }
 
 .cell[data-state='wrong'] {
@@ -85,14 +97,14 @@
   color: #e5484d;
 }
 
-/* 마커 펜. 보드 아래 중앙에 두 색을 나란히 둔다. */
-.marker-controls {
+/* 임시 정답 아이템. 보드 아래 중앙에 하나 둔다. */
+.probe-controls {
   display: flex;
   justify-content: center;
-  gap: 20px;
 }
 
-.pen-btn {
+.probe-btn {
+  position: relative;
   width: 56px;
   height: 56px;
   border-radius: 50%;
@@ -106,16 +118,26 @@
   cursor: pointer;
 }
 
-.pen-btn.selected {
+.probe-btn.selected {
   background: var(--sun);
   outline: 3px solid var(--carrot);
   outline-offset: -1px;
 }
 
-.pen-glyph {
-  font-family: var(--font-display);
-  font-size: 26px;
-  line-height: 1;
+.probe-count {
+  position: absolute;
+  right: -6px;
+  bottom: -4px;
+  min-width: 22px;
+  height: 22px;
+  padding: 0 4px;
+  border-radius: 11px;
+  border: 2px solid var(--ink);
+  background: var(--card);
+  font-family: var(--font-help);
+  font-size: 11px;
+  line-height: 18px;
+  text-align: center;
 }
 
 .cell-hit {

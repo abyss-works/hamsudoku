@@ -2,7 +2,6 @@ import { useEffect, useRef } from 'react';
 import { AnimatePresence, motion } from 'framer-motion';
 import { Heart, X } from 'lucide-react';
 import { HamsterFace } from '../ui/HamsterFace';
-import { DotMark } from '../ui/HelpCard';
 import type { CellState } from './puzzles';
 import { delayForPointerType, type TapKind } from './tap';
 
@@ -20,8 +19,9 @@ interface CellProps {
 
 const LABEL: Record<CellState, string> = {
   empty: '빈칸',
-  mark: '의심 표시',
-  hypo: '가설 표시',
+  mark: 'X 표시',
+  anchor: '임시 정답 표시',
+  frag: '물음표 표시',
   auto: '자동 표시',
   hamster: '햄스터',
   wrong: '틀린 칸',
@@ -109,7 +109,22 @@ export function Cell({ row, col, state, islandId, conflicted, hit, pulseDelay, o
               <Heart size={14} fill="currentColor" aria-hidden="true" />
             </motion.span>
           </motion.span>
-        ) : state === 'mark' || state === 'hypo' || state === 'wrong' || state === 'auto' ? (
+        ) : state === 'anchor' ? (
+          <motion.span
+            key="anchor"
+            className="cell-glyph-item"
+            aria-hidden="true"
+            initial={{ scale: 0.3, opacity: 0 }}
+            animate={{ scale: 1, opacity: 1 }}
+            exit={{ scale: 0.3, opacity: 0, transition: { duration: 0.15, delay: 0 } }}
+            transition={{ duration: 0.25, delay: (pulseDelay ?? 0) / 1000 }}
+          >
+            <HamsterFace />
+            <span className="anchor-badge" aria-hidden="true">
+              ?
+            </span>
+          </motion.span>
+        ) : state === 'mark' || state === 'frag' || state === 'wrong' || state === 'auto' ? (
           <motion.span
             key={state}
             className="cell-glyph-item"
@@ -119,12 +134,10 @@ export function Cell({ row, col, state, islandId, conflicted, hit, pulseDelay, o
             exit={{ scale: 0.3, opacity: 0, transition: { duration: 0.15, delay: 0 } }}
             transition={{ duration: 0.25, delay: (pulseDelay ?? 0) / 1000 }}
           >
-            {state === 'hypo' ? (
-              <span className="mark-glyph mark-unknown" aria-hidden="true">
+            {state === 'frag' ? (
+              <span className="mark-glyph mark-frag" aria-hidden="true">
                 ?
               </span>
-            ) : state === 'mark' ? (
-              <DotMark size={22} />
             ) : (
               <X
                 className={`mark-glyph${state === 'wrong' ? ' mark-wrong' : ''}${state === 'auto' ? ' mark-auto' : ''}`}

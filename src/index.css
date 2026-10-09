@@ -599,6 +599,12 @@ body {
   right: 4px;
 }
 
+.help-unknown {
+  font-family: var(--font-display);
+  font-size: 22px;
+  line-height: 1;
+}
+
 .help-col {
   display: flex;
   flex-direction: column;

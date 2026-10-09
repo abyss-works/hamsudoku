@@ -12,16 +12,12 @@ function Ham({ x, y }: { x: number; y: number }) {
   return <circle cx={x} cy={y} r="4.5" fill="#e8823c" stroke="#4a3128" strokeWidth="1.6" />;
 }
 
-function Check({ x, y }: { x: number; y: number }) {
+function CrossMark({ x, y }: { x: number; y: number }) {
   return (
-    <polyline
-      points={`${x - 3.5},${y} ${x - 1},${y + 2.5} ${x + 3.5},${y - 3}`}
-      fill="none"
-      stroke="#4a3128"
-      strokeWidth="2"
-      strokeLinecap="round"
-      strokeLinejoin="round"
-    />
+    <g stroke="#7a5c4d" strokeWidth="2" strokeLinecap="round">
+      <line x1={x - 3} y1={y - 3} x2={x + 3} y2={y + 3} />
+      <line x1={x + 3} y1={y - 3} x2={x - 3} y2={y + 3} />
+    </g>
   );
 }
 
@@ -44,7 +40,7 @@ function TouchFig() {
   return (
     <MiniFrame>
       {cells.map(([x, y]) => (
-        <Check key={`${x},${y}`} x={x} y={y} />
+        <CrossMark key={`${x},${y}`} x={x} y={y} />
       ))}
       <Ham x={18} y={18} />
     </MiniFrame>
@@ -56,8 +52,8 @@ function LineFig() {
     <MiniFrame>
       <rect x="2" y="11" width="32" height="14" rx="5" fill="#e2eefc" stroke="#4a3128" strokeWidth="1.6" />
       <Ham x={8} y={18} />
-      <Check x={18} y={18} />
-      <Check x={28} y={18} />
+      <CrossMark x={18} y={18} />
+      <CrossMark x={28} y={18} />
     </MiniFrame>
   );
 }
