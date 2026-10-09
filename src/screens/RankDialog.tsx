@@ -33,10 +33,11 @@ export function RankDialog({ rank, uid, signedIn, onClose }: RankDialogProps) {
           주간 랭킹
           {rank && <span className="rank-season">{rank.season}</span>}
         </p>
+        {rank?.frozen && <p className="rank-frozen">집계가 마감됐어요. 새 시즌은 4시에 시작해요.</p>}
         {rank && (
           <p className="rank-snapshot">
             순위표 기준: {formatSnapshotAge(rank.snapshotAt) ?? '알 수 없음'}
-            {signedIn && ' · 내 점수는 실시간이에요'}
+            {signedIn && (rank.frozen ? ' · 확정 순위예요' : ' · 내 점수는 실시간이에요')}
           </p>
         )}
         <ol className="rank-list rank-scroll">
@@ -47,7 +48,7 @@ export function RankDialog({ rank, uid, signedIn, onClose }: RankDialogProps) {
               </span>
               <span className="rank-name">
                 {e.nickname ?? '게스트'}
-                {e.userId === uid && <span className="rank-live">실시간</span>}
+                {e.userId === uid && <span className="rank-live">{rank?.frozen ? '최종' : '실시간'}</span>}
               </span>
               <span className="rank-score">
                 {e.score}

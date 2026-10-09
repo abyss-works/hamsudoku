@@ -52,7 +52,7 @@ describe('fetchRank', () => {
     vi.stubGlobal(
       'fetch',
       vi.fn(async () =>
-        Response.json({ season: '2026-W41', top: [], snapshotAt: '2026-10-07T00:00:00.000Z', me: { rank: null, score: 0 } }),
+        Response.json({ season: '2026-W41', top: [], snapshotAt: '2026-10-07T00:00:00.000Z', me: { rank: null, score: 0 }, frozen: false }),
       ),
     );
     expect((await fetchRank()).season).toBe('2026-W41');

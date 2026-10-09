@@ -24,6 +24,7 @@ const rank = {
   ],
   snapshotAt: '2026-10-07T00:00:00.000Z',
   me: { rank: 2, score: 6 },
+  frozen: false,
 };
 
 describe('RankDialog', () => {
@@ -51,6 +52,7 @@ describe('RankDialog', () => {
       ],
       snapshotAt: '2026-10-07T00:00:00.000Z',
       me: { rank: 3, score: 52 },
+      frozen: false,
     };
     render(<RankDialog rank={r} uid="me" signedIn onClose={() => {}} />);
     // 60(1위), 나 52(2위, 실시간), 토끼 51, 곰 47
@@ -61,6 +63,21 @@ describe('RankDialog', () => {
     expect(list[2].textContent).toContain('토끼');
     expect(screen.getByText('실시간')).toBeTruthy();
     expect(screen.getByText(/순위표 기준: 30초 전/)).toBeTruthy();
+  });
+});
+
+describe('RankDialog 마감 창', () => {
+  const frozenRank = {
+    ...rank,
+    season: '2026-W40',
+    frozen: true,
+  };
+
+  it('마감 안내를 보여주고 최종 순위로 표시한다', () => {
+    render(<RankDialog rank={frozenRank} uid="u2" signedIn onClose={() => {}} />);
+    expect(screen.getByText(/집계가 마감됐어요/)).toBeTruthy();
+    expect(screen.getByText('최종')).toBeTruthy();
+    expect(screen.queryByText('실시간')).toBeNull();
   });
 });
 
@@ -78,6 +95,7 @@ describe('RankDialog 게스트 뷰와 스크롤', () => {
       top: Array.from({ length: 12 }, (_, i) => ({ userId: `u${i}`, nickname: null, score: 100 - i })),
       snapshotAt: '2026-10-07T00:00:00.000Z',
       me: { rank: null, score: 0 },
+      frozen: false,
     };
     render(<RankDialog rank={big} uid={null} signedIn={false} onClose={() => {}} />);
     const list = document.querySelector('.rank-list');

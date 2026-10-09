@@ -58,6 +58,7 @@ export const rankResponseSchema = z.object({
   top: z.array(rankEntrySchema),
   snapshotAt: z.iso.datetime(),
   me: z.object({ rank: z.number().int().min(1).nullable(), score: z.number().int().min(0) }),
+  frozen: z.boolean(),
 });
 
 export const meResponseSchema = z.object({
