@@ -1,5 +1,5 @@
 import { useState } from 'react';
-import { ChevronLeft, ChevronRight, Plus } from 'lucide-react';
+import { ChevronLeft, ChevronRight, Plus, RotateCcw } from 'lucide-react';
 import { HelpCard, HelpCol } from '../ui/HelpCard';
 import { ControlsPage } from './ControlsHelp';
 import { RulesPage } from './RulesHelp';
@@ -25,6 +25,14 @@ function ProbePage() {
           3개까지·끄고 확정
         </p>
       </HelpCol>
+      <HelpCol>
+        <RotateCcw size={20} aria-hidden="true" />
+        <p>
+          리셋은 정답마커
+          <br />
+          빼고 지우기
+        </p>
+      </HelpCol>
     </>
   );
 }
@@ -35,7 +43,7 @@ export function GameHelp({ probe = false }: { probe?: boolean }) {
     ? [
         { title: '기본 규칙', page: <RulesPage />, cols: 3 as const },
         { title: '기본 조작', page: <ControlsPage />, cols: 3 as const },
-        { title: '임시 정답', page: <ProbePage />, cols: 2 as const },
+        { title: '임시 정답', page: <ProbePage />, cols: 3 as const },
       ]
     : [
         { title: '기본 규칙', page: <RulesPage />, cols: 3 as const },
