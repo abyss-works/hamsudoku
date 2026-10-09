@@ -7,6 +7,7 @@ import {
   isSfxEnabled,
   playCascade,
   playSfx,
+  preloadSfx,
   recoverAudio,
   setSfxEnabled,
   type SfxName,
@@ -53,6 +54,13 @@ describe('sound', () => {
     } finally {
       globalThis.window = w;
     }
+  });
+
+  it('미리 받아두면 첫 재생이 막히지 않는다', async () => {
+    vi.resetModules();
+    const fresh = await import('./sound');
+    fresh.preloadSfx();
+    expect(Howl).toHaveBeenCalledTimes(NAMES.length);
   });
 });
 

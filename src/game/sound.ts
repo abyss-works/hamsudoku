@@ -24,6 +24,14 @@ export function isSfxEnabled(): boolean {
   return enabled;
 }
 
+// 이름마다 대응 파일을 미리 받아둔다. 첫 재생 때 받아오면 소리가 늦는다.
+export function preloadSfx(): void {
+  if (typeof window === 'undefined') return;
+  (Object.keys(FILES) as SfxName[]).forEach((name) => {
+    if (!cache.has(name)) cache.set(name, new Howl({ src: [FILES[name]], preload: true }));
+  });
+}
+
 // 설정이 꺼져 있거나 서버에서는 재생하지 않는다.
 // Howler가 첫 제스처에 오디오 잠금을 푼다.
 export function playSfx(name: SfxName): void {
