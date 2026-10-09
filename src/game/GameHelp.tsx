@@ -56,13 +56,18 @@ export function GameHelp({ probe = false }: { probe?: boolean }) {
     <div className="help-carousel">
       <HelpCard label={pages[page].title} cols={pages[page].cols}>
         <button type="button" className="btn help-arrow help-prev" aria-label="이전 도움말" onClick={prev}>
-          <ChevronLeft size={14} aria-hidden="true" />
+          <ChevronLeft size={18} aria-hidden="true" />
         </button>
         {pages[page].page}
         <button type="button" className="btn help-arrow help-next" aria-label="다음 도움말" onClick={next}>
-          <ChevronRight size={14} aria-hidden="true" />
+          <ChevronRight size={18} aria-hidden="true" />
         </button>
       </HelpCard>
+      <div className="help-dots" aria-hidden="true">
+        {pages.map((p, i) => (
+          <i key={p.title} className={i === page ? 'on' : ''} />
+        ))}
+      </div>
     </div>
   );
 }
