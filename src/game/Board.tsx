@@ -3,6 +3,7 @@ import { motion, useAnimationControls } from 'framer-motion';
 import { Cell } from './Cell';
 import { ClearDialog } from './ClearDialog';
 import { cellsAlongSegment, type GridPoint } from './path';
+import { resolveMark } from './probe';
 import { cellConflicted, type Violations } from './rules';
 import type { CellState, Puzzle } from './puzzles';
 import type { TapKind } from './tap';
@@ -144,7 +145,7 @@ export function Board({
           line.map((state, c) => {
             const key = `${r},${c}`;
             // 덮인 조각은 X로 보인다. 지우면 조각이 드러난다.
-            const shown = state === 'frag' && xMarks.has(key) ? 'mark' : state;
+            const shown = resolveMark(state, xMarks.has(key));
             return (
               <Cell
                 key={`${r}-${c}`}
