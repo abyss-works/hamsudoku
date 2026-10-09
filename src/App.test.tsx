@@ -391,6 +391,32 @@ describe('화면 전환', () => {
     expect(await screen.findByRole('button', { name: '스테이지' })).toBeTruthy();
   });
 
+  it('로그아웃 뒤 무한모드를 누르면 로그인 안내가 나온다', async () => {
+    let signedIn = true;
+    stubFetch(async (url: string) => {
+      if (url.endsWith('/api/auth/me'))
+        return Response.json(signedIn ? { uid: 'uB', email: 'e@x.y', cloud: true } : { uid: 'anon2', email: null, cloud: true });
+      if (url.endsWith('/api/auth/session')) return Response.json({ uid: 'anon2' });
+      if (url.endsWith('/api/auth/signout')) {
+        signedIn = false;
+        return Response.json({ ok: true });
+      }
+      if (url.endsWith('/api/profile/me')) return Response.json({ nickname: null });
+      if (url.endsWith('/api/records')) return Response.json({ clears: [] });
+      if (url.endsWith('/api/endless/me'))
+        return Response.json({ wallet: { balance: 0 }, clearedCount: 0, streak: { current: 0, best: 0 }, season: '2026-W41' });
+      if (url.endsWith('/api/endless/rank'))
+        return Response.json({ season: '2026-W41', top: [], snapshotAt: new Date().toISOString(), me: { rank: null, score: 0 } });
+      throw new Error(`unexpected ${url}`);
+    });
+    render(<App />);
+    fireEvent.click(await screen.findByRole('button', { name: '프로필' }));
+    fireEvent.click(screen.getByRole('button', { name: '로그아웃' }));
+    // 로그아웃 뒤에는 게스트로 돌아오므로 무한모드 진입은 게이트를 탄다.
+    fireEvent.click(await screen.findByRole('button', { name: '무한모드' }));
+    expect(await screen.findByRole('dialog', { name: '로그인 안내' })).toBeTruthy();
+  });
+
   it('게임 중 뒤로가기 후 재진입하면 빈판이다', async () => {
     const { container } = render(<App />);
     fireEvent.click(await screen.findByRole('button', { name: '스테이지' }));
