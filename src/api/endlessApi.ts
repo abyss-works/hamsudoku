@@ -1,10 +1,12 @@
 import {
   clearResponseSchema,
   meResponseSchema,
+  myRankResponseSchema,
   nextResponseSchema,
   rankResponseSchema,
   type ClearResponse,
   type MeResponse,
+  type MyRankResponse,
   type RankResponse,
 } from '../shared/endless';
 
@@ -99,6 +101,12 @@ export async function fetchRank(): Promise<RankResponse> {
   const res = await fetch('/api/endless/rank');
   if (!res.ok) throw new EndlessApiError(res.status);
   return rankResponseSchema.parse(await res.json());
+}
+
+export async function fetchMyRank(): Promise<MyRankResponse> {
+  const res = await fetch('/api/endless/me-rank');
+  if (!res.ok) throw new EndlessApiError(res.status);
+  return myRankResponseSchema.parse(await res.json());
 }
 
 export async function fetchMe(): Promise<MeResponse> {
