@@ -22,6 +22,7 @@ vi.mock('../api/stagesApi', () => ({
 }));
 
 const mockedMe = vi.mocked(authApi.me);
+const mockedSession = vi.mocked(authApi.session);
 const mockedProfileGet = vi.mocked(profileApi.get);
 const mockedProfileSave = vi.mocked(profileApi.save);
 
@@ -59,5 +60,34 @@ describe('useAccount nickname', () => {
     });
     expect(r).toEqual({ ok: false, msg: '닉네임은 2~12자로 입력하세요.' });
     expect(result.current.nickname).toBe('햄찌');
+  });
+});
+
+describe('useAccount warmSession', () => {
+  it('게스트는 익명 세션을 확보하고 상태를 읽는다', async () => {
+    mockedMe.mockResolvedValue({ uid: null, email: null, cloud: true });
+    mockedSession.mockResolvedValue({ uid: 'anon9' });
+    mockedProfileGet.mockResolvedValue({ nickname: null });
+    const { result } = renderHook(() => useAccount());
+    await waitFor(() => expect(result.current.loading).toBe(false));
+    mockedMe.mockResolvedValue({ uid: 'anon9', email: null, cloud: true });
+    await act(async () => {
+      await result.current.warmSession();
+    });
+    expect(mockedSession).toHaveBeenCalled();
+    expect(result.current.uid).toBe('anon9');
+  });
+
+  it('로그인 사용자는 세션을 건드리지 않는다', async () => {
+    mockedMe.mockResolvedValue({ uid: 'u1', email: 'e@x.y', cloud: true });
+    mockedProfileGet.mockResolvedValue({ nickname: '햄찌' });
+    const { result } = renderHook(() => useAccount());
+    await waitFor(() => expect(result.current.email).toBe('e@x.y'));
+    mockedSession.mockClear();
+    await act(async () => {
+      await result.current.warmSession();
+    });
+    expect(mockedSession).not.toHaveBeenCalled();
+    expect(result.current.uid).toBe('u1');
   });
 });
