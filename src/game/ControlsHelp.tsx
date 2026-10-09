@@ -12,7 +12,7 @@ export function ControlsPage() {
     <>
       {CONTROLS.map((c) => (
         <HelpCol key={c.lines[0]}>
-          {c.icon}
+          <span className="help-icon">{c.icon}</span>
           <p>
             {c.lines[0]}
             <br />

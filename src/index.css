@@ -569,12 +569,20 @@ body {
 
 .help-carousel .help-card {
   position: relative;
+  display: flex;
+  flex-direction: column;
   min-height: 104px;
   padding-left: 34px;
   padding-right: 34px;
 }
 
-.help-card.cols-2 {
+.help-cols {
+  flex: 1;
+  display: grid;
+  grid-template-columns: repeat(3, 1fr);
+}
+
+.help-card.cols-2 .help-cols {
   grid-template-columns: repeat(2, 1fr);
 }
 
@@ -639,6 +647,14 @@ body {
 
 .help-col + .help-col {
   border-left: 2px dashed rgb(74 49 40 / 0.18);
+}
+
+/* 항목 아이콘 자리 고정. 크기가 달라도 설명 행이 어긋나지 않는다. */
+.help-icon {
+  height: 40px;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
 }
 
 .help-col p {

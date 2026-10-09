@@ -71,7 +71,7 @@ export function RulesPage() {
     <>
       {RULES.map((r) => (
         <HelpCol key={r.text}>
-          {r.fig}
+          <span className="help-icon">{r.fig}</span>
           <p>{r.text}</p>
         </HelpCol>
       ))}
