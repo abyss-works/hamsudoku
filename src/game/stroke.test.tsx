@@ -341,7 +341,7 @@ describe('probe', () => {
     expect(result.current.probeSlots).toBe(3);
   });
 
-  it('전파로 정답마커가 된 조각은 회수 때 건드리지 않는다', () => {
+  it('남의 조각은 전파가 건드리지 않는다', () => {
     const { result } = renderHook(() => useHamSudoku(PUZZLES[0]));
     act(() => {
       result.current.tapCell(2, 0, 'single'); // 회색 X
@@ -351,14 +351,35 @@ describe('probe', () => {
     });
     expect(at(result.current.cells, 0, 3)).toBe('frag');
     act(() => {
-      result.current.tapCell(0, 0, 'double'); // 정답 확정
+      result.current.tapCell(0, 0, 'double'); // 남의 자리 확정
     });
-    expect(at(result.current.cells, 0, 3)).toBe('auto');
+    expect(at(result.current.cells, 0, 0)).toBe('hamster');
+    expect(at(result.current.cells, 0, 3)).toBe('frag');
+    expect(at(result.current.cells, 2, 3)).toBe('anchor');
+  });
+
+  it('겹친 앵커를 확정해도 남의 조각이 남는다', () => {
+    const { result } = renderHook(() => useHamSudoku(PUZZLES[0]));
     act(() => {
-      result.current.tapCell(2, 3, 'single'); // 앵커 회수
+      result.current.setProbeActive(true);
+      result.current.tapCell(0, 4, 'single'); // B 앵커
+      result.current.setProbeActive(false);
+      result.current.tapCell(0, 0, 'single'); // B 조각에 X 올리기
+      result.current.setProbeActive(true);
+      result.current.tapCell(0, 0, 'single'); // A 앵커로 차지
+      result.current.setProbeActive(false);
     });
-    expect(at(result.current.cells, 2, 3)).toBe('empty');
-    expect(at(result.current.cells, 0, 3)).toBe('auto');
+    expect(at(result.current.cells, 0, 0)).toBe('anchor');
+    expect(at(result.current.cells, 0, 4)).toBe('anchor');
+    act(() => {
+      result.current.tapCell(0, 0, 'double'); // A 확정
+    });
+    expect(at(result.current.cells, 0, 0)).toBe('hamster');
+    expect(at(result.current.cells, 0, 1)).toBe('frag');
+    expect(at(result.current.cells, 0, 2)).toBe('frag');
+    expect(at(result.current.cells, 0, 3)).toBe('frag');
+    expect(at(result.current.cells, 0, 4)).toBe('anchor');
+    expect(result.current.probeSlots).toBe(2);
   });
 
   it('resetMarks는 정답마커 빼고 전부 지운다', () => {
@@ -508,7 +529,7 @@ describe('정답 전파', () => {
     expect(at(result.current.cells, 2, 2)).toBe('mark');
   });
 
-  it('일반 전파는 조각을 정답마커로 바꾸고 남의 앵커는 그대로 둔다', () => {
+  it('일반 전파는 남의 조각을 건드리지 않고 앵커도 그대로 둔다', () => {
     const { result } = renderHook(() => useHamSudoku(PUZZLES[0]));
     act(() => {
       result.current.setProbeActive(true);
@@ -519,10 +540,10 @@ describe('정답 전파', () => {
     expect(at(result.current.cells, 0, 3)).toBe('frag');
     expect(at(result.current.cells, 0, 0)).toBe('empty');
     act(() => {
-      result.current.tapCell(0, 0, 'double'); // 정답 확정
+      result.current.tapCell(0, 0, 'double'); // 남의 자리 확정
     });
     expect(at(result.current.cells, 0, 0)).toBe('hamster');
-    expect(at(result.current.cells, 0, 3)).toBe('auto');
+    expect(at(result.current.cells, 0, 3)).toBe('frag');
     expect(at(result.current.cells, 2, 3)).toBe('anchor');
   });
 
