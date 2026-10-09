@@ -1,4 +1,6 @@
 // @vitest-environment jsdom
+import { readFileSync } from 'node:fs';
+import { join } from 'node:path';
 import { afterEach, describe, expect, it, vi } from 'vitest';
 import { cleanup, fireEvent, render, screen, waitFor } from '@testing-library/react';
 import { HomeScreen } from './HomeScreen';
@@ -19,7 +21,7 @@ function makeProps(overrides: Partial<Parameters<typeof HomeScreen>[0]> = {}): P
       loading: false,
       error: null,
       refresh: vi.fn(async () => {}),
-      refreshSoft: vi.fn(async () => {}),
+      refreshSoft: vi.fn(async () => null),
     },
     onSaveNickname: async () => ({ ok: true }),
     onSignup: async () => ({ ok: true }),
@@ -36,7 +38,7 @@ function makeProps(overrides: Partial<Parameters<typeof HomeScreen>[0]> = {}): P
 
 describe('HomeScreen 진입 갱신', () => {
   it('홈에 들어올 때마다 요약을 다시 요청한다', async () => {
-    const refreshSoft = vi.fn(async () => {});
+    const refreshSoft = vi.fn(async () => null);
     render(<HomeScreen {...makeProps({ summary: { ...makeProps().summary, refreshSoft } })} />);
     await waitFor(() => {
       expect(refreshSoft).toHaveBeenCalled();
@@ -111,5 +113,18 @@ describe('HomeScreen 게스트 안내 문구와 배치', () => {
     for (const b of buttons) {
       expect((b as HTMLElement).className).toContain('guest-gate-fill');
     }
+  });
+
+  it('로그인 버튼의 아이콘과 글씨는 세로 중앙 정렬을 쓴다', () => {
+    render(<HomeScreen {...makeProps({ email: null, endlessEnabled: true })} />);
+    fireEvent.click(screen.getByRole('button', { name: '무한모드' }));
+    const login = screen.getByRole('button', { name: '로그인 안내 로그인' });
+    // 아이콘이 함께 있으므로 버튼 자체가 세로 중앙 정렬이어야 한다.
+    expect(login.querySelector('svg')).toBeTruthy();
+    // jsdom은 스타일시트를 계산하지 않으므로 정본(theme.css)의 선언을 고정한다.
+    const css = readFileSync(join(process.cwd(), 'src', 'theme.css'), 'utf8');
+    const block = css.match(/\.btn-sticker\s*\{[^}]*\}/)?.[0] ?? '';
+    expect(block).toContain('display: inline-flex');
+    expect(block).toContain('align-items: center');
   });
 });
