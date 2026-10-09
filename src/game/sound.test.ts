@@ -202,6 +202,13 @@ describe('bad rate', () => {
     const inst = vi.mocked(Howl).mock.instances[0] as unknown as { rate: { mock: { calls: unknown[][] } } };
     expect(inst.rate.mock.calls).toEqual([[1.12, 7]]);
   });
+
+  it('볼륨을 낮춰 재생한다', () => {
+    playSfx('bad', 1, 0.7);
+    vi.advanceTimersByTime(100);
+    const inst = vi.mocked(Howl).mock.instances[0] as unknown as { volume: { mock: { calls: unknown[][] } } };
+    expect(inst.volume.mock.calls).toEqual([[0.7, 7]]);
+  });
 });
 
 describe('recoverAudio', () => {
