@@ -30,6 +30,7 @@ function makeProps(overrides: Partial<Parameters<typeof HomeScreen>[0]> = {}): P
     onBrowse: () => {},
     onEndless: () => {},
     endlessEnabled: true,
+    onWarmSession: () => {},
     onLogin: () => {},
     onLogout: () => {},
     ...overrides,
@@ -80,6 +81,25 @@ describe('HomeScreen 무한모드 게스트 게이트', () => {
     render(<HomeScreen {...guestProps({ email: 'a@b.c', onEndless })} />);
     fireEvent.click(screen.getByRole('button', { name: '무한모드' }));
     expect(onEndless).toHaveBeenCalled();
+  });
+});
+
+describe('HomeScreen 프로필 세션 예열', () => {
+  it('프로필을 열 때 세션을 예열한다', () => {
+    const onWarmSession = vi.fn();
+    render(<HomeScreen {...makeProps({ onWarmSession })} />);
+    fireEvent.click(screen.getByRole('button', { name: '프로필' }));
+    expect(onWarmSession).toHaveBeenCalled();
+  });
+
+  it('랭킹을 열 때 조용한 갱신을 쓴다', () => {
+    const refresh = vi.fn(async () => {});
+    const refreshSoft = vi.fn(async () => null);
+    render(<HomeScreen {...makeProps({ summary: { ...makeProps().summary, refresh, refreshSoft } })} />);
+    fireEvent.click(screen.getByRole('button', { name: '랭킹' }));
+    expect(screen.getByRole('dialog', { name: '랭킹' })).toBeTruthy();
+    expect(refreshSoft).toHaveBeenCalled();
+    expect(refresh).not.toHaveBeenCalled();
   });
 });
 
