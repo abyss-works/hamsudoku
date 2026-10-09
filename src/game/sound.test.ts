@@ -1,11 +1,11 @@
 // @vitest-environment jsdom
-import { afterEach, describe, expect, it, vi } from 'vitest';
+import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 import { Howl, Howler } from 'howler';
 import {
   cascadeFrequencies,
   installAudioRecovery,
   isSfxEnabled,
-  playCascade,
+  playGoodProgression,
   playSfx,
   recoverAudio,
   resetSoundForTests,
@@ -14,29 +14,59 @@ import {
 } from './sound';
 
 vi.mock('howler', () => ({
-  Howl: vi.fn(function (this: { play?: unknown }) {
-    this.play = vi.fn();
+  Howl: vi.fn(function (this: { play?: unknown; rate?: unknown; volume?: unknown }) {
+    this.play = vi.fn(() => 7);
+    this.rate = vi.fn();
+    this.volume = vi.fn();
   }),
   Howler: { ctx: null as unknown },
 }));
 
 const NAMES: SfxName[] = ['ui-click', 'mark', 'erase', 'good', 'bad', 'clear', 'gameover', 'seed'];
 
+beforeEach(() => {
+  vi.useFakeTimers();
+});
+
 afterEach(() => {
   vi.clearAllMocks();
   resetSoundForTests();
   setSfxEnabled(true);
+  vi.useRealTimers();
 });
+
+function totalPlays() {
+  return vi
+    .mocked(Howl)
+    .mock.instances.map((inst) => (inst.play as unknown as { mock: { calls: unknown[] } }).mock.calls.length)
+    .reduce((a, b) => a + b, 0);
+}
 
 describe('sound', () => {
   it('이름마다 대응 파일을 재생한다', () => {
-    for (const name of NAMES) playSfx(name);
+    for (const name of NAMES) {
+      playSfx(name);
+      vi.advanceTimersByTime(100);
+    }
     expect(Howl).toHaveBeenCalledTimes(NAMES.length);
     const urls = vi.mocked(Howl).mock.calls.map(([opts]) => (opts as { src: string[] }).src[0]);
     for (const name of NAMES) expect(urls).toContain(`/sfx/${name}.wav`);
-    for (const instance of vi.mocked(Howl).mock.instances) {
-      expect(instance.play).toHaveBeenCalledTimes(1);
-    }
+    expect(totalPlays()).toBe(NAMES.length);
+  });
+
+  it('최소 간격으로 띄워 재생한다', () => {
+    playSfx('mark');
+    playSfx('mark');
+    vi.advanceTimersByTime(50);
+    expect(totalPlays()).toBe(1);
+    vi.advanceTimersByTime(50);
+    expect(totalPlays()).toBe(2);
+  });
+
+  it('밀리면 버린다', () => {
+    for (let i = 0; i < 10; i += 1) playSfx('mark');
+    vi.advanceTimersByTime(2000);
+    expect(totalPlays()).toBe(6);
   });
 
   it('끄면 재생하지 않는다', () => {
@@ -112,7 +142,7 @@ function useCtx(ctx: FakeCtx | null) {
   (Howler as unknown as { ctx: unknown }).ctx = ctx;
 }
 
-describe('cascade', () => {
+describe('progression', () => {
   afterEach(() => {
     useCtx(null);
     setSfxEnabled(true);
@@ -129,30 +159,29 @@ describe('cascade', () => {
     expect(cascadeFrequencies(30)).toHaveLength(24);
   });
 
-  it('전파 박자마다 한음씩 늘어난 화음을 올린다', () => {
+  it('맞힐 때마다 높아지고 한음씩 붙는다', () => {
     const scheduled: ScheduledNote[] = [];
-    const gains: number[] = [];
-    useCtx(fakeCtx(scheduled, gains));
-    playCascade([180, 60, 120]);
-    // 0박 2음, 1박 3음, 2박 4음
-    expect(scheduled).toHaveLength(9);
-    expect(scheduled.map((s) => s.at)).toEqual([10.06, 10.06, 10.12, 10.12, 10.12, 10.18, 10.18, 10.18, 10.18]);
-    const byBeat = [scheduled.slice(0, 2), scheduled.slice(2, 5), scheduled.slice(5)];
-    for (const beat of byBeat) {
-      const freqs = beat.map((s) => s.freq);
-      for (let i = 1; i < freqs.length; i += 1) expect(freqs[i]).toBeGreaterThan(freqs[i - 1]);
-    }
-    // 박자 합이 일정해서 먹지 않는다
-    expect(gains.slice(0, 2).reduce((a, b) => a + b, 0)).toBeCloseTo(0.25, 5);
-    expect(gains.slice(2, 5).reduce((a, b) => a + b, 0)).toBeCloseTo(0.25, 5);
-    expect(gains.slice(5).reduce((a, b) => a + b, 0)).toBeCloseTo(0.25, 5);
+    useCtx(fakeCtx(scheduled, []));
+    playGoodProgression(1);
+    expect(scheduled.map((s) => s.freq)).toEqual(cascadeFrequencies(2));
+    scheduled.length = 0;
+    playGoodProgression(3);
+    expect(scheduled.map((s) => s.freq)).toEqual(cascadeFrequencies(6).slice(2));
+    expect(scheduled.map((s) => s.at)).toEqual([10, 10.09, 10.18, 10.27]);
+  });
+
+  it('5음을 넘기지 않는다', () => {
+    const scheduled: ScheduledNote[] = [];
+    useCtx(fakeCtx(scheduled, []));
+    playGoodProgression(99);
+    expect(scheduled).toHaveLength(5);
   });
 
   it('끄면 스케줄하지 않는다', () => {
     const scheduled: ScheduledNote[] = [];
     useCtx(fakeCtx(scheduled, []));
     setSfxEnabled(false);
-    playCascade([60]);
+    playGoodProgression(3);
     expect(scheduled).toHaveLength(0);
   });
 
@@ -160,9 +189,25 @@ describe('cascade', () => {
     const scheduled: ScheduledNote[] = [];
     const ctx = fakeCtx(scheduled, [], 'suspended');
     useCtx(ctx);
-    playCascade([60]);
+    playGoodProgression(3);
     expect(ctx.resume).toHaveBeenCalled();
     expect(scheduled).toHaveLength(0);
+  });
+});
+
+describe('bad rate', () => {
+  it('배율을 올려 재생한다', () => {
+    playSfx('bad', 1.12);
+    vi.advanceTimersByTime(100);
+    const inst = vi.mocked(Howl).mock.instances[0] as unknown as { rate: { mock: { calls: unknown[][] } } };
+    expect(inst.rate.mock.calls).toEqual([[1.12, 7]]);
+  });
+
+  it('볼륨을 낮춰 재생한다', () => {
+    playSfx('bad', 1, 0.7);
+    vi.advanceTimersByTime(100);
+    const inst = vi.mocked(Howl).mock.instances[0] as unknown as { volume: { mock: { calls: unknown[][] } } };
+    expect(inst.volume.mock.calls).toEqual([[0.7, 7]]);
   });
 });
 

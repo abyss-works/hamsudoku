@@ -135,9 +135,12 @@ export function Cell({ row, col, state, islandId, conflicted, hit, pulseDelay, o
             transition={{ duration: 0.25, delay: (pulseDelay ?? 0) / 1000 }}
           >
             {state === 'frag' ? (
-              <span className="mark-glyph mark-frag" aria-hidden="true">
-                ?
-              </span>
+              <>
+                <X className="mark-glyph" strokeWidth={3} aria-hidden="true" />
+                <span className="anchor-badge" aria-hidden="true">
+                  ?
+                </span>
+              </>
             ) : (
               <X
                 className={`mark-glyph${state === 'wrong' ? ' mark-wrong' : ''}${state === 'auto' ? ' mark-auto' : ''}`}

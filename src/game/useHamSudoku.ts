@@ -1,7 +1,8 @@
 import { useRef, useState } from 'react';
 import { countHamsters, getViolations, isCleared, isSolutionCell, type Violations } from './rules';
 import type { CellState, Puzzle } from './puzzles';
-import { playCascade, playSfx } from './sound';
+import { ownedFrags, resolveMark } from './probe';
+import { playGoodProgression, playSfx } from './sound';
 import { nextState, spreadMarks, type TapKind } from './tap';
 
 function blankBoard(size: number): CellState[][] {
@@ -17,13 +18,15 @@ export const PROBE_SLOTS = 3;
 
 export interface HamSudoku {
   cells: CellState[][];
+  /** 조각 위에 올린 X 집합. 렌더만 X가 이기고 상태는 조각 그대로다. */
+  xMarks: ReadonlySet<string>;
   violations: Violations;
   cleared: boolean;
   hamsterCount: number;
   pulse: ReadonlyMap<string, number>;
   hitKey: string | null;
   shake: number;
-  /** 임시 정답 아이템 켜짐. 켠 동안 싱글·더블톡은 앵커 놓기·회수만 한다. */
+  /** 임시 정답 아이템 켜짐. 켠 동안 싱글톡은 앵커 놓기·회수만 한다. */
   probeActive: boolean;
   setProbeActive: (on: boolean) => void;
   /** 남은 앵커 슬롯. */
@@ -39,13 +42,12 @@ export interface HamSudoku {
 
 // 진행 중 드래그. 누른 칸이 마크·앵커면 지우기, 아니면 칠하기 모드다.
 // 처음 올라탄 칸만 모드대로 바꾸고, 한 번 지나간 칸은 다시 건드리지 않는다.
-// 방향마다 한 번씩만 틱이 난다.
+// 칠하고 지울 때마다 속도에 맞춰 겹쳐 난다.
 interface Stroke {
   sr: number;
   sc: number;
   toMark: boolean;
   engaged: boolean;
-  sounded: boolean;
   visited: Set<string>;
 }
 
@@ -76,6 +78,9 @@ export function useHamSudoku(puzzle: Puzzle): HamSudoku {
   const [pulse, setPulse] = useState<ReadonlyMap<string, number>>(new Map());
   const [hitKey, setHitKey] = useState<string | null>(null);
   const [shake, setShake] = useState(0);
+  // 연타·연속실패 횟수. 정답 진행음 상승과 오답 음높이에 쓴다. 렌더와 무관하다.
+  const correctRef = useRef(0);
+  const wrongRef = useRef(0);
 
   const violations = getViolations(cells, puzzle.islands);
   const cleared = isCleared(cells, puzzle.islands);
@@ -89,16 +94,22 @@ export function useHamSudoku(puzzle: Puzzle): HamSudoku {
     setHitKey(hit);
   };
 
-  // 앵커를 놓고 십자·주변에 조각을 살포한다. 빈칸·회색X만 바뀌고 잠금·햄스터·남의 조각은 통과한다.
+  // 앵커를 놓고 십자·주변·같은 섬에 조각을 살포한다. 빈칸·회색X·덮인 조각만 바뀌고
+  // 잠금·햄스터·남의 조각은 통과한다.
   // 덮인 X마커는 간직했다가 회수 때 되돌린다.
   const placeAnchor = (r: number, c: number) => {
     const prev = latest.current;
     if (anchorCount(prev) >= PROBE_SLOTS) return;
     const next = prev.map((line) => [...line]);
     if (prev[r][c] === 'mark') underlay.current.set(keyOf(r, c), 'mark');
+    if (prev[r][c] === 'frag') {
+      // 덮개를 벗기고 앵커가 차지한다.
+      links.current.delete(keyOf(r, c));
+      underlay.current.delete(keyOf(r, c));
+    }
     next[r][c] = 'anchor';
     const delays = new Map<string, number>();
-    for (const m of spreadMarks(prev.length, r, c)) {
+    for (const m of spreadMarks(prev.length, r, c, puzzle.islands)) {
       const cur = next[m.r][m.c];
       if (cur === 'empty' || cur === 'mark') {
         if (cur === 'mark') underlay.current.set(keyOf(m.r, m.c), 'mark');
@@ -114,17 +125,10 @@ export function useHamSudoku(puzzle: Puzzle): HamSudoku {
   // 앵커와 자기 조각을 거둔다. 덮인 X마커는 되돌리고 먼 조각부터 역순으로 사라진다.
   const recallAnchor = (r: number, c: number) => {
     const prev = latest.current;
-    const owner = keyOf(r, c);
-    const owned: string[] = [];
-    for (const [frag, anchor] of links.current) {
-      if (anchor === owner) {
-        const [fr, fc] = frag.split(',').map(Number);
-        if (prev[fr]?.[fc] === 'frag') owned.push(frag);
-      }
-    }
+    const owned = ownedFrags(links.current, prev, keyOf(r, c));
     const next = prev.map((line) => [...line]);
-    next[r][c] = underlay.current.get(owner) ?? 'empty';
-    underlay.current.delete(owner);
+    next[r][c] = underlay.current.get(keyOf(r, c)) ?? 'empty';
+    underlay.current.delete(keyOf(r, c));
     const delays = new Map<string, number>();
     const ordered = owned
       .map((key) => {
@@ -146,15 +150,31 @@ export function useHamSudoku(puzzle: Puzzle): HamSudoku {
   const tapCell = (r: number, c: number, kind: TapKind) => {
     const prev = latest.current;
     const cur = prev[r][c];
-    if (probeRef.current) {
-      // 아이템 켜짐: 놓기·회수만 하고 판정은 하지 않는다. 더블도 놓기로만 본다.
-      if (cur === 'empty' || cur === 'mark') placeAnchor(r, c);
+    const key = keyOf(r, c);
+    // 덮인 조각은 X로 본다. 상태는 조각 그대로 두고 렌더만 X가 이긴다.
+    const covered = cur === 'frag' && underlay.current.has(key);
+    if (probeRef.current && kind === 'single') {
+      // 아이템 켜짐: 싱글톡은 놓기·회수만 하고 판정은 하지 않는다.
+      // 더블톡은 전역 확정으로 아래 일반 경로를 탄다.
+      if (cur === 'empty' || cur === 'mark' || covered) placeAnchor(r, c);
       else if (cur === 'anchor') recallAnchor(r, c);
       return;
     }
-    if (cur === 'frag') return;
     if (cur === 'anchor' && kind === 'single') {
       recallAnchor(r, c);
+      return;
+    }
+    if (cur === 'frag' && kind === 'single') {
+      if (covered) {
+        // X를 걷고 조각을 드러낸다.
+        underlay.current.delete(key);
+        playSfx('erase');
+      } else {
+        // X를 올린다. 조각은 살린다.
+        underlay.current.set(key, 'mark');
+        playSfx('mark');
+      }
+      commit(prev.map((line) => [...line]), new Map(), null);
       return;
     }
     if (cur === 'anchor' && kind === 'double') {
@@ -162,31 +182,41 @@ export function useHamSudoku(puzzle: Puzzle): HamSudoku {
       recallAnchor(r, c);
     }
     const after = latest.current;
-    const result = nextState(after[r][c], kind, isSolutionCell(puzzle, r, c));
-    if (result === after[r][c]) return;
+    // 덮인 조각은 X로 보고 확정한다.
+    const base = resolveMark(after[r][c], underlay.current.has(key));
+    const result = nextState(base, kind, isSolutionCell(puzzle, r, c));
+    if (result === base) return;
     const next = after.map((line) => [...line]);
     next[r][c] = result;
+    // 덮개를 소비하면 소유권을 끊는다.
+    if (after[r][c] === 'frag') {
+      links.current.delete(key);
+      underlay.current.delete(key);
+    }
     if (result === 'hamster') {
+      const streak = correctRef.current + 1;
+      correctRef.current = streak;
+      wrongRef.current = 0;
       const delays = new Map<string, number>();
-      // 빈 타일·회색X·조각을 정답마커로 바꾼다. 남의 앵커는 건드리지 않는다.
-      // 조각에 덮인 X마커는 함께 버린다.
-      for (const m of spreadMarks(after.length, r, c)) {
+      // 빈 타일·회색X만 정답마커로 바꾼다. 남의 조각·앵커는 건드리지 않는다.
+      for (const m of spreadMarks(after.length, r, c, puzzle.islands)) {
         const target = next[m.r][m.c];
-        if (target === 'empty' || target === 'mark' || target === 'frag') {
+        if (target === 'empty' || target === 'mark') {
           next[m.r][m.c] = 'auto';
-          links.current.delete(keyOf(m.r, m.c));
-          underlay.current.delete(keyOf(m.r, m.c));
           delays.set(keyOf(m.r, m.c), m.delayMs);
         }
       }
       commit(next, delays, keyOf(r, c));
-      playSfx('good');
-      playCascade([...delays.values()]);
+      playGoodProgression(streak);
     } else {
       commit(next, new Map(), null);
       if (result === 'wrong' && kind === 'double') {
         setShake((n) => n + 1);
-        playSfx('bad');
+        const fails = wrongRef.current + 1;
+        wrongRef.current = fails;
+        correctRef.current = 0;
+        // 실패할 때마다 두음씩 오른다(최대 2배). 작게 시작한다.
+        playSfx('bad', 2 ** ((2 * Math.min(fails, 6)) / 12), 0.7);
       } else if (result === 'empty') {
         playSfx('erase');
       } else if (result === 'mark') {
@@ -200,6 +230,8 @@ export function useHamSudoku(puzzle: Puzzle): HamSudoku {
     latest.current = blank;
     links.current.clear();
     underlay.current.clear();
+    correctRef.current = 0;
+    wrongRef.current = 0;
     strokeRef.current = null;
     setCells(blank);
     setPulse(new Map());
@@ -220,8 +252,8 @@ export function useHamSudoku(puzzle: Puzzle): HamSudoku {
     setHitKey(null);
   };
 
-  // 칠하기 모드는 빈칸만 마크로, 지우기 모드는 마크·앵커만 바꾼다(앵커는 조각까지 회수).
-  // 조각은 직접 지울 수 없고 다른 상태는 손대지 않는다.
+  // 칠하기 모드는 빈칸만 마크로, 지우기 모드는 X마커·앵커·덮인 조각을 바꾼다.
+  // 덮인 조각은 X를 걷고 드러내고, 앵커는 조각까지 회수한다. 맨 조각은 손대지 않는다.
   const paintOne = (st: Stroke, r: number, c: number) => {
     const cur = latest.current[r][c];
     if (st.toMark) {
@@ -229,20 +261,20 @@ export function useHamSudoku(puzzle: Puzzle): HamSudoku {
       const next = latest.current.map((line) => [...line]);
       next[r][c] = 'mark';
       commit(next, new Map(), null);
-      if (!st.sounded) {
-        st.sounded = true;
-        playSfx('mark');
-      }
+      playSfx('mark');
       return;
     }
     if (cur === 'mark') {
       const next = latest.current.map((line) => [...line]);
       next[r][c] = 'empty';
       commit(next, new Map(), null);
-      if (!st.sounded) {
-        st.sounded = true;
-        playSfx('erase');
-      }
+      playSfx('erase');
+      return;
+    }
+    if (cur === 'frag' && underlay.current.has(keyOf(r, c))) {
+      underlay.current.delete(keyOf(r, c));
+      commit(latest.current.map((line) => [...line]), new Map(), null);
+      playSfx('erase');
       return;
     }
     if (cur === 'anchor') recallAnchor(r, c);
@@ -255,8 +287,10 @@ export function useHamSudoku(puzzle: Puzzle): HamSudoku {
       return;
     }
     const cur = latest.current[r][c];
-    const toMark = cur !== 'mark' && cur !== 'anchor';
-    strokeRef.current = { sr: r, sc: c, toMark, engaged: false, sounded: false, visited: new Set([`${r},${c}`]) };
+    // 덮인 조각은 X로 본다.
+    const pressed = resolveMark(cur, underlay.current.has(keyOf(r, c)));
+    const toMark = pressed !== 'mark' && pressed !== 'anchor';
+    strokeRef.current = { sr: r, sc: c, toMark, engaged: false, visited: new Set([`${r},${c}`]) };
   };
 
   // 누른 칸에서 다른 칸으로 처음 움직일 때 드래그로 확정되며 누른 칸부터 모드대로 바꾼다.
@@ -280,5 +314,5 @@ export function useHamSudoku(puzzle: Puzzle): HamSudoku {
     return engaged;
   };
 
-  return { cells, violations, cleared, hamsterCount, pulse, hitKey, shake, probeActive, setProbeActive, probeSlots, tapCell, beginStroke, strokeEnter, endStroke, reset, resetMarks };
+  return { cells, xMarks: new Set(underlay.current.keys()), violations, cleared, hamsterCount, pulse, hitKey, shake, probeActive, setProbeActive, probeSlots, tapCell, beginStroke, strokeEnter, endStroke, reset, resetMarks };
 }

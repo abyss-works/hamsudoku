@@ -61,4 +61,37 @@ describe('spreadMarks', () => {
     expect(byKey.get('2,2')).toBeUndefined();
     expect(marks.length).toBe(new Set(marks.map((m) => `${m.r},${m.c}`)).size);
   });
+
+  it('같은 섬 칸도 체비쇼프 거리 딜레이로 낸다', () => {
+    const islands = [
+      [0, 0, 1, 1, 1],
+      [0, 0, 1, 1, 1],
+      [2, 2, 2, 2, 2],
+      [3, 3, 3, 3, 3],
+      [3, 3, 3, 3, 4],
+    ];
+    const marks = spreadMarks(5, 0, 0, islands);
+    const byKey = new Map(marks.map((m) => [`${m.r},${m.c}`, m.delayMs]));
+    // 같은 섬 (0,1)은 줄이어서 줄 딜레이, (1,0)은 줄, (1,1)은 이웃·섬 겹침
+    expect(byKey.get('0,1')).toBe(60);
+    expect(byKey.get('1,0')).toBe(60);
+    expect(byKey.get('1,1')).toBe(60);
+    expect(marks.length).toBe(new Set(marks.map((m) => `${m.r},${m.c}`)).size);
+  });
+
+  it('줄·주변 밖 같은 섬 칸도 낸다', () => {
+    const islands = [
+      [0, 1, 1, 1, 1],
+      [0, 1, 1, 1, 1],
+      [0, 1, 1, 1, 1],
+      [0, 1, 1, 1, 1],
+      [0, 0, 1, 1, 1],
+    ];
+    const marks = spreadMarks(5, 0, 0, islands);
+    const byKey = new Map(marks.map((m) => [`${m.r},${m.c}`, m.delayMs]));
+    // (4,1)은 줄·주변 밖이지만 같은 섬이라 체비쇼프 거리 4로 난다
+    expect(byKey.get('4,1')).toBe(240);
+    // (4,0)은 열이어서 열 딜레이가 우선한다
+    expect(byKey.get('4,0')).toBe(240);
+  });
 });
