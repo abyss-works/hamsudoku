@@ -9,10 +9,12 @@ function ProbePage() {
   return (
     <>
       <HelpCol>
-        <span className="probe-face" aria-hidden="true">
-          <HamsterFace />
-          <span className="anchor-badge" aria-hidden="true">
-            ?
+        <span className="help-icon">
+          <span className="probe-face" aria-hidden="true">
+            <HamsterFace />
+            <span className="anchor-badge" aria-hidden="true">
+              ?
+            </span>
           </span>
         </span>
         <p>
@@ -22,7 +24,9 @@ function ProbePage() {
         </p>
       </HelpCol>
       <HelpCol>
-        <RotateCcw size={20} aria-hidden="true" />
+        <span className="help-icon">
+          <RotateCcw size={20} aria-hidden="true" />
+        </span>
         <p>
           리셋은 정답마커
           <br />
@@ -54,16 +58,16 @@ export function GameHelp({ probe = false }: { probe?: boolean }) {
         <button type="button" className="btn help-arrow help-prev" aria-label="이전 도움말" onClick={prev}>
           <ChevronLeft size={18} aria-hidden="true" />
         </button>
-        {pages[page].page}
+        <div className="help-cols">{pages[page].page}</div>
+        <div className="help-dots" aria-hidden="true">
+          {pages.map((p, i) => (
+            <i key={p.title} className={i === page ? 'on' : ''} />
+          ))}
+        </div>
         <button type="button" className="btn help-arrow help-next" aria-label="다음 도움말" onClick={next}>
           <ChevronRight size={18} aria-hidden="true" />
         </button>
       </HelpCard>
-      <div className="help-dots" aria-hidden="true">
-        {pages.map((p, i) => (
-          <i key={p.title} className={i === page ? 'on' : ''} />
-        ))}
-      </div>
     </div>
   );
 }
