@@ -560,47 +560,37 @@ body {
   grid-template-columns: repeat(3, 1fr);
 }
 
-/* 도움말 캐러셀. 좌우 버튼으로 세 장을 돌려본다. */
+/* 도움말 캐러셀. 전환 버튼은 카드 안 좌우에 겹쳐 둔다. */
 .help-carousel {
   display: flex;
   flex-direction: column;
-  gap: 6px;
 }
 
-.help-nav {
-  display: grid;
-  grid-template-columns: 1fr auto 1fr;
-  align-items: center;
-  gap: 8px;
-}
-
-.help-nav .help-arrow:first-child {
-  justify-self: start;
-}
-
-.help-nav .help-arrow:last-child {
-  justify-self: end;
+.help-carousel .help-card {
+  position: relative;
+  padding-left: 34px;
+  padding-right: 34px;
 }
 
 .help-arrow {
-  width: 40px;
-  height: 32px;
+  position: absolute;
+  top: 50%;
+  translate: 0 -50%;
+  width: 26px;
+  height: 26px;
   padding: 0;
+  border-radius: 50%;
   display: inline-flex;
   align-items: center;
   justify-content: center;
 }
 
-.help-count {
-  font-family: var(--font-help);
-  font-size: 12px;
-  color: var(--ink-soft);
+.help-prev {
+  left: 4px;
 }
 
-.help-unknown {
-  font-family: var(--font-display);
-  font-size: 22px;
-  line-height: 1;
+.help-next {
+  right: 4px;
 }
 
 .help-col {
