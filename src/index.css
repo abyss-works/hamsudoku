@@ -691,15 +691,9 @@ body {
   color: var(--ink);
 }
 
-/* HUD 우측 씨앗 묶음. 보유 씨앗 박스에 현재 목숨을 덧댄다. */
-.hud-seeds {
-  display: inline-flex;
-  align-items: center;
-  gap: 6px;
+/* HUD 우측 씨앗 묶음. 보유 씨앗 박스 안에 현재 목숨을 덧댄다. */
+.game .hud .seed-box {
   justify-self: end;
-}
-
-.hud-seeds .seed-box {
   margin-top: 0;
 }
 
