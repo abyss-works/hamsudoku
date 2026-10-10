@@ -3,7 +3,7 @@ import fs from 'node:fs';
 import path from 'node:path';
 import { afterEach, describe, expect, it, vi } from 'vitest';
 import { cleanup, fireEvent, render, screen } from '@testing-library/react';
-import { GameHelp } from '../src/game/GameHelp';
+import { GameHelp } from '../src/features/sudoku/ui/GameHelp';
 
 const css = fs.readFileSync(path.join(process.cwd(), 'src/index.css'), 'utf8');
 
