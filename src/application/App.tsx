@@ -1,11 +1,11 @@
 import { useAppService } from './useAppService';
 import { QueryProvider } from './queryClient';
-import { EndlessGameScreen } from '../features/endless/EndlessGameScreen';
-import { GameScreen } from '../features/stages/GameScreen';
-import { HomeScreen } from '../features/home/HomeScreen';
-import { LoginScreen } from '../features/account/LoginScreen';
-import { SelectScreen } from '../features/stages/SelectScreen';
-import { SetPasswordScreen } from '../features/account/SetPasswordScreen';
+import { EndlessGameScreen } from '../views/endless/EndlessGameScreen';
+import { GameScreen } from '../views/stages/GameScreen';
+import { HomeScreen } from '../views/home/HomeScreen';
+import { LoginScreen } from '../views/account/LoginScreen';
+import { SelectScreen } from '../views/stages/SelectScreen';
+import { SetPasswordScreen } from '../views/account/SetPasswordScreen';
 import { BootSplash } from '../ui/BootSplash';
 import { LoadingProvider } from '../ui/LoadingProvider';
 export type { Screen } from './appLogic';

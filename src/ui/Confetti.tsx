@@ -1,23 +1,19 @@
 import type { CSSProperties } from 'react';
 import { motion } from 'framer-motion';
-
-const COLORS = ['#e5484d', '#f5a524', '#46a758', '#3e63dd', '#8e4ec6', '#f76b15'];
+import { useConfettiService } from './useConfettiService';
 
 export function Confetti({ count = 24 }: { count?: number }) {
-  const pieces = Array.from({ length: count }, (_, i) => ({
-    x: `${(i * 41) % 100}%`,
-    c: COLORS[i % COLORS.length],
-    d: 1.6 + ((i * 7) % 10) / 10,
-  }));
+  const pieces = useConfettiService(count);
+
   return (
     <div className="confetti" aria-hidden="true">
-      {pieces.map((p, i) => (
+      {pieces.map((p) => (
         <motion.i
-          key={i}
-          style={{ left: p.x, background: p.c } as CSSProperties}
+          key={p.id}
+          style={{ left: p.x, background: p.color } as CSSProperties}
           initial={{ y: -12, rotate: 0 }}
           animate={{ y: '110vh', rotate: 540 }}
-          transition={{ duration: p.d, repeat: Infinity, ease: 'linear' }}
+          transition={{ duration: p.duration, repeat: Infinity, ease: 'linear' }}
         />
       ))}
     </div>

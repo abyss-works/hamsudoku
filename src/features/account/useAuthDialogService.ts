@@ -1,8 +1,23 @@
 import { useRef, useState } from 'react';
-import type { AuthDialogProps } from './authDialog.types';
+import type { AuthDialogOptions } from './authDialog.types';
 import { useFeedbackLifetime } from './useFeedbackLifetime';
-import { validateCredentials, recommendedBase, existingEmail, validateResetEmail } from './validation';
-export function useAuthDialogService({ signup, signin, reset, guest, fetchAccountSeeds, onBase, onDone }: AuthDialogProps) {
+import {
+  validateCredentials,
+  recommendedBase,
+  existingEmail,
+  validateResetEmail,
+  authDialogDisplayModel,
+} from './validation';
+
+export function useAuthDialogService({
+  signup,
+  signin,
+  reset,
+  guest,
+  fetchAccountSeeds,
+  onBase,
+  onDone,
+}: AuthDialogOptions) {
   // 열린 시점의 게스트 값을 고정한다(로그인 선행으로 세션이 바뀌어도 기준 비교는 열림 시점 기준).
   const latestFetchAccountSeeds = useRef(fetchAccountSeeds);
   latestFetchAccountSeeds.current = fetchAccountSeeds;
@@ -46,7 +61,10 @@ export function useAuthDialogService({ signup, signin, reset, guest, fetchAccoun
   const finishLater = (message: string) => {
     if (!alive.current) return;
     setOkMessage(message);
-    timer.current = setTimeout(() => { timer.current = null; if (alive.current) onDone(); }, 700);
+    timer.current = setTimeout(() => {
+      timer.current = null;
+      if (alive.current) onDone();
+    }, 700);
   };
 
   // 기준 선택 후 로그인 실행. 선택값은 콜백에 전달해 상위가 데이터 흐름을 정한다.
@@ -104,7 +122,13 @@ export function useAuthDialogService({ signup, signin, reset, guest, fetchAccoun
         }
         setChooseBase(true);
         // 계정 기준 버튼에 기존 지갑의 씨앗 수를 보여준다.
-        await latestFetchAccountSeeds.current?.().then((seeds) => {if (alive.current) setAccountSeeds(seeds);}).catch(() => {if (alive.current) setAccountSeeds(null);});
+        await latestFetchAccountSeeds.current?.()
+          .then((seeds) => {
+            if (alive.current) setAccountSeeds(seeds);
+          })
+          .catch(() => {
+            if (alive.current) setAccountSeeds(null);
+          });
         return;
       }
       setError(r.msg ?? '실패했어요.');
@@ -138,5 +162,29 @@ export function useAuthDialogService({ signup, signin, reset, guest, fetchAccoun
 
   const cancelBase = () => setPendingBase(null);
 
-  return { guestSnapshot, email, setEmail, password, setPassword, error, okMessage, chooseBase, accountSeeds, pendingBase, busy, submit, requestReset, pickBase, selectBase, confirmBase, cancelBase, deviceRecommended, accountRecommended };
+  const { deviceLabel, accountLabel } = authDialogDisplayModel(guestSnapshot, accountSeeds);
+
+  return {
+    guestSnapshot,
+    email,
+    setEmail,
+    password,
+    setPassword,
+    error,
+    okMessage,
+    chooseBase,
+    accountSeeds,
+    pendingBase,
+    busy,
+    submit,
+    requestReset,
+    pickBase,
+    selectBase,
+    confirmBase,
+    cancelBase,
+    deviceRecommended,
+    accountRecommended,
+    deviceLabel,
+    accountLabel,
+  };
 }

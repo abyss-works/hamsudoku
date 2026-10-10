@@ -5,7 +5,7 @@ export type AuthFn = (
   hold?: boolean,
 ) => Promise<{ ok: boolean; msg?: string; code?: string }>;
 
-export interface AuthDialogProps {
+export interface AuthDialogOptions {
   /** 기준 선택 결과를 상위에 전달. device | account */
   onBase?: (base: 'device' | 'account') => void;
   signup: AuthFn;
@@ -15,6 +15,5 @@ export interface AuthDialogProps {
   guest: { seeds: number; clears: number } | null;
   /** 계정 지갑의 씨앗 수를 읽어온다(로그인 세션이고 나서). 기준 선택 표시용. */
   fetchAccountSeeds?: () => Promise<number>;
-  onBack: () => void;
   onDone: () => void;
 }
