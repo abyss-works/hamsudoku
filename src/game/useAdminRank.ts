@@ -1,64 +1,49 @@
-'use client';
+﻿'use client';
 
-import { useCallback, useEffect, useState } from 'react';
+import { useCallback, useRef, useState } from 'react';
+import { useQuery } from '@tanstack/react-query';
+import { fetchAdminRank, removeRankEntries } from '../api/adminApi';
+export type { AdminRankEntry } from '../api/adminApi';
 
-export interface AdminRankEntry {
-  userId: string;
-  nickname: string | null;
-  score: number;
-}
-
-interface AdminRankState {
-  loading: boolean;
-  error: string | null;
-  season: string | null;
-  entries: AdminRankEntry[];
-}
-
-/** 관리자 랭킹 패널 상태. View는 이 훅만 본다. */
-export function useAdminRank(): AdminRankState & {
-  guestEntries: AdminRankEntry[];
-  selected: string[];
-  toggle: (uid: string) => void;
-  removeSelected: () => Promise<number>;
-} {
-  const [state, setState] = useState<AdminRankState>({ loading: true, error: null, season: null, entries: [] });
-
+export function useAdminRank(uid?: string | null) {
+  const query = useQuery({
+    queryKey: ['admin-rank', uid],
+    queryFn: fetchAdminRank,
+    enabled: uid !== undefined,
+  });
+  const [selection, setSelection] = useState<{ uid: string | null | undefined; ids: string[] }>({ uid, ids: [] });
+  const activeUid = useRef(uid);
+  activeUid.current = uid;
+  const selected = selection.uid === uid ? selection.ids : [];
   const refresh = useCallback(async () => {
-    try {
-      const res = await fetch('/api/admin/rank');
-      if (res.status === 403) throw new Error('권한이 없어요.');
-      if (res.status === 503) throw new Error('랭킹 스토어 미설정.');
-      if (!res.ok) throw new Error('불러오기 실패');
-      const data = (await res.json()) as { season: string; entries: AdminRankEntry[] };
-      setState({ loading: false, error: null, season: data.season, entries: data.entries });
-    } catch (e) {
-      setState({ loading: false, error: e instanceof Error ? e.message : '오류', season: null, entries: [] });
+    if (uid !== undefined && activeUid.current === uid) {
+      await query.refetch({ cancelRefetch: false });
     }
-  }, []);
-
-  useEffect(() => {
-    void refresh();
-  }, [refresh]);
-
-  const guestEntries = state.entries.filter((e) => e.nickname === null);
-  const [selected, setSelected] = useState<string[]>([]);
-  const toggle = (uid: string) =>
-    setSelected((prev) => (prev.includes(uid) ? prev.filter((x) => x !== uid) : [...prev, uid]));
-
+  }, [uid, query.refetch]);
+  const toggle = (id: string) => setSelection((prev) => {
+    if (activeUid.current !== uid) return prev;
+    const ids = prev.uid === uid ? prev.ids : [];
+    return { uid, ids: ids.includes(id) ? ids.filter((entry) => entry !== id) : [...ids, id] };
+  });
   const removeSelected = useCallback(async () => {
-    if (selected.length === 0) return 0;
-    const res = await fetch('/api/admin/rank', {
-      method: 'POST',
-      headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({ userIds: selected }),
-    });
-    if (!res.ok) throw new Error('삭제 실패');
-    const data = (await res.json()) as { removed: number };
-    setSelected([]);
-    await refresh();
-    return data.removed;
-  }, [selected, refresh]);
-
-  return { ...state, guestEntries, selected, toggle, removeSelected };
+    if (!selected.length || uid === undefined || activeUid.current !== uid) return 0;
+    const removed = await removeRankEntries(selected);
+    if (activeUid.current === uid) {
+      setSelection({ uid, ids: [] });
+      await refresh();
+    }
+    return removed;
+  }, [selected, uid, refresh]);
+  const entries = query.error ? [] : query.data?.entries ?? [];
+  return {
+    loading: query.isPending,
+    error: query.error instanceof Error ? query.error.message : null,
+    season: query.error ? null : query.data?.season ?? null,
+    entries,
+    guestEntries: entries.filter((entry) => entry.nickname === null),
+    selected,
+    toggle,
+    removeSelected,
+    refresh,
+  };
 }

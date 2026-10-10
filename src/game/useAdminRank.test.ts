@@ -1,6 +1,7 @@
-// @vitest-environment jsdom
+﻿// @vitest-environment jsdom
 import { renderHook, waitFor } from '@testing-library/react';
 import { afterEach, describe, expect, it, vi } from 'vitest';
+import { QueryProvider } from './queryClient';
 import { useAdminRank } from './useAdminRank';
 
 afterEach(() => {
@@ -22,7 +23,7 @@ describe('useAdminRank', () => {
         }),
       ),
     );
-    const { result } = renderHook(() => useAdminRank());
+    const { result } = renderHook(() => useAdminRank(null), { wrapper: QueryProvider });
     await waitFor(() => {
       expect(result.current.loading).toBe(false);
     });
@@ -31,7 +32,7 @@ describe('useAdminRank', () => {
 
   it('403이면 권한 오류를 표시한다', async () => {
     vi.stubGlobal('fetch', vi.fn(async () => new Response(null, { status: 403 })));
-    const { result } = renderHook(() => useAdminRank());
+    const { result } = renderHook(() => useAdminRank(null), { wrapper: QueryProvider });
     await waitFor(() => {
       expect(result.current.error).toBe('권한이 없어요.');
     });
@@ -49,7 +50,7 @@ describe('useAdminRank', () => {
         return Response.json({ ok: true, season: 'S', entries: [] });
       }),
     );
-    const { result } = renderHook(() => useAdminRank());
+    const { result } = renderHook(() => useAdminRank(null), { wrapper: QueryProvider });
     await waitFor(() => {
       expect(result.current.loading).toBe(false);
     });
@@ -64,3 +65,5 @@ describe('useAdminRank', () => {
     expect(JSON.parse(posts[0].body ?? '{}').userIds).toEqual(['g1', 'g2']);
   });
 });
+
+
