@@ -1,8 +1,8 @@
 import { useRef, useState } from 'react';
-import type { SetPasswordScreenProps } from './setPassword.types';
+import type { SetPasswordServiceOptions } from './setPassword.types';
 import { useFeedbackLifetime } from './useFeedbackLifetime';
 import { validatePassword } from './validation';
-export function useSetPasswordService({ setPassword, onDone }: SetPasswordScreenProps) {
+export function useSetPasswordService({ setPassword, onDone }: SetPasswordServiceOptions) {
   const [password, setPw] = useState('');
   const [confirm, setConfirm] = useState('');
   const [error, setError] = useState<string | null>(null);

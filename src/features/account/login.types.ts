@@ -1,12 +1,11 @@
-interface AuthFn {
-  (email: string, password: string): Promise<{ ok: boolean; msg?: string; code?: string }>;
-}
+export type LoginAuthFn = (
+  email: string,
+  password: string,
+) => Promise<{ ok: boolean; msg?: string; code?: string }>;
 
-export interface LoginScreenProps {
-  signup: AuthFn;
-  signin: AuthFn;
+export interface LoginServiceOptions {
+  signup: LoginAuthFn;
+  signin: LoginAuthFn;
   reset: (email: string) => Promise<{ ok: boolean; msg?: string }>;
-  cloud: boolean;
-  onBack: () => void;
   onDone: () => void;
 }

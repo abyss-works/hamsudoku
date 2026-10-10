@@ -9,7 +9,7 @@ import { useFontsReady } from '../ui/useFontsReady';
 import { fetchAttemptKey, pull, pushClear, reconcile } from '../features/stages/sync';
 import { BOOT_TIMEOUT_MS, bootReady, chapterForStage, nextStage, recoveryState, stageSelection, type Screen } from './appLogic';
 import { dismissStaticSplash, locationSearch, removeRecoveryLocation } from './appBrowser';
-import { useSoundPreferences } from '../platform/audio/useSoundPreferences';
+import { useSoundPreferences, useSoundToggle } from '../platform/audio/useSoundPreferences';
 
 export function useAppService() {
   const [initialLocation] = useState(() => recoveryState(locationSearch()));
@@ -165,12 +165,13 @@ export function useAppService() {
     }
   }, [ready]);
   useSoundPreferences(sound);
+  const toggleSound = useSoundToggle(sound, () => setSound(!sound));
 
   return {
     screen, stage, chapterId, clears, sound, account, chapters, loading, error, summary,
     ready, showBootLoading, linkError: initialLocation.linkError,
     enter, handleRecord, signinThenSwitch, beginSwitch, cancelSignin, handleLogout, goHome, goNextMap,
-    toggleSound: () => setSound(!sound),
+    toggleSound,
     browse: () => setScreen('select'),
     openEndless: () => setScreen('endless'),
     openLogin: () => setScreen('login'),

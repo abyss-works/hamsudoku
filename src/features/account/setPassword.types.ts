@@ -1,6 +1,4 @@
-export interface SetPasswordScreenProps {
+export interface SetPasswordServiceOptions {
   setPassword: (password: string) => Promise<{ ok: boolean; msg?: string }>;
-  linkError: boolean;
   onDone: () => void;
 }
-

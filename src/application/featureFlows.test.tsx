@@ -1,4 +1,4 @@
-﻿// @vitest-environment jsdom
+// @vitest-environment jsdom
 import { act, renderHook } from '@testing-library/react';
 import { afterEach, expect, it, vi } from 'vitest';
 import { useLoginService } from '../features/account/useLoginService';
@@ -16,7 +16,7 @@ it('validates credentials and password confirmation without IO', () => {
 it('guards duplicate signup and cancels completion timer on unmount', async () => {
  vi.useFakeTimers(); let resolve!: (r: {ok:boolean}) => void;
  const signup = vi.fn(() => new Promise<{ok:boolean}>(r => {resolve = r;})); const onDone = vi.fn();
- const {result, unmount} = renderHook(() => useLoginService({signup, signin: signup, reset: async () => ({ok:true}), cloud:true, onBack:()=>{}, onDone}));
+ const {result, unmount} = renderHook(() => useLoginService({signup, signin: signup, reset: async () => ({ok:true}), onDone}));
  act(() => {result.current.setEmail(' e@x.y '); result.current.setPassword('123456');});
  let pending!: Promise<void>;
  act(() => {pending = result.current.submit(); void result.current.submit();});
@@ -28,7 +28,7 @@ it('guards duplicate signup and cancels completion timer on unmount', async () =
 });
 it('holds existing account until basis confirmation and keeps opening guest snapshot', async () => {
  const signin = vi.fn(async () => ({ok:true})); const onBase = vi.fn();
- const options = {signup: async () => ({ok:false,code:'email_exists'}), signin, reset:async()=>({ok:true}), guest:{seeds:8, clears:2}, fetchAccountSeeds:async()=>9, onBase,onBack:()=>{},onDone:()=>{}};
+ const options = {signup: async () => ({ok:false,code:'email_exists'}), signin, reset:async()=>({ok:true}), guest:{seeds:8, clears:2}, fetchAccountSeeds:async()=>9, onBase,onDone:()=>{}};
  const {result, rerender} = renderHook((p) => useAuthDialogService(p), {initialProps:options});
  act(() => {result.current.setEmail('e@x.y');result.current.setPassword('123456');});
  await act(async () => {await result.current.submit();});
@@ -49,7 +49,7 @@ it('shows nickname failure and restores the submission state', async () => {
 });
 it('completes password success after 700ms', async () => {
  vi.useFakeTimers(); const onDone=vi.fn();
- const {result}=renderHook(()=>useSetPasswordService({setPassword:async()=>({ok:true}),linkError:false,onDone}));
+ const {result}=renderHook(()=>useSetPasswordService({setPassword:async()=>({ok:true}),onDone}));
  act(()=>{result.current.setPw('123456'); result.current.setConfirm('123456');});
  await act(async()=>{await result.current.submit();});
  act(()=>vi.advanceTimersByTime(700));expect(onDone).toHaveBeenCalledOnce();
@@ -68,7 +68,7 @@ it('chooses gates before endless entry and selects fallback chapter',()=>{
 import { useHomeService } from '../features/home/useHomeService';
 it('refreshes home quietly and opens guest gate before requesting entry',()=>{
  const refreshSoft=vi.fn(async()=>null);const refreshMyRank=vi.fn(async()=>{});const onEndless=vi.fn();
- const options={email:null,nickname:null,uid:'guest',summary:{me:null,rank:null,myRank:null,loading:false,error:null,refresh:async()=>{},refreshSoft,refreshMyRank},sound:true,onToggleSound:()=>{},onSaveNickname:async()=>({ok:true}),onSignup:async()=>({ok:true}),onSignin:async()=>({ok:true}),onReset:async()=>({ok:true}),onBrowse:()=>{},onEndless,endlessEnabled:true,onWarmSession:()=>{},onLogin:()=>{},onLogout:()=>{}};
+ const options={email:null,nickname:null,uid:'guest',summary:{me:null,rank:null,myRank:null,loading:false,error:null,refresh:async()=>{},refreshSoft,refreshMyRank},onSignin:async()=>({ok:true}),onEndless,endlessEnabled:true,onWarmSession:()=>{},onLogin:()=>{}};
  const {result}=renderHook(()=>useHomeService(options));
  expect(refreshSoft).toHaveBeenCalledOnce();
  act(()=>result.current.enterEndless());expect(result.current.guestGateOpen).toBe(true);expect(onEndless).not.toHaveBeenCalled();
@@ -76,14 +76,14 @@ it('refreshes home quietly and opens guest gate before requesting entry',()=>{
 });
 it('preserves login error and allows retry after failure',async()=>{
  const signin=vi.fn(async()=>({ok:false,msg:'로그인 오류'}));
- const {result}=renderHook(()=>useLoginService({signup:async()=>({ok:false,code:'email_exists'}),signin,reset:async()=>({ok:true}),cloud:true,onBack:()=>{},onDone:()=>{}}));
+ const {result}=renderHook(()=>useLoginService({signup:async()=>({ok:false,code:'email_exists'}),signin,reset:async()=>({ok:true}),onDone:()=>{}}));
  act(()=>{result.current.setEmail('e@x.y');result.current.setPassword('123456');});
  await act(async()=>{await result.current.submit();});expect(result.current.confirmLogin).toBe(true);
  await act(async()=>{await result.current.login();});expect(result.current.error).toBe('로그인 오류');expect(result.current.busy).toBe(false);
 });
 it('ignores completion after unmount while signup is pending',async()=>{
  vi.useFakeTimers();let resolve!:(value:{ok:boolean})=>void;const onDone=vi.fn();
- const {result,unmount}=renderHook(()=>useAuthDialogService({signup:()=>new Promise(r=>{resolve=r;}),signin:async()=>({ok:true}),reset:async()=>({ok:true}),guest:null,onBack:()=>{},onDone}));
+ const {result,unmount}=renderHook(()=>useAuthDialogService({signup:()=>new Promise(r=>{resolve=r;}),signin:async()=>({ok:true}),reset:async()=>({ok:true}),guest:null,onDone}));
  act(()=>{result.current.setEmail('e@x.y');result.current.setPassword('123456');});
  let pending!:Promise<void>;act(()=>{pending=result.current.submit();});unmount();
  await act(async()=>{resolve({ok:true});await pending;});act(()=>vi.advanceTimersByTime(700));expect(onDone).not.toHaveBeenCalled();
@@ -98,7 +98,7 @@ it('classifies existing-email responses and reset input',()=>{
  expect(validateResetEmail(' ')).toBe(false);expect(validateResetEmail(' e@x.y ')).toBe(true);
 });
 it('uses latest account summary from a retained home callback',async()=>{
- const base: Parameters<typeof useHomeService>[0]={email:null,nickname:null,uid:'guest',summary:{me:null,rank:null,myRank:null,loading:false,error:null,refresh:async()=>{},refreshSoft:async()=>null,refreshMyRank:async()=>{}},sound:true,onToggleSound:()=>{},onSaveNickname:async()=>({ok:true}),onSignup:async()=>({ok:true}),onSignin:async()=>({ok:true}),onReset:async()=>({ok:true}),onBrowse:()=>{},onEndless:()=>{},endlessEnabled:true,onWarmSession:()=>{},onLogin:()=>{},onLogout:()=>{}};
+ const base: Parameters<typeof useHomeService>[0]={email:null,nickname:null,uid:'guest',summary:{me:null,rank:null,myRank:null,loading:false,error:null,refresh:async()=>{},refreshSoft:async()=>null,refreshMyRank:async()=>{}},onSignin:async()=>({ok:true}),onEndless:()=>{},endlessEnabled:true,onWarmSession:()=>{},onLogin:()=>{}};
  const fresh=vi.fn(async()=>({wallet:{balance:42},clearedCount:0,streak:{current:0,best:0},season:'2026-W41'}));
  const {result,rerender}=renderHook(p=>useHomeService(p),{initialProps:base});
  const previous=result.current.fetchAccountSeeds;
@@ -107,7 +107,7 @@ it('uses latest account summary from a retained home callback',async()=>{
 });
 it('fetches account seeds through latest callback after pending signin',async()=>{
  let resolve!:(value:{ok:boolean})=>void;
- const options={signup:async()=>({ok:false,code:'email_exists'}),signin:()=>new Promise<{ok:boolean}>(r=>{resolve=r;}),reset:async()=>({ok:true}),guest:{seeds:1,clears:0},fetchAccountSeeds:async()=>1,onBack:()=>{},onDone:()=>{}};
+ const options={signup:async()=>({ok:false,code:'email_exists'}),signin:()=>new Promise<{ok:boolean}>(r=>{resolve=r;}),reset:async()=>({ok:true}),guest:{seeds:1,clears:0},fetchAccountSeeds:async()=>1,onDone:()=>{}};
  const {result,rerender}=renderHook(p=>useAuthDialogService(p),{initialProps:options});
  act(()=>{result.current.setEmail('e@x.y');result.current.setPassword('123456');});
  let pending!:Promise<void>;await act(async()=>{pending=result.current.submit();await Promise.resolve();});

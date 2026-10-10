@@ -1,8 +1,8 @@
 import { useRef, useState } from 'react';
-import type { LoginScreenProps } from './login.types';
+import type { LoginServiceOptions } from './login.types';
 import { useFeedbackLifetime } from './useFeedbackLifetime';
 import { validateCredentials, existingEmail, validateResetEmail } from './validation';
-export function useLoginService({ signup, signin, reset, onDone }: LoginScreenProps) {
+export function useLoginService({ signup, signin, reset, onDone }: LoginServiceOptions) {
   const [email, setEmail] = useState('');
   const [password, setPassword] = useState('');
   const [error, setError] = useState<string | null>(null);
