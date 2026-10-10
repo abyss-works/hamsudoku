@@ -1,9 +1,9 @@
 import fs from 'node:fs';
-import { countSingles, ENDLESS_BAND, inBand, LEVEL_CONFIGS, poolTarget, type GeneratedLevel, type ShapeInfo } from '../src/game/levels';
-import { measure, WEIGHTS, type Measure } from '../src/game/logic';
-import type { Pos } from '../src/game/solver';
-import { checkIslands, countSolutions } from '../src/game/solver';
-import { scoreDifficulty } from '../src/game/shape';
+import { countSingles, ENDLESS_BAND, inBand, LEVEL_CONFIGS, poolTarget, type GeneratedLevel, type ShapeInfo } from '../src/features/sudoku/model/levels';
+import { measure, WEIGHTS, type Measure } from '../src/features/sudoku/model/logic';
+import type { Pos } from '../src/features/sudoku/model/solver';
+import { checkIslands, countSolutions } from '../src/features/sudoku/model/solver';
+import { scoreDifficulty } from '../src/features/sudoku/model/shape';
 
 const DIRS: Pos[] = [
   [1, 0],
@@ -329,7 +329,7 @@ export function renderModule(levels: GeneratedLevel[], seed: number, infos: Pool
     `// 가중치: ${WEIGHTS.version}`,
     `// 밴드: ${JSON.stringify(LEVEL_CONFIGS)}`,
     ...infos.map((i) => `// 레벨 ${i.level}: 풀 ${i.pool}, 점수 ${i.scoreMin}~${i.scoreMax}`),
-    `import type { GeneratedLevel } from './levels';`,
+    `import type { GeneratedLevel } from '../sudoku/model/levels';`,
     `export const LEVELS: GeneratedLevel[] = ${JSON.stringify(levels)};`,
     ``,
   ];

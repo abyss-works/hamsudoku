@@ -1,6 +1,6 @@
 import { describe, expect, it } from 'vitest';
 import { generateLevel, pickSpread, quantile, renderModule, runLevels, summarize } from './generate';
-import type { GeneratedLevel } from '../src/game/levels';
+import type { GeneratedLevel } from '../src/features/sudoku/model/levels';
 
 describe('pickSpread', () => {
   it('정렬된 풀에서 등간격 인덱스로 count 개를 고른다', () => {

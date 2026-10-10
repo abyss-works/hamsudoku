@@ -1,4 +1,4 @@
-import { validateNickname } from '../game/nickname';
+import { validateNickname } from '../features/account/nickname';
 import type { DbPort } from './db';
 
 // 랭킹 표시용 이름 조회는 최대 100 uid로 묶는다.

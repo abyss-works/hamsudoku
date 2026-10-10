@@ -1,7 +1,7 @@
 import type { Metadata } from "next";
 import "../theme.css";
 import "../index.css";
-import "../game/hamster.css";
+import "../features/sudoku/ui/hamster.css";
 
 // next/font는 설치본의 한글 서브셋 데이터를 제공하지 않아(자호스팅 시 한글이
 // 전부 폴백으로 남는다) Google Fonts 직결을 유지한다. 대신 CSS @import의
