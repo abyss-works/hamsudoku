@@ -1,4 +1,4 @@
-import { useState } from 'react';
+import { useNicknameService } from '../game/useNicknameService';
 import { Button } from '../ui/Button';
 import { Overlay } from '../ui/Overlay';
 import { TextInput } from '../ui/TextInput';
@@ -10,24 +10,7 @@ interface NicknameGateDialogProps {
 }
 
 export function NicknameGateDialog({ onSaveNickname, onEnter, onLater }: NicknameGateDialogProps) {
-  const [draft, setDraft] = useState('');
-  const [msg, setMsg] = useState<string | null>(null);
-  const [saving, setSaving] = useState(false);
-
-  const save = async () => {
-    setSaving(true);
-    try {
-      const r = await onSaveNickname(draft);
-      if (!r.ok) {
-        setMsg(r.msg ?? '저장하지 못했어요.');
-        return;
-      }
-      setMsg(null);
-      onEnter();
-    } finally {
-      setSaving(false);
-    }
-  };
+  const { draft, setDraft, msg, saving, save } = useNicknameService({ onSaveNickname, onEnter });
 
   return (
     <Overlay label="닉네임 안내">

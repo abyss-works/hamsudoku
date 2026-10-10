@@ -1,4 +1,4 @@
-import { useState } from 'react';
+import { useHelpCarousel } from './useHelpCarousel';
 import { ChevronLeft, ChevronRight, RotateCcw } from 'lucide-react';
 import { HelpCard, HelpCol } from '../ui/HelpCard';
 import { HamsterFace } from '../ui/HamsterFace';
@@ -49,9 +49,7 @@ export function GameHelp({ probe = false }: { probe?: boolean }) {
         { title: '기본 규칙', page: <RulesPage />, cols: 3 as const },
         { title: '기본 조작', page: <ControlsPage />, cols: 3 as const },
       ];
-  const [page, setPage] = useState(0);
-  const prev = () => setPage((p) => (p + pages.length - 1) % pages.length);
-  const next = () => setPage((p) => (p + 1) % pages.length);
+  const { page, prev, next } = useHelpCarousel(pages.length);
   return (
     <div className="help-carousel">
       <HelpCard label={pages[page].title} cols={pages[page].cols}>

@@ -1,4 +1,4 @@
-import { mergePulled } from '../shared/merge';
+﻿import { mergeClearEntries } from '../shared/clearEntries';
 import type { ClearEntry } from './save';
 
 export type PushResult = 'ok' | 'offline' | 'unauthorized';
@@ -51,31 +51,6 @@ async function fetchServerRecords(): Promise<{ status: 200 | 401; clears: Server
   return { status: 200, clears: data.clears ?? [] };
 }
 
-function mergeInto(local: ClearEntry[], server: ServerRecord[]): ClearEntry[] {
-  const out = new Map<string, ClearEntry>();
-  for (const c of local) out.set(c.stageCode, c);
-  for (const s of server) {
-    const prev = out.get(s.stageCode);
-    const base = prev
-      ? { bestElapsedSec: prev.elapsedSec, attempts: prev.attempts, lastClearedAt: prev.clearedAt }
-      : null;
-    const merged = mergePulled(base, {
-      bestElapsedSec: s.bestElapsedSec,
-      attempts: s.attempts,
-      lastClearedAt: s.lastClearedAt,
-    });
-    if (merged) {
-      out.set(s.stageCode, {
-        stageCode: s.stageCode,
-        clearedAt: merged.lastClearedAt,
-        elapsedSec: merged.bestElapsedSec ?? 0,
-        attempts: merged.attempts,
-      });
-    }
-  }
-  return [...out.values()];
-}
-
 export async function pull(local: ClearEntry[]): Promise<{ clears: ClearEntry[]; unauthorized: boolean }> {
   let server: ServerRecord[];
   try {
@@ -85,7 +60,7 @@ export async function pull(local: ClearEntry[]): Promise<{ clears: ClearEntry[];
   } catch {
     return { clears: local, unauthorized: false };
   }
-  return { clears: mergeInto(local, server), unauthorized: false };
+  return { clears: mergeClearEntries(local, server), unauthorized: false };
 }
 
 // 화해: 서버에 없는 로컬 기록을 미검증으로 밀어올린 뒤 합친다.
@@ -109,5 +84,6 @@ export async function reconcile(local: ClearEntry[]): Promise<{ clears: ClearEnt
       }
     }
   }
-  return { clears: mergeInto(local, server), unauthorized: false };
+  return { clears: mergeClearEntries(local, server), unauthorized: false };
 }
+

@@ -1,9 +1,6 @@
-import { useEffect, useRef, useState } from 'react';
 import type { Stage } from '../api/stagesApi';
 import { Board } from '../game/Board';
-import { formatElapsed, useElapsed } from '../game/useElapsed';
-import { useHamSudoku } from '../game/useHamSudoku';
-import { playSfx } from '../game/sound';
+import { useStageGame } from '../game/useStageGame';
 import { GameHelp } from '../game/GameHelp';
 import { Button } from '../ui/Button';
 
@@ -15,27 +12,7 @@ interface GameScreenProps {
 }
 
 export function GameScreen({ stage, onBack, onNextMap, onRecord }: GameScreenProps) {
-  const { cells, xMarks, violations, cleared, hamsterCount, pulse, hitKey, shake, tapCell, beginStroke, strokeEnter, endStroke, reset } =
-    useHamSudoku(stage.puzzle);
-  const [runId, setRunId] = useState(0);
-  const sec = useElapsed(!cleared, runId);
-  const wasCleared = useRef(false);
-
-  useEffect(() => {
-    if (cleared && !wasCleared.current) {
-      wasCleared.current = true;
-      playSfx('clear');
-      onRecord(stage.code, sec);
-    } else if (!cleared) {
-      wasCleared.current = false;
-    }
-  }, [cleared, onRecord, stage.code, sec]);
-
-  // 다시하기는 보드와 시간을 함께 되돌린다.
-  const retry = () => {
-    reset();
-    setRunId((i) => i + 1);
-  };
+  const { cells, xMarks, violations, cleared, hamsterCount, pulse, hitKey, shake, tapCell, beginStroke, strokeEnter, endStroke, retry, elapsedText } = useStageGame(stage, onRecord);
 
   return (
     <div className="game">
@@ -44,7 +21,7 @@ export function GameScreen({ stage, onBack, onNextMap, onRecord }: GameScreenPro
           뒤로
         </Button>
         <span className="hud-code">
-          {stage.code} · {formatElapsed(sec)}
+          {stage.code} · {elapsedText}
         </span>
         <span />
       </div>

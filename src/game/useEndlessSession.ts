@@ -1,10 +1,12 @@
-import { useCallback, useRef, useState } from 'react';
+import { useCallback, useEffect, useRef, useState } from 'react';
 import * as Sentry from '@sentry/nextjs';
 import { EndlessApiError, nextStage, reportFail, submitClear } from '../api/endlessApi';
 import type { EndlessMirror } from '../shared/endless';
 import { seasonId } from '../shared/season';
 import { toPuzzle } from './endlessBoard';
-import { applyClear, applyClearResponse, applyFail, loadMirror, markCleared, storeMirror } from './endlessMirror';
+import { applyClear, applyClearResponse, applyFail, markCleared } from '../shared/endlessMirrorRules';
+import { loadMirror, storeMirror } from '../api/saveApi';
+import { playClearSound, playGameOverSound } from './sound';
 import type { Puzzle } from './puzzles';
 
 export type EndlessPhase = 'idle' | 'playing' | 'gameover' | 'cleared';
@@ -44,6 +46,18 @@ export function useEndlessSession(): EndlessSession {
   const finishedRef = useRef(false);
   const genRef = useRef(0);
   const startingRef = useRef(false);
+  const activeRef = useRef(true);
+  const retryRef = useRef<{ timer: ReturnType<typeof setTimeout>; resolve: () => void } | null>(null);
+  const cancelRetry = useCallback(() => {
+    if (!retryRef.current) return;
+    clearTimeout(retryRef.current.timer);
+    retryRef.current.resolve();
+    retryRef.current = null;
+  }, []);
+  useEffect(() => {
+    activeRef.current = true;
+    return () => { activeRef.current = false; cancelRetry(); };
+  }, [cancelRetry]);
 
   const setMirrorBoth = useCallback((next: EndlessMirror) => {
     mirrorRef.current = next;
@@ -57,11 +71,14 @@ export function useEndlessSession(): EndlessSession {
     startingRef.current = true;
     const gen = genRef.current + 1;
     genRef.current = gen;
+    cancelRetry();
+    setSubmitting(false);
+    setFinishResult(null);
     setError(null);
     finishedRef.current = false;
     try {
       const next = await nextStage();
-      if (genRef.current !== gen) return;
+      if (!activeRef.current || genRef.current !== gen) return;
       attemptKeyRef.current = next.attemptKey;
       solutionRef.current = next.solution;
       stageRef.current = next.stage.id;
@@ -71,7 +88,7 @@ export function useEndlessSession(): EndlessSession {
       setSeeds(3);
       setPhase('playing');
     } catch (e) {
-      if (genRef.current !== gen) return;
+      if (!activeRef.current || genRef.current !== gen) return;
       // 예상된 흐름(비로그인 401)은 로그하지 않고, Unexpected 실패만 남긴다.
       if (e instanceof EndlessApiError && e.status === 401) setError('로그인이 필요해요.');
       else {
@@ -79,10 +96,12 @@ export function useEndlessSession(): EndlessSession {
         setError('무한모드를 불러오지 못했어요.');
       }
     } finally {
-      startingRef.current = false;
-      setStarting(false);
+      if (activeRef.current && genRef.current === gen) {
+        startingRef.current = false;
+        setStarting(false);
+      }
     }
-  }, []);
+  }, [cancelRetry]);
 
   const reportWrong = useCallback(() => {
     if (seedRef.current <= 0) return;
@@ -91,6 +110,7 @@ export function useEndlessSession(): EndlessSession {
     setSeeds(nextSeeds);
     if (nextSeeds === 0) {
       setPhase('gameover');
+      playGameOverSound();
       setMirrorBoth(applyFail(mirrorRef.current));
       const key = attemptKeyRef.current;
       if (key) void reportFail(key);
@@ -104,7 +124,7 @@ export function useEndlessSession(): EndlessSession {
     if (!key || !sid) return;
     finishedRef.current = true;
     const gen = genRef.current;
-    const stale = () => genRef.current !== gen;
+    const stale = () => !activeRef.current || genRef.current !== gen;
     const left = seedRef.current;
     const previous = mirrorRef.current;
     const optimistic = applyClear(markCleared(previous, sid), left);
@@ -115,17 +135,23 @@ export function useEndlessSession(): EndlessSession {
     try {
       const submit = () => submitClear({ attemptKey: key, stageId: sid, solution: solutionRef.current, seedLeft: left });
 
-      try {
-        const res = await submit();
-        if (stale()) return;
+      const acceptResponse = (res: Awaited<ReturnType<typeof submitClear>>) => {
         if (res.ok) {
           setMirrorBoth(applyClearResponse(optimistic, res));
           setFinishResult({ ok: true, earned: res.earned });
+          playClearSound(res.earned);
         } else {
           setMirrorBoth(previous);
           setError(res.reason);
           setFinishResult({ ok: false, earned: 0 });
+          playClearSound();
         }
+      };
+
+      try {
+        const res = await submit();
+        if (stale()) return;
+        acceptResponse(res);
         setPhase('cleared');
       } catch (e) {
         if (stale()) return;
@@ -133,31 +159,29 @@ export function useEndlessSession(): EndlessSession {
           setMirrorBoth(previous);
           setError(e.status === 401 ? '로그인이 필요해요.' : '기록을 저장하지 못했어요.');
           setFinishResult({ ok: false, earned: 0 });
+          playClearSound();
           setPhase('cleared');
           return;
         }
-        await new Promise((resolve) => setTimeout(resolve, RETRY_DELAY_MS));
+        await new Promise<void>((resolve) => {
+          const timer = setTimeout(() => { retryRef.current = null; resolve(); }, RETRY_DELAY_MS);
+          retryRef.current = { timer, resolve };
+        });
         if (stale()) return;
         try {
           const res = await submit();
           if (stale()) return;
-          if (res.ok) {
-            setMirrorBoth(applyClearResponse(optimistic, res));
-            setFinishResult({ ok: true, earned: res.earned });
-          } else {
-            setMirrorBoth(previous);
-            setError(res.reason);
-            setFinishResult({ ok: false, earned: 0 });
-          }
+          acceptResponse(res);
         } catch {
           if (stale()) return;
           setError('기록을 저장하지 못했어요.');
           setFinishResult({ ok: false, earned: 0 });
+          playClearSound();
         }
         setPhase('cleared');
       }
     } finally {
-      setSubmitting(false);
+      if (!stale()) setSubmitting(false);
     }
   }, [setMirrorBoth]);
 

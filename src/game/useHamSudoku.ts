@@ -1,20 +1,10 @@
 import { useRef, useState } from 'react';
-import { countHamsters, getViolations, isCleared, isSolutionCell, type Violations } from './rules';
+import type { Violations } from './rules';
 import type { CellState, Puzzle } from './puzzles';
-import { ownedFrags, resolveMark } from './probe';
-import { playGoodProgression, playSfx } from './sound';
-import { nextState, spreadMarks, type TapKind } from './tap';
-
-function blankBoard(size: number): CellState[][] {
-  return Array.from({ length: size }, () => Array<CellState>(size).fill('empty'));
-}
-
-function keyOf(r: number, c: number): string {
-  return `${r},${c}`;
-}
-
-/** 한 판에 동시에 놓을 수 있는 임시 정답(앵커) 수. 지우면 충전된다. */
-export const PROBE_SLOTS = 3;
+import type { TapKind } from './tap';
+import { createGameState, projectGame, transitionGame, type GameAction } from './gameTransition';
+import { createBoardSounds } from './sound';
+export { PROBE_SLOTS } from './gameTransition';
 
 export interface HamSudoku {
   cells: CellState[][];
@@ -40,279 +30,36 @@ export interface HamSudoku {
   resetMarks: () => void;
 }
 
-// 진행 중 드래그. 누른 칸이 마크·앵커면 지우기, 아니면 칠하기 모드다.
-// 처음 올라탄 칸만 모드대로 바꾸고, 한 번 지나간 칸은 다시 건드리지 않는다.
-// 칠하고 지울 때마다 속도에 맞춰 겹쳐 난다.
-interface Stroke {
-  sr: number;
-  sc: number;
-  toMark: boolean;
-  engaged: boolean;
-  visited: Set<string>;
-}
+export function useHamSudoku(puzzle: Puzzle, events: { onWrong?: () => void; onClear?: () => void } = {}): HamSudoku {
+  const [state, setState] = useState(() => createGameState(puzzle.size));
+  const latest = useRef(state);
+  const audio = useRef<ReturnType<typeof createBoardSounds> | null>(null);
+  if (!audio.current) audio.current = createBoardSounds();
 
-function anchorCount(cells: CellState[][]): number {
-  let n = 0;
-  for (const line of cells) for (const cell of line) if (cell === 'anchor') n += 1;
-  return n;
-}
-
-export function useHamSudoku(puzzle: Puzzle): HamSudoku {
-  const [cells, setCells] = useState<CellState[][]>(() => blankBoard(puzzle.size));
-  const [probeActive, setProbeActiveState] = useState(false);
-  const probeRef = useRef(false);
-  const setProbeActive = (on: boolean) => {
-    probeRef.current = on;
-    setProbeActiveState(on);
-  };
-  // 지연 탭(타이머 콜백)이 클릭 시점 스냅샷이 아닌 최신 판을 보도록 ref 미러를 둔다.
-  // tapCell은 동기적으로 ref까지 갱신하므로 연타·더블클릭 경합에서도 덮어쓰기가 없다.
-  const latest = useRef(cells);
-  // 조각→앵커 소유자. 앵커를 지울 때 자기 조각만 회수한다.
-  // 조각이 전파로 정답마커가 되면 항목이 stale해지며 reset에서 비운다.
-  const links = useRef(new Map<string, string>());
-  // 조각·앵커에 덮인 X마커. 회수 때 되돌린다. 전파로 정답마커가 되면 함께 버린다.
-  const underlay = useRef(new Map<string, 'mark'>());
-  // 진행 중 스트로크. 최신 판은 latest ref로만 읽어서 지연 이벤트 경합을 피한다.
-  const strokeRef = useRef<Stroke | null>(null);
-  const [pulse, setPulse] = useState<ReadonlyMap<string, number>>(new Map());
-  const [hitKey, setHitKey] = useState<string | null>(null);
-  const [shake, setShake] = useState(0);
-  // 연타·연속실패 횟수. 정답 진행음 상승과 오답 음높이에 쓴다. 렌더와 무관하다.
-  const correctRef = useRef(0);
-  const wrongRef = useRef(0);
-
-  const violations = getViolations(cells, puzzle.islands);
-  const cleared = isCleared(cells, puzzle.islands);
-  const hamsterCount = countHamsters(cells);
-  const probeSlots = PROBE_SLOTS - anchorCount(cells);
-
-  const commit = (next: CellState[][], delays: Map<string, number>, hit: string | null) => {
-    latest.current = next;
-    setCells(next);
-    setPulse(delays);
-    setHitKey(hit);
-  };
-
-  // 앵커를 놓고 십자·주변·같은 섬에 조각을 살포한다. 빈칸·회색X·덮인 조각만 바뀌고
-  // 잠금·햄스터·남의 조각은 통과한다.
-  // 덮인 X마커는 간직했다가 회수 때 되돌린다.
-  const placeAnchor = (r: number, c: number) => {
-    const prev = latest.current;
-    if (anchorCount(prev) >= PROBE_SLOTS) return;
-    const next = prev.map((line) => [...line]);
-    if (prev[r][c] === 'mark') underlay.current.set(keyOf(r, c), 'mark');
-    if (prev[r][c] === 'frag') {
-      // 덮개를 벗기고 앵커가 차지한다.
-      links.current.delete(keyOf(r, c));
-      underlay.current.delete(keyOf(r, c));
-    }
-    next[r][c] = 'anchor';
-    const delays = new Map<string, number>();
-    for (const m of spreadMarks(prev.length, r, c, puzzle.islands)) {
-      const cur = next[m.r][m.c];
-      if (cur === 'empty' || cur === 'mark') {
-        if (cur === 'mark') underlay.current.set(keyOf(m.r, m.c), 'mark');
-        next[m.r][m.c] = 'frag';
-        links.current.set(keyOf(m.r, m.c), keyOf(r, c));
-        delays.set(keyOf(m.r, m.c), m.delayMs);
+  const dispatch = (action: GameAction) => {
+    const result = transitionGame(latest.current, puzzle, action);
+    latest.current = result.state;
+    setState(result.state);
+    for (const sound of result.sounds) {
+      switch (sound) {
+        case 'correct': audio.current!.playCorrectSound(); break;
+        case 'wrong': audio.current!.playWrongSound(); break;
+        case 'mark': audio.current!.playMarkSound(); break;
+        case 'erase': audio.current!.playEraseSound(); break;
+        case 'reset': audio.current!.reset(); break;
       }
     }
-    commit(next, delays, null);
-    playSfx('mark');
+    if (result.sounds.includes('wrong')) events.onWrong?.();
+    if (result.completed) events.onClear?.();
+    return result.engaged;
   };
-
-  // 앵커와 자기 조각을 거둔다. 덮인 X마커는 되돌리고 먼 조각부터 역순으로 사라진다.
-  const recallAnchor = (r: number, c: number) => {
-    const prev = latest.current;
-    const owned = ownedFrags(links.current, prev, keyOf(r, c));
-    const next = prev.map((line) => [...line]);
-    next[r][c] = underlay.current.get(keyOf(r, c)) ?? 'empty';
-    underlay.current.delete(keyOf(r, c));
-    const delays = new Map<string, number>();
-    const ordered = owned
-      .map((key) => {
-        const [fr, fc] = key.split(',').map(Number);
-        return { key, dist: Math.max(Math.abs(fr - r), Math.abs(fc - c)) };
-      })
-      .sort((a, b) => b.dist - a.dist);
-    ordered.forEach(({ key }, i) => {
-      const [fr, fc] = key.split(',').map(Number);
-      next[fr][fc] = underlay.current.get(key) ?? 'empty';
-      underlay.current.delete(key);
-      links.current.delete(key);
-      delays.set(key, i * 60);
-    });
-    commit(next, delays, null);
-    playSfx('erase');
+  return { ...projectGame(state, puzzle),
+    setProbeActive: (on) => { dispatch({ type: 'probe', on }); },
+    tapCell: (r, c, kind) => { dispatch({ type: 'tap', r, c, kind }); },
+    beginStroke: (r, c) => { dispatch({ type: 'begin', r, c }); },
+    strokeEnter: (r, c) => { dispatch({ type: 'enter', r, c }); },
+    endStroke: () => dispatch({ type: 'end' }),
+    reset: () => { dispatch({ type: 'reset' }); },
+    resetMarks: () => { dispatch({ type: 'resetMarks' }); },
   };
-
-  const tapCell = (r: number, c: number, kind: TapKind) => {
-    const prev = latest.current;
-    const cur = prev[r][c];
-    const key = keyOf(r, c);
-    // 덮인 조각은 X로 본다. 상태는 조각 그대로 두고 렌더만 X가 이긴다.
-    const covered = cur === 'frag' && underlay.current.has(key);
-    if (probeRef.current && kind === 'single') {
-      // 아이템 켜짐: 싱글톡은 놓기·회수만 하고 판정은 하지 않는다.
-      // 더블톡은 전역 확정으로 아래 일반 경로를 탄다.
-      if (cur === 'empty' || cur === 'mark' || covered) placeAnchor(r, c);
-      else if (cur === 'anchor') recallAnchor(r, c);
-      return;
-    }
-    if (cur === 'anchor' && kind === 'single') {
-      recallAnchor(r, c);
-      return;
-    }
-    if (cur === 'frag' && kind === 'single') {
-      if (covered) {
-        // X를 걷고 조각을 드러낸다.
-        underlay.current.delete(key);
-        playSfx('erase');
-      } else {
-        // X를 올린다. 조각은 살린다.
-        underlay.current.set(key, 'mark');
-        playSfx('mark');
-      }
-      commit(prev.map((line) => [...line]), new Map(), null);
-      return;
-    }
-    if (cur === 'anchor' && kind === 'double') {
-      // 확정은 앵커를 먼저 지우고 빈칸에서 시도한다. 조각이 남지 않는다.
-      recallAnchor(r, c);
-    }
-    const after = latest.current;
-    // 덮인 조각은 X로 보고 확정한다.
-    const base = resolveMark(after[r][c], underlay.current.has(key));
-    const result = nextState(base, kind, isSolutionCell(puzzle, r, c));
-    if (result === base) return;
-    const next = after.map((line) => [...line]);
-    next[r][c] = result;
-    // 덮개를 소비하면 소유권을 끊는다.
-    if (after[r][c] === 'frag') {
-      links.current.delete(key);
-      underlay.current.delete(key);
-    }
-    if (result === 'hamster') {
-      const streak = correctRef.current + 1;
-      correctRef.current = streak;
-      wrongRef.current = 0;
-      const delays = new Map<string, number>();
-      // 빈 타일·회색X만 정답마커로 바꾼다. 남의 조각·앵커는 건드리지 않는다.
-      for (const m of spreadMarks(after.length, r, c, puzzle.islands)) {
-        const target = next[m.r][m.c];
-        if (target === 'empty' || target === 'mark') {
-          next[m.r][m.c] = 'auto';
-          delays.set(keyOf(m.r, m.c), m.delayMs);
-        }
-      }
-      commit(next, delays, keyOf(r, c));
-      playGoodProgression(streak);
-    } else {
-      commit(next, new Map(), null);
-      if (result === 'wrong' && kind === 'double') {
-        setShake((n) => n + 1);
-        const fails = wrongRef.current + 1;
-        wrongRef.current = fails;
-        correctRef.current = 0;
-        // 실패할 때마다 두음씩 오른다(최대 2배). 작게 시작한다.
-        playSfx('bad', 2 ** ((2 * Math.min(fails, 6)) / 12), 0.7);
-      } else if (result === 'empty') {
-        playSfx('erase');
-      } else if (result === 'mark') {
-        playSfx('mark');
-      }
-    }
-  };
-
-  const reset = () => {
-    const blank = blankBoard(puzzle.size);
-    latest.current = blank;
-    links.current.clear();
-    underlay.current.clear();
-    correctRef.current = 0;
-    wrongRef.current = 0;
-    strokeRef.current = null;
-    setCells(blank);
-    setPulse(new Map());
-    setHitKey(null);
-  };
-
-  // X마커·앵커·조각을 전부 빈칸으로 되돌린다. 햄스터·정답·오답마커는 그대로 둔다.
-  const resetMarks = () => {
-    const next = latest.current.map((line) =>
-      line.map((cell) => (cell === 'mark' || cell === 'anchor' || cell === 'frag' ? 'empty' : cell)),
-    );
-    latest.current = next;
-    links.current.clear();
-    underlay.current.clear();
-    strokeRef.current = null;
-    setCells(next);
-    setPulse(new Map());
-    setHitKey(null);
-  };
-
-  // 칠하기 모드는 빈칸만 마크로, 지우기 모드는 X마커·앵커·덮인 조각을 바꾼다.
-  // 덮인 조각은 X를 걷고 드러내고, 앵커는 조각까지 회수한다. 맨 조각은 손대지 않는다.
-  const paintOne = (st: Stroke, r: number, c: number) => {
-    const cur = latest.current[r][c];
-    if (st.toMark) {
-      if (cur !== 'empty') return;
-      const next = latest.current.map((line) => [...line]);
-      next[r][c] = 'mark';
-      commit(next, new Map(), null);
-      playSfx('mark');
-      return;
-    }
-    if (cur === 'mark') {
-      const next = latest.current.map((line) => [...line]);
-      next[r][c] = 'empty';
-      commit(next, new Map(), null);
-      playSfx('erase');
-      return;
-    }
-    if (cur === 'frag' && underlay.current.has(keyOf(r, c))) {
-      underlay.current.delete(keyOf(r, c));
-      commit(latest.current.map((line) => [...line]), new Map(), null);
-      playSfx('erase');
-      return;
-    }
-    if (cur === 'anchor') recallAnchor(r, c);
-  };
-
-  const beginStroke = (r: number, c: number) => {
-    // 아이템 켜짐: 스트로크는 무시하고 톡으로만 놓는다.
-    if (probeRef.current) {
-      strokeRef.current = null;
-      return;
-    }
-    const cur = latest.current[r][c];
-    // 덮인 조각은 X로 본다.
-    const pressed = resolveMark(cur, underlay.current.has(keyOf(r, c)));
-    const toMark = pressed !== 'mark' && pressed !== 'anchor';
-    strokeRef.current = { sr: r, sc: c, toMark, engaged: false, visited: new Set([`${r},${c}`]) };
-  };
-
-  // 누른 칸에서 다른 칸으로 처음 움직일 때 드래그로 확정되며 누른 칸부터 모드대로 바꾼다.
-  // 이미 지나간 칸(누른 칸 포함)에 다시 들어오면 아무것도 하지 않는다.
-  const strokeEnter = (r: number, c: number) => {
-    const st = strokeRef.current;
-    if (!st) return;
-    const key = `${r},${c}`;
-    if (st.visited.has(key)) return;
-    st.visited.add(key);
-    if (!st.engaged) {
-      st.engaged = true;
-      paintOne(st, st.sr, st.sc);
-    }
-    paintOne(st, r, c);
-  };
-
-  const endStroke = () => {
-    const engaged = strokeRef.current?.engaged ?? false;
-    strokeRef.current = null;
-    return engaged;
-  };
-
-  return { cells, xMarks: new Set(underlay.current.keys()), violations, cleared, hamsterCount, pulse, hitKey, shake, probeActive, setProbeActive, probeSlots, tapCell, beginStroke, strokeEnter, endStroke, reset, resetMarks };
 }

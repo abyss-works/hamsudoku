@@ -1,4 +1,4 @@
-import { useEffect, useState } from 'react';
+import { useNicknameService } from '../game/useNicknameService';
 import { Button } from '../ui/Button';
 import { Overlay } from '../ui/Overlay';
 import { Panel } from '../ui/Panel';
@@ -17,25 +17,7 @@ interface ProfileDialogProps {
 }
 
 export function ProfileDialog({ email, nickname, onSaveNickname, onLogin, onLogout, onClose, onGuestLink }: ProfileDialogProps) {
-  const [draft, setDraft] = useState(nickname ?? '');
-  const [msg, setMsg] = useState<string | null>(null);
-  const [saving, setSaving] = useState(false);
-
-  useEffect(() => {
-    setDraft(nickname ?? '');
-  }, [nickname]);
-
-  const save = async () => {
-    setSaving(true);
-    const r = await onSaveNickname(draft);
-    setSaving(false);
-    if (!r.ok) {
-      setMsg(r.msg ?? '저장하지 못했어요.');
-      return;
-    }
-    setDraft('');
-    setMsg(null);
-  };
+  const { draft, setDraft, msg, saving, save } = useNicknameService({ nickname, onSaveNickname });
 
   return (
     <Overlay label="프로필">
@@ -50,7 +32,7 @@ export function ProfileDialog({ email, nickname, onSaveNickname, onLogin, onLogo
             ) : (
               <>
                 <p className="login-note">지금은 이 기기에만 기록돼요.</p>
-                <Button variant="sticker" onClick={() => (onGuestLink ? onGuestLink() : onLogin())}>
+                <Button variant="sticker" onClick={onGuestLink || onLogin}>
                   계정 연동
                 </Button>
               </>

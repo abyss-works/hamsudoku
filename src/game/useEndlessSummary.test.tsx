@@ -1,6 +1,7 @@
-// @vitest-environment jsdom
+﻿// @vitest-environment jsdom
 import { afterEach, describe, expect, it, vi } from 'vitest';
 import { act, renderHook, waitFor } from '@testing-library/react';
+import { QueryProvider } from './queryClient';
 import { useEndlessSummary } from './useEndlessSummary';
 
 afterEach(() => {
@@ -19,7 +20,7 @@ describe('useEndlessSummary', () => {
         throw new Error(`unexpected ${url}`);
       }),
     );
-    const { result } = renderHook(() => useEndlessSummary(true));
+    const { result } = renderHook(() => useEndlessSummary(true), { wrapper: QueryProvider });
     await waitFor(() => {
       expect(result.current.me?.wallet.balance).toBe(5);
     });
@@ -38,7 +39,7 @@ describe('useEndlessSummary', () => {
         throw new Error(`unexpected ${url}`);
       }),
     );
-    const { result } = renderHook(() => useEndlessSummary(true));
+    const { result } = renderHook(() => useEndlessSummary(true), { wrapper: QueryProvider });
     await waitFor(() => {
       expect(result.current.me?.wallet.balance).toBe(5);
     });
@@ -46,13 +47,13 @@ describe('useEndlessSummary', () => {
     await act(async () => {
       await result.current.refreshMyRank();
     });
-    expect(result.current.myRank).toEqual({ rank: 2, score: 52, nickname: '햄찌' });
+    await waitFor(() => expect(result.current.myRank).toEqual({ rank: 2, score: 52, nickname: '햄찌' }));
   });
 
   it('비활성이면 요청하지 않는다', async () => {
     const fetchMock = vi.fn();
     vi.stubGlobal('fetch', fetchMock);
-    const { result } = renderHook(() => useEndlessSummary(false));
+    const { result } = renderHook(() => useEndlessSummary(false), { wrapper: QueryProvider });
     await waitFor(() => {
       expect(result.current.loading).toBe(false);
     });
@@ -61,7 +62,7 @@ describe('useEndlessSummary', () => {
 
   it('실패하면 오류 문구를 남긴다', async () => {
     vi.stubGlobal('fetch', vi.fn(async () => new Response(null, { status: 500 })));
-    const { result } = renderHook(() => useEndlessSummary(true));
+    const { result } = renderHook(() => useEndlessSummary(true), { wrapper: QueryProvider });
     await waitFor(() => {
       expect(result.current.error).toBe('요약을 불러오지 못했어요.');
     });
@@ -79,7 +80,7 @@ describe('useEndlessSummary', () => {
         throw new Error(`unexpected ${url}`);
       }),
     );
-    const { result } = renderHook(() => useEndlessSummary(true));
+    const { result } = renderHook(() => useEndlessSummary(true), { wrapper: QueryProvider });
     await waitFor(() => {
       expect(result.current.me?.wallet.balance).toBe(5);
     });
@@ -102,7 +103,7 @@ describe('useEndlessSummary', () => {
         throw new Error(`unexpected ${url}`);
       }),
     );
-    const { result } = renderHook(() => useEndlessSummary(true));
+    const { result } = renderHook(() => useEndlessSummary(true), { wrapper: QueryProvider });
     await waitFor(() => {
       expect(result.current.me?.wallet.balance).toBe(5);
     });
@@ -116,3 +117,5 @@ describe('useEndlessSummary', () => {
     expect(returned).toBe(72);
   });
 });
+
+

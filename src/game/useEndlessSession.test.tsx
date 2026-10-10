@@ -1,8 +1,15 @@
 // @vitest-environment jsdom
 import { afterEach, describe, expect, it, vi } from 'vitest';
-import { act, renderHook, waitFor } from '@testing-library/react';
+import { act, cleanup, renderHook, waitFor } from '@testing-library/react';
 import { encryptSolution } from '../server/crypto';
 import { useEndlessSession } from './useEndlessSession';
+import { resetSoundForTests } from './sound';
+import { StrictMode, useEffect, useRef } from 'react';
+
+vi.mock('howler', () => ({
+  Howl: vi.fn(function () { return { play: vi.fn(() => 7), rate: vi.fn(), volume: vi.fn() }; }),
+  Howler: { ctx: null },
+}));
 
 function stubFetch(clearResponse: () => Response | Promise<Response>) {
   vi.stubGlobal(
@@ -21,11 +28,45 @@ function stubFetch(clearResponse: () => Response | Promise<Response>) {
 }
 
 afterEach(() => {
+  cleanup();
+  resetSoundForTests();
+  vi.useRealTimers();
   vi.unstubAllGlobals();
   localStorage.clear();
 });
 
 describe('useEndlessSession', () => {
+  it('StrictMode 생명주기 재실행 뒤 최초 판 응답을 유지한다', async () => {
+    stubFetch(() => Response.json({ ok: true }));
+    const { result } = renderHook(() => {
+      const session = useEndlessSession();
+      const started = useRef(false);
+      useEffect(() => {
+        if (started.current) return;
+        started.current = true;
+        void session.start();
+      }, [session.start]);
+      return session;
+    }, { wrapper: StrictMode });
+    await waitFor(() => expect(result.current.puzzle).not.toBeNull());
+  });
+  it('unmount은 대기 중 재시도를 정리하고 다음 제출을 실행하지 않는다', async () => {
+    stubFetch(() => { throw new TypeError('network'); });
+    const { result, unmount } = renderHook(() => useEndlessSession());
+    await act(async () => { await result.current.start(); });
+    vi.useFakeTimers();
+    let finished: Promise<void>;
+    await act(async () => {
+      finished = result.current.finish();
+      await Promise.resolve(); await Promise.resolve(); await Promise.resolve();
+    });
+    expect(vi.getTimerCount()).toBe(1);
+    unmount();
+    expect(vi.getTimerCount()).toBe(0);
+    await act(async () => { await vi.runAllTimersAsync(); await finished!; });
+    const clears = vi.mocked(fetch).mock.calls.filter(([url]) => url === '/api/endless/clear');
+    expect(clears).toHaveLength(1);
+  });
   it('시작하면 판이 열리고 씨앗 3으로 시작한다', async () => {
     stubFetch(() => Response.json({ ok: true }));
     const { result } = renderHook(() => useEndlessSession());

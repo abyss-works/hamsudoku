@@ -1,26 +1,10 @@
 import { Trophy } from 'lucide-react';
-import { mergeRankEntries } from '../shared/rankMerge';
-import type { MyRankResponse, RankResponse } from '../shared/endless';
+import { useRankDialogService, type RankDialogProps } from '../game/useRankDialogService';
 import { Button } from '../ui/Button';
 import { Overlay } from '../ui/Overlay';
 
-interface RankDialogProps {
-  rank: RankResponse | null;
-  /** 내 순위 실시간 값. 상위 목록은 스냅샷에서, 내 행은 이 값으로 그린다. */
-  myRank?: MyRankResponse | null;
-  uid: string | null;
-  /** 로그인 사용자 여부. 게스트는 목록만 본다(내 순위 없음). */
-  signedIn: boolean;
-  onClose: () => void;
-}
-
 export function RankDialog({ rank, myRank, uid, signedIn, onClose }: RankDialogProps) {
-  const live = myRank ? { score: myRank.score, nickname: myRank.nickname } : undefined;
-  const merged = rank && uid && signedIn ? mergeRankEntries(rank, uid, live) : null;
-  const entries = merged?.entries ?? rank?.top ?? [];
-  const myScore = myRank?.score ?? rank?.me.score ?? 0;
-  const fallbackNo = rank?.me.rank ?? null;
-  const myRankNo = myRank ? myRank.rank : fallbackNo === null ? null : (merged?.meRank ?? fallbackNo);
+  const { entries, myScore, myRankNo } = useRankDialogService({rank,myRank,uid,signedIn,onClose});
 
   return (
     <Overlay label="랭킹">

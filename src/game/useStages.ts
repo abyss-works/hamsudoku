@@ -1,5 +1,5 @@
-import { useEffect, useState } from 'react';
-import { fetchStages, type Chapter } from '../api/stagesApi';
+﻿import { useQuery } from '@tanstack/react-query';
+import { stageCatalog, type Chapter } from '../shared/stageCatalog';
 
 export interface StagesState {
   chapters: Chapter[];
@@ -8,21 +8,10 @@ export interface StagesState {
 }
 
 export function useStages(): StagesState {
-  const [chapters, setChapters] = useState<Chapter[]>([]);
-  const [loading, setLoading] = useState(true);
-  const [error, setError] = useState<string | null>(null);
-
-  useEffect(() => {
-    fetchStages()
-      .then((list) => {
-        setChapters(list);
-        setLoading(false);
-      })
-      .catch(() => {
-        setError('스테이지 목록을 불러오지 못했다');
-        setLoading(false);
-      });
-  }, []);
-
-  return { chapters, loading, error };
+  const query = useQuery({ queryKey: ['stage-catalog'], queryFn: stageCatalog });
+  return {
+    chapters: query.data ?? [],
+    loading: query.isPending,
+    error: query.error ? '스테이지 목록을 불러오지 못했다' : null,
+  };
 }

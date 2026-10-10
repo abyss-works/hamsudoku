@@ -1,73 +1,62 @@
-import { useCallback, useEffect, useState } from 'react';
+﻿import { useCallback, useRef, useState } from 'react';
+import { useQuery } from '@tanstack/react-query';
 import { fetchMe, fetchMyRank, fetchRank } from '../api/endlessApi';
 import type { MeResponse, MyRankResponse, RankResponse } from '../shared/endless';
 
 export interface EndlessSummaryState {
   me: MeResponse | null;
   rank: RankResponse | null;
-  /** 내 순위 실시간 값. 랭킹을 열 때 따로 가져온다. */
   myRank: MyRankResponse | null;
   loading: boolean;
   error: string | null;
   refresh(): Promise<void>;
-  /** 이미 불러온 값은 유지하면서 조용히 다시 요청한다. 화면전환 갱신용. 가져온 요약을 그대로 돌려준다. */
   refreshSoft(): Promise<MeResponse | null>;
-  /** 내 순위만 조용히 다시 요청한다. 랭킹 열기용. */
   refreshMyRank(): Promise<void>;
 }
 
-export function useEndlessSummary(enabled: boolean): EndlessSummaryState {
-  const [me, setMe] = useState<MeResponse | null>(null);
-  const [rank, setRank] = useState<RankResponse | null>(null);
-  const [myRank, setMyRank] = useState<MyRankResponse | null>(null);
-  const [loading, setLoading] = useState(enabled);
-  const [error, setError] = useState<string | null>(null);
-
+export function useEndlessSummary(enabled: boolean, uid: string | null = null): EndlessSummaryState {
+  const active = useRef({ uid, enabled });
+  active.current = { uid, enabled };
+  const [status, setStatus] = useState<{ uid: string | null; loading: boolean; error: string | null } | null>(null);
+  const summary = useQuery({
+    queryKey: ['endless-summary', uid],
+    enabled,
+    queryFn: async () => {
+      const [me, rank] = await Promise.all([fetchMe(), fetchRank()]);
+      return { me, rank };
+    },
+  });
+  const myRank = useQuery({ queryKey: ['endless-my-rank', uid], queryFn: fetchMyRank, enabled: false });
   const refresh = useCallback(async () => {
-    if (!enabled) {
-      setLoading(false);
-      return;
-    }
-    setLoading(true);
-    setError(null);
-    try {
-      const [m, r] = await Promise.all([fetchMe(), fetchRank()]);
-      setMe(m);
-      setRank(r);
-    } catch {
-      setError('요약을 불러오지 못했어요.');
-    } finally {
-      setLoading(false);
-    }
-  }, [enabled]);
-
-  // 화면전환 갱신용 조용한 재요청. loading 표시와 error 리셋을 하지 않아
-  // 부팅 게이트(dataReady의 me/error 유무 판정)를 재고정하지 않는다.
+    if (!enabled || active.current.uid !== uid || !active.current.enabled) return;
+    setStatus({ uid, loading: true, error: null });
+    const result = await summary.refetch({ cancelRefetch: false });
+    if (active.current.uid !== uid || !active.current.enabled) return;
+    setStatus({ uid, loading: false, error: result.error ? '요약을 불러오지 못했어요.' : null });
+  }, [enabled, uid, summary.refetch]);
   const refreshSoft = useCallback(async () => {
-    if (!enabled) return null;
-    try {
-      const [m, r] = await Promise.all([fetchMe(), fetchRank()]);
-      setMe(m);
-      setRank(r);
-      return m;
-    } catch {
-      // 이미 표시 중인 값이 있으면 유지한다. 에러 문구도 갈아쓰지 않는다.
-      return null;
+    if (!enabled || active.current.uid !== uid || !active.current.enabled) return null;
+    if (summary.error && !summary.data) {
+      setStatus((prev) => prev?.uid === uid ? prev : { uid, loading: false, error: '요약을 불러오지 못했어요.' });
     }
-  }, [enabled]);
-
-  useEffect(() => {
-    void refresh();
-  }, [refresh]);
-
+    const result = await summary.refetch({ cancelRefetch: false });
+    if (active.current.uid !== uid || !active.current.enabled || result.error) return null;
+    return result.data?.me ?? null;
+  }, [enabled, uid, summary.refetch, summary.error, summary.data]);
   const refreshMyRank = useCallback(async () => {
-    if (!enabled) return;
-    try {
-      setMyRank(await fetchMyRank());
-    } catch {
-      // 이미 표시 중인 값이 있으면 유지한다.
+    if (enabled && active.current.uid === uid && active.current.enabled) {
+      await myRank.refetch({ cancelRefetch: false });
     }
-  }, [enabled]);
-
-  return { me, rank, myRank, loading, error, refresh, refreshSoft, refreshMyRank };
+  }, [enabled, uid, myRank.refetch]);
+  const currentStatus = status?.uid === uid ? status : null;
+  return {
+    me: summary.data?.me ?? null,
+    rank: summary.data?.rank ?? null,
+    myRank: myRank.data ?? null,
+    loading: enabled && (currentStatus?.loading === true || (summary.isPending && summary.isFetching)),
+    error: currentStatus ? currentStatus.error : summary.error && !summary.data ? '요약을 불러오지 못했어요.' : null,
+    refresh,
+    refreshSoft,
+    refreshMyRank,
+  };
 }
