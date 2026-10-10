@@ -1,24 +1,8 @@
-import { useState } from 'react';
-import type { Chapter, Stage } from '../api/stagesApi';
-import { formatElapsed } from '../game/useElapsed';
-import type { ClearEntry } from '../game/save';
+import { useSelectService, type SelectScreenProps } from '../game/useSelectService';
 import { Button } from '../ui/Button';
-import { useDelayedLoading } from '../ui/useDelayedLoading';
-
-interface SelectScreenProps {
-  chapters: Chapter[];
-  loading: boolean;
-  error: string | null;
-  clears: Map<string, ClearEntry>;
-  initialChapterId?: string | null;
-  onSelect: (stage: Stage) => void;
-  onBack: () => void;
-}
 
 export function SelectScreen({ chapters, loading, error, clears, initialChapterId, onSelect, onBack }: SelectScreenProps) {
-  const [selectedId, setSelectedId] = useState<string | null>(initialChapterId ?? null);
-  const active = chapters.find((c) => c.id === selectedId) ?? chapters[0];
-  const showLoading = useDelayedLoading(loading);
+  const { active, stages, showLoading, setSelectedId } = useSelectService({chapters,loading,error,clears,initialChapterId,onSelect,onBack});
 
   return (
     <div className="select">
@@ -38,18 +22,17 @@ export function SelectScreen({ chapters, loading, error, clears, initialChapterI
               <Button
                 key={c.id}
                 variant="sticker"
-                className={c.id === active.id ? 'btn-primary' : ''}
-                aria-pressed={c.id === active.id}
+                className={c.id === active!.id ? 'btn-primary' : ''}
+                aria-pressed={c.id === active!.id}
                 onClick={() => setSelectedId(c.id)}
               >
                 {c.title}
               </Button>
             ))}
           </div>
-          <section key={active.id} className="chapter">
+          <section key={active!.id} className="chapter">
             <div className="stage-list">
-              {active.stages.map((stage, i) => {
-                const entry = clears.get(stage.code);
+              {stages.map(({ stage, number, best, label }) => {
                 return (
                   <Button
                     key={stage.id}
@@ -57,13 +40,13 @@ export function SelectScreen({ chapters, loading, error, clears, initialChapterI
                     className="stage-btn"
                     disabled={stage.locked}
                     onClick={() => onSelect(stage)}
-                    aria-label={entry ? `${i + 1}, 베스트 ${formatElapsed(entry.elapsedSec)}` : String(i + 1)}
+                    aria-label={label}
                   >
                     <span className="stage-num" aria-hidden="true">
-                      {i + 1}
+                      {number}
                     </span>
                     <span className="stage-best" aria-hidden="true">
-                      {entry ? formatElapsed(entry.elapsedSec) : '-'}
+                      {best}
                     </span>
                   </Button>
                 );

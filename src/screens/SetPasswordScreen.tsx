@@ -1,52 +1,10 @@
-import { useEffect, useRef, useState, type FormEvent } from 'react';
+import { useSetPasswordService } from '../game/useSetPasswordService';
+import type { SetPasswordScreenProps } from '../game/useSetPasswordServiceContracts';
 import { Button } from '../ui/Button';
 import { HamsterFace } from '../ui/HamsterFace';
 
-interface SetPasswordScreenProps {
-  setPassword: (password: string) => Promise<{ ok: boolean; msg?: string }>;
-  linkError: boolean;
-  onDone: () => void;
-}
-
 export function SetPasswordScreen({ setPassword, linkError, onDone }: SetPasswordScreenProps) {
-  const [password, setPw] = useState('');
-  const [confirm, setConfirm] = useState('');
-  const [error, setError] = useState<string | null>(null);
-  const [okMessage, setOkMessage] = useState<string | null>(null);
-  const [busy, setBusy] = useState(false);
-  const timer = useRef<ReturnType<typeof setTimeout> | null>(null);
-
-  useEffect(
-    () => () => {
-      if (timer.current) clearTimeout(timer.current);
-    },
-    [],
-  );
-
-  const submit = async (e: FormEvent) => {
-    e.preventDefault();
-    if (password.length < 6) {
-      setError('6자 이상 비밀번호를 입력하세요.');
-      return;
-    }
-    if (password !== confirm) {
-      setError('비밀번호가 서로 달라요.');
-      return;
-    }
-    setBusy(true);
-    setError(null);
-    try {
-      const r = await setPassword(password);
-      if (r.ok) {
-        setOkMessage('비밀번호를 바꿨어요!');
-        timer.current = setTimeout(() => onDone(), 700);
-      } else {
-        setError(r.msg ?? '실패했어요.');
-      }
-    } finally {
-      setBusy(false);
-    }
-  };
+  const { password, setPw, confirm, setConfirm, error, okMessage, busy, submit } = useSetPasswordService({ setPassword, linkError, onDone });
 
   return (
     <div className="login">
@@ -70,7 +28,7 @@ export function SetPasswordScreen({ setPassword, linkError, onDone }: SetPasswor
         ) : okMessage ? (
           <p className="login-ok">{okMessage}</p>
         ) : (
-          <form className="login-form" onSubmit={(e) => void submit(e)}>
+          <form className="login-form" onSubmit={(e) => { e.preventDefault(); void submit(); }}>
             <label className="login-field">
               <span>새 비밀번호</span>
               <input

@@ -1,100 +1,11 @@
-import { useEffect, useRef, useState, type FormEvent } from 'react';
+import { useLoginService } from '../game/useLoginService';
+import type { LoginScreenProps } from '../game/useLoginServiceContracts';
 import { ChevronLeft } from 'lucide-react';
 import { Button } from '../ui/Button';
 import { HamsterFace } from '../ui/HamsterFace';
 
-interface AuthFn {
-  (email: string, password: string): Promise<{ ok: boolean; msg?: string; code?: string }>;
-}
-
-interface LoginScreenProps {
-  signup: AuthFn;
-  signin: AuthFn;
-  reset: (email: string) => Promise<{ ok: boolean; msg?: string }>;
-  cloud: boolean;
-  onBack: () => void;
-  onDone: () => void;
-}
-
-// 통합 계정 폼 — 가입·로그인 구분 없이 "이메일로 계속하기" 하나로.
-// 승격(signup) 먼저 시도하고, 이미 가입된 이메일이면 확인 후 로그인(signin)으로 전환한다.
 export function LoginScreen({ signup, signin, reset, cloud, onBack, onDone }: LoginScreenProps) {
-  const [email, setEmail] = useState('');
-  const [password, setPassword] = useState('');
-  const [error, setError] = useState<string | null>(null);
-  const [okMessage, setOkMessage] = useState<string | null>(null);
-  const [confirmLogin, setConfirmLogin] = useState(false);
-  const [busy, setBusy] = useState(false);
-  const timer = useRef<ReturnType<typeof setTimeout> | null>(null);
-
-  useEffect(
-    () => () => {
-      if (timer.current) clearTimeout(timer.current);
-    },
-    [],
-  );
-
-  const doneLater = (message: string) => {
-    setOkMessage(message);
-    timer.current = setTimeout(() => onDone(), 700);
-  };
-
-  const submit = async (e: FormEvent) => {
-    e.preventDefault();
-    if (!email.trim() || password.length < 6) {
-      setError('이메일과 6자 이상 비밀번호를 입력하세요.');
-      return;
-    }
-    setBusy(true);
-    setError(null);
-    try {
-      const r = await signup(email.trim(), password);
-      if (r.ok) {
-        doneLater('계정이 만들어졌다!');
-        return;
-      }
-      if (r.code === 'email_exists' || r.code === 'user_already_exists') {
-        setConfirmLogin(true);
-        return;
-      }
-      setError(r.msg ?? '실패했어요.');
-    } finally {
-      setBusy(false);
-    }
-  };
-
-  const forgot = async () => {
-    if (!email.trim()) {
-      setError('재설정 메일을 받을 이메일을 입력하세요.');
-      return;
-    }
-    setBusy(true);
-    setError(null);
-    try {
-      const r = await reset(email.trim());
-      if (r.ok) {
-        setOkMessage('재설정 메일을 보냈어요. 받은편지함을 확인하세요.');
-      } else {
-        setError(r.msg ?? '실패했어요.');
-      }
-    } finally {
-      setBusy(false);
-    }
-  };
-  const login = async () => {
-    setBusy(true);
-    setError(null);
-    try {
-      const r = await signin(email.trim(), password);
-      if (r.ok) {
-        doneLater('로그인됐다!');
-      } else {
-        setError(r.msg ?? '실패했어요.');
-      }
-    } finally {
-      setBusy(false);
-    }
-  };
+  const { email, setEmail, password, setPassword, error, okMessage, confirmLogin, busy, submit, forgot, login, cancelLogin } = useLoginService({ signup, signin, reset, cloud, onBack, onDone });
 
   return (
     <div className="login">
@@ -108,7 +19,7 @@ export function LoginScreen({ signup, signin, reset, cloud, onBack, onDone }: Lo
             <HamsterFace />
           </span>
         </div>
-        <form className="login-form" onSubmit={(e) => void submit(e)}>
+        <form className="login-form" onSubmit={(e) => { e.preventDefault(); void submit(); }}>
           <label className="login-field">
             <span>이메일</span>
             <input
@@ -143,7 +54,7 @@ export function LoginScreen({ signup, signin, reset, cloud, onBack, onDone }: Lo
                 <Button variant="sticker" className="btn-primary" onClick={() => void login()} disabled={busy}>
                   로그인하기
                 </Button>
-                <Button variant="sticker" onClick={() => setConfirmLogin(false)} disabled={busy}>
+                <Button variant="sticker" onClick={cancelLogin} disabled={busy}>
                   취소
                 </Button>
               </div>
