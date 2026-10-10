@@ -1,9 +1,9 @@
-import { useEffect, useRef } from 'react';
 import { AnimatePresence, motion } from 'framer-motion';
 import { Heart, X } from 'lucide-react';
 import { HamsterFace } from '../ui/HamsterFace';
 import type { CellState } from './puzzles';
-import { delayForPointerType, type TapKind } from './tap';
+import type { TapKind } from './tap';
+import { useCellInteraction } from './useCellInteraction';
 
 interface CellProps {
   row: number;
@@ -28,43 +28,7 @@ const LABEL: Record<CellState, string> = {
 };
 
 export function Cell({ row, col, state, islandId, conflicted, hit, pulseDelay, onTap, onPress }: CellProps) {
-  const timer = useRef<number | null>(null);
-  const pointerKind = useRef<string | null>(null);
-
-  useEffect(
-    () => () => {
-      if (timer.current !== null) window.clearTimeout(timer.current);
-    },
-    [],
-  );
-
-  const handleClick = () => {
-    // 두 번째 탭이 윈도우 안에 들어오면 브라우저 dblclick과 무관하게 더블로 확정한다.
-    // (모바일 더블탭은 dblclick을 안 주는 경우가 있어 클릭 타이밍으로 직접 판정)
-    if (timer.current !== null) {
-      window.clearTimeout(timer.current);
-      timer.current = null;
-      onTap('double');
-      return;
-    }
-    timer.current = window.setTimeout(() => {
-      timer.current = null;
-      onTap('single');
-    }, delayForPointerType(pointerKind.current));
-  };
-
-  const handlePress = (e: React.PointerEvent) => {
-    pointerKind.current = e.pointerType ?? null;
-    onPress();
-  };
-
-  const handleDoubleClick = () => {
-    if (timer.current !== null) {
-      window.clearTimeout(timer.current);
-      timer.current = null;
-    }
-    onTap('double');
-  };
+  const { handleClick, handlePress, handleDoubleClick } = useCellInteraction(onTap, onPress);
 
   return (
     <motion.button

@@ -167,3 +167,27 @@ export function playGoodProgression(streak: number): void {
   const t0 = ctx.currentTime;
   freqs.forEach((freq, i) => blip(ctx, freq, t0 + i * 0.09, 0.2));
 }
+
+/** 각 판이 연속 정답·오답 상태를 독립적으로 소유한다. */
+export function createBoardSounds() {
+  let correct = 0;
+  let wrong = 0;
+  return {
+    playCorrectSound() { correct += 1; wrong = 0; playGoodProgression(correct); },
+    playWrongSound() { wrong += 1; correct = 0; playSfx('bad', 2 ** ((2 * Math.min(wrong, 6)) / 12), 0.7); },
+    playMarkSound() { playSfx('mark'); },
+    playEraseSound() { playSfx('erase'); },
+    reset() { correct = 0; wrong = 0; },
+  };
+}
+
+export function playButtonSound(): void { playSfx('ui-click'); }
+export function playClearSound(earned = 0): void {
+  playSfx('clear');
+  if (earned > 0) playSfx('seed');
+}
+export function playGameOverSound(): void { playSfx('gameover'); }
+export function previewSoundEnabled(): void {
+  setSfxEnabled(true);
+  playButtonSound();
+}

@@ -1,24 +1,39 @@
 // @vitest-environment jsdom
-import { afterEach, describe, expect, it, vi } from 'vitest';
+import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 import { act, cleanup, renderHook } from '@testing-library/react';
-import { playGoodProgression, playSfx } from './sound';
+import { Howl, Howler } from 'howler';
+import { cascadeFrequencies, resetSoundForTests } from './sound';
 import { useHamSudoku } from './useHamSudoku';
 import { PUZZLES } from './puzzles';
 
-vi.mock('./sound', () => ({
-  playSfx: vi.fn(),
-  playGoodProgression: vi.fn(),
+vi.mock('howler', () => ({
+  Howl: vi.fn(function (this: { play?: unknown; rate?: unknown; volume?: unknown }) {
+    this.play = vi.fn(() => 7); this.rate = vi.fn(); this.volume = vi.fn();
+  }), Howler: { ctx: null as unknown },
 }));
-
-afterEach(cleanup);
-
+const notes: number[][] = [];
+beforeEach(() => {
+  vi.useFakeTimers();
+  notes.length = 0;
+  (Howler as unknown as { ctx: unknown }).ctx = {
+    state: 'running', destination: {},
+    get currentTime() { notes.push([]); return 10; },
+    createOscillator() {
+      return { type: '', frequency: { value: 0 }, connect() {},
+        start(this: { frequency: { value: number } }) { notes[notes.length - 1].push(this.frequency.value); }, stop() {} };
+    },
+    createGain() { return { gain: { setValueAtTime() {}, exponentialRampToValueAtTime() {} }, connect() {} }; },
+  };
+});
+afterEach(() => { cleanup(); resetSoundForTests(); vi.useRealTimers(); });
 const at = (cells: string[][], r: number, c: number) => cells[r][c];
-const badRates = () =>
-  vi
-    .mocked(playSfx)
-    .mock.calls.filter(([name]) => name === 'bad')
-    .map(([, rate, volume]) => [rate as number, volume as number]);
-const progCalls = () => vi.mocked(playGoodProgression).mock.calls.map(([s]) => s as number);
+const badRates = () => {
+  vi.runAllTimers();
+  const index = vi.mocked(Howl).mock.calls.findIndex(([options]) => options.src?.[0] === '/sfx/bad.wav');
+  const howl = vi.mocked(Howl).mock.instances[index];
+  return vi.mocked(howl.rate).mock.calls.map(([rate], i) => [rate, vi.mocked(howl.volume).mock.calls[i][0]]);
+};
+const progCalls = () => notes;
 
 describe('streak sounds', () => {
   it('맞힐 때마다 높아지고 한음씩 붙는다', () => {
@@ -31,7 +46,7 @@ describe('streak sounds', () => {
       result.current.tapCell(1, 3, 'double');
     });
     expect(at(result.current.cells, 1, 3)).toBe('hamster');
-    expect(progCalls()).toEqual([1, 2]);
+    expect(progCalls()).toEqual([cascadeFrequencies(2), cascadeFrequencies(4).slice(1)]);
   });
 
   it('오답은 실패할 때마다 두음씩 오른다', () => {
@@ -66,7 +81,7 @@ describe('streak sounds', () => {
     const [w1, w2] = badRates();
     expect(w1[0]).toBeCloseTo(2 ** (2 / 12), 5);
     expect(w2[0]).toBeCloseTo(2 ** (2 / 12), 5);
-    expect(progCalls()).toEqual([1]);
+    expect(progCalls()).toEqual([cascadeFrequencies(2)]);
   });
 });
 
@@ -79,7 +94,7 @@ describe('global double', () => {
     });
     expect(at(result.current.cells, 0, 0)).toBe('hamster');
     expect(result.current.probeSlots).toBe(3);
-    expect(progCalls()).toEqual([1]);
+    expect(progCalls()).toEqual([cascadeFrequencies(2)]);
   });
 
   it('아이템이 켜져 있어도 앵커 더블은 지우고 확정한다', () => {

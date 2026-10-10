@@ -1,6 +1,6 @@
 import { Button } from '../ui/Button';
 import { Overlay } from '../ui/Overlay';
-import { playSfx, setSfxEnabled } from '../game/sound';
+import { useSoundToggle } from '../game/useSoundPreferences';
 
 interface SettingsDialogProps {
   sound: boolean;
@@ -9,14 +9,7 @@ interface SettingsDialogProps {
 }
 
 export function SettingsDialog({ sound, onToggleSound, onClose }: SettingsDialogProps) {
-  const toggleSound = () => {
-    onToggleSound();
-    if (!sound) {
-      // 켜는 순간 미리 듣는다. 엔진 동기화는 App effect가 뒤따라 한다.
-      setSfxEnabled(true);
-      playSfx('ui-click');
-    }
-  };
+  const toggleSound = useSoundToggle(sound, onToggleSound);
   return (
     <Overlay label="설정">
       <div className="settings">
