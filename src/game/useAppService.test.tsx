@@ -10,13 +10,14 @@ const deps = vi.hoisted(() => ({
   account: { uid: 'a', email: 'a@example.com' as string | null, nickname: '이름', cloud: true, loading: false,
     signin: vi.fn(), signup: vi.fn(), signout: vi.fn(), warmSession: vi.fn(), reset: vi.fn(), setPassword: vi.fn(), saveNickname: vi.fn() },
   reconcile: vi.fn(), pull: vi.fn(), pushClear: vi.fn(), fetchAttemptKey: vi.fn(),
+  summary: { me: {} as object | null, error: null as string | null, refreshSoft: vi.fn() },
 }));
 vi.mock('./useAccount', () => ({ useAccount: () => deps.account }));
 vi.mock('./useStages', () => ({ useStages: () => ({ chapters: [{ id: 'lv1', title: '레벨 1', stages: [
   { id: 's1', code: '1-1', title: '첫 판', locked: false, puzzle: PUZZLES[0] },
   { id: 's2', code: '1-2', title: '둘째 판', locked: false, puzzle: PUZZLES[0] },
 ] }], loading: false, error: null }) }));
-vi.mock('./useEndlessSummary', () => ({ useEndlessSummary: () => ({ me: {}, error: null, refreshSoft: vi.fn() }) }));
+vi.mock('./useEndlessSummary', () => ({ useEndlessSummary: () => deps.summary }));
 vi.mock('../ui/useFontsReady', () => ({ useFontsReady: () => true }));
 vi.mock('./sync', () => ({ reconcile: deps.reconcile, pull: deps.pull, pushClear: deps.pushClear, fetchAttemptKey: deps.fetchAttemptKey }));
 
@@ -26,6 +27,8 @@ beforeEach(() => {
   window.history.replaceState({}, '', '/');
   deps.account.uid = 'a';
   deps.account.email = 'a@example.com';
+  deps.summary.me = {};
+  deps.summary.error = null;
   deps.reconcile.mockResolvedValue({ clears: [], unauthorized: false });
   deps.pull.mockResolvedValue({ clears: [], unauthorized: false });
   deps.pushClear.mockResolvedValue('ok');
@@ -36,6 +39,19 @@ beforeEach(() => {
 afterEach(cleanup);
 
 describe('앱 Service', () => {
+  it('부팅 완료 후 로그인 요약 대기는 계정 기준 선택 화면을 유지한다', async () => {
+    const { result, rerender } = renderHook(useAppService);
+    expect(result.current.ready).toBe(true);
+    await act(async () => { await result.current.signinThenSwitch('b@example.com', 'password', true); });
+    deps.account.uid = 'b';
+    deps.summary.me = null;
+    act(rerender);
+    expect(result.current.ready).toBe(true);
+    expect(deps.pull).not.toHaveBeenCalled();
+    await act(async () => result.current.beginSwitch());
+    expect(deps.pull).toHaveBeenCalledWith([]);
+  });
+
   it('같은 판 재진입은 이전 입장 요청의 키를 사용하지 않는다', async () => {
     let complete!: (value: string) => void;
     deps.fetchAttemptKey.mockReturnValueOnce(new Promise((resolve) => { complete = resolve; }));

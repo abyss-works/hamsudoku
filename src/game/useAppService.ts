@@ -22,6 +22,7 @@ export function useAppService() {
   const { chapters, loading, error } = useStages();
   const summary = useEndlessSummary(account.cloud, account.uid);
   const [bootTimedOut, setBootTimedOut] = useState(false);
+  const [bootCompleted, setBootCompleted] = useState(false);
   const fontsReady = useFontsReady();
   const attemptKeys = useRef(new Map<string, string>());
   const entryGenerations = useRef(new Map<string, number>());
@@ -155,9 +156,14 @@ export function useAppService() {
     else setScreen('home');
   };
 
-  const ready = bootReady(fontsReady, bootTimedOut, account.loading, loading, account.cloud, summary.me !== null || summary.error !== null);
+  const ready = bootCompleted || bootReady(fontsReady, bootTimedOut, account.loading, loading, account.cloud, summary.me !== null || summary.error !== null);
   const showBootLoading = useDelayedLoading(!ready);
-  useEffect(() => { if (ready) dismissStaticSplash(); }, [ready]);
+  useEffect(() => {
+    if (ready) {
+      setBootCompleted(true);
+      dismissStaticSplash();
+    }
+  }, [ready]);
   useSoundPreferences(sound);
 
   return {
