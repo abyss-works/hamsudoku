@@ -1,5 +1,7 @@
-import { useEffect, useRef, useState } from 'react';
-import { authApi, profileApi } from './accountApi';
+import { useCallback } from 'react';
+import type { AuthResult, ProfileResult } from './accountApi';
+import { useAuthService } from './useAuthService';
+import { useProfileService } from './useProfileService';
 
 export function useAccount(): {
   uid: string | null;
@@ -7,98 +9,105 @@ export function useAccount(): {
   nickname: string | null;
   cloud: boolean;
   loading: boolean;
-  signup: (email: string, password: string) => Promise<{ ok: boolean; msg?: string; code?: string }>;
-  signin: (email: string, password: string) => Promise<{ ok: boolean; msg?: string; code?: string }>;
+  signup: (email: string, password: string) => Promise<AuthResult>;
+  signin: (email: string, password: string) => Promise<AuthResult>;
   signout: () => Promise<void>;
   /** 진입점 예열 — 게스트의 익명 세션을 미리 확보한다. 로그인 사용자는 건드리지 않는다. */
   warmSession: () => Promise<void>;
-  reset: (email: string) => Promise<{ ok: boolean; msg?: string }>;
-  setPassword: (password: string) => Promise<{ ok: boolean; msg?: string }>;
-  saveNickname: (nickname: string) => Promise<{ ok: boolean; msg?: string; code?: string }>;
+  reset: (email: string) => Promise<AuthResult>;
+  setPassword: (password: string) => Promise<AuthResult>;
+  saveNickname: (nickname: string) => Promise<ProfileResult>;
 } {
-  const [uid, setUid] = useState<string | null>(null);
-  const [email, setEmail] = useState<string | null>(null);
-  const [nickname, setNickname] = useState<string | null>(null);
-  const [cloud, setCloud] = useState(true);
-  const [loading, setLoading] = useState(true);
-  const emailRef = useRef<string | null>(null);
-  emailRef.current = email;
+  const profile = useProfileService();
 
-  useEffect(() => {
-    authApi
-      .me()
-      .then(async ({ uid: id, email: mail, cloud: cl }) => {
-        setCloud(cl);
-        if (id) return { uid: id, email: mail, cloud: cl };
-        await authApi.session();
-        return authApi.me();
-      })
-      .then(({ uid: id, email: mail, cloud: cl }) => {
-        setUid(id);
-        setEmail(mail);
-        setCloud(cl);
-        setLoading(false);
-        if (id) {
-          void profileApi.get().then((p) => setNickname(p.nickname));
-        } else {
-          setNickname(null);
-        }
-      });
-  }, []);
+  const handleBootAuth = useCallback(
+    (uid: string | null) => {
+      if (uid) {
+        void profile.loadProfile(uid);
+      } else {
+        profile.resetProfile();
+      }
+    },
+    [profile]
+  );
 
-  const refresh = async () => {
-    const m = await authApi.me();
-    setUid(m.uid);
-    setEmail(m.email);
-    setCloud(m.cloud);
+  const auth = useAuthService({
+    onBootAuth: handleBootAuth,
+  });
+
+  const refreshAccount = useCallback(async () => {
+    const m = await auth.refresh();
     if (m.uid) {
-      const p = await profileApi.get();
-      setNickname(p.nickname);
+      await profile.loadProfile(m.uid);
     } else {
-      setNickname(null);
+      profile.resetProfile();
     }
-  };
+  }, [auth, profile]);
 
-  // 로그아웃·예열 뒤 게스트 복귀 — 익명 세션을 세우고 계정 상태를 읽는다.
-  // 세션 호출과 me()는 실패를 null로 흡수하므로 복원 실패 시 로그아웃 상태 그대로 둔다.
-  const restoreGuest = async () => {
-    await authApi.session();
-    await refresh();
-  };
+  const restoreGuest = useCallback(async () => {
+    const m = await auth.restoreGuest();
+    if (m.uid) {
+      await profile.loadProfile(m.uid);
+    } else {
+      profile.resetProfile();
+    }
+  }, [auth, profile]);
+
+  const signup = useCallback(
+    async (email: string, password: string) => {
+      const r = await auth.signup(email, password);
+      if (r.ok) await refreshAccount();
+      return r;
+    },
+    [auth, refreshAccount]
+  );
+
+  const signin = useCallback(
+    async (email: string, password: string) => {
+      const r = await auth.signin(email, password);
+      if (r.ok) await refreshAccount();
+      return r;
+    },
+    [auth, refreshAccount]
+  );
+
+  const signout = useCallback(async () => {
+    await auth.signout();
+    await restoreGuest();
+  }, [auth, restoreGuest]);
+
+  // 최신 상태 guard가 적용된 AuthService의 warmSession 계약을 조합
+  // 실제 세션 복원이 발생했을 때만 프로필을 동기화한다
+  const warmSession = useCallback(async () => {
+    const res = await auth.warmSession();
+    if (res.restored) {
+      if (res.me?.uid) {
+        await profile.loadProfile(res.me.uid);
+      } else {
+        profile.resetProfile();
+      }
+    }
+  }, [auth.warmSession, profile]);
+
+  const saveNickname = useCallback(
+    async (nickname: string) => {
+      return profile.saveNickname(nickname, auth.uid);
+    },
+    [auth.uid, profile]
+  );
 
   return {
-    uid,
-    email,
-    nickname,
-    cloud,
-    loading,
-    signup: async (e: string, p: string) => {
-      const r = await authApi.signup(e, p);
-      if (r.ok) await refresh();
-      return r;
-    },
-    signin: async (e: string, p: string) => {
-      const r = await authApi.signin(e, p);
-      if (r.ok) await refresh();
-      return r;
-    },
-    signout: async () => {
-      await authApi.signout();
-      // 로그아웃 뒤에는 게스트로 돌아온다. 익명 세션을 다시 세우지 않으면
-      // 세션 없는 상태가 남아 무한모드 게이트 같은 uid 전제가 어긋난다.
-      await restoreGuest();
-    },
-    warmSession: async () => {
-      // 로그인 사용자는 건드리지 않는다. 만료는 기존 401 경로가 처리한다.
-      if (emailRef.current) return;
-      await restoreGuest();
-    },
-    reset: (email: string) => authApi.reset(email),
-    setPassword: (password: string) => authApi.setPassword(password),
-    saveNickname: async (name: string) => {
-      const r = await profileApi.save(name);
-      if (r.ok) setNickname(r.nickname);
-      return r;
-    },
+    uid: auth.uid,
+    email: auth.email,
+    nickname: profile.nickname,
+    cloud: auth.cloud,
+    loading: auth.loading,
+    signup,
+    signin,
+    signout,
+    warmSession,
+    reset: auth.reset,
+    setPassword: auth.setPassword,
+    saveNickname,
   };
 }
