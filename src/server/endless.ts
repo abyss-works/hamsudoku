@@ -2,8 +2,8 @@ import type { ClearResponse } from '../shared/endless';
 import { seasonId } from '../shared/season';
 import type { DbPort } from './db';
 
-export const MIN_CLEAR_MS = 10_000;
-export const MIN_SUBMIT_GAP_MS = 5_000;
+export const MIN_CLEAR_MS = 3_000;
+export const MIN_SUBMIT_GAP_MS = 1_000;
 export const PERFECT_WINDOW = 20;
 export const PERFECT_SUSPICIOUS_AT = 16;
 
