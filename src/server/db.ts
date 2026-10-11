@@ -44,6 +44,22 @@ export interface EndlessEventRow {
   createdAt: string;
 }
 
+export const MAX_INT32 = 2_147_483_647;
+export const MAX_BIGINT64 = 9_223_372_036_854_775_807n;
+
+export function clampInt32(val: number): number {
+  if (val > MAX_INT32) return MAX_INT32;
+  if (val < 0) return 0;
+  return Math.round(val);
+}
+
+export function clampBigInt64(val: bigint): bigint {
+  if (val > MAX_BIGINT64) return MAX_BIGINT64;
+  if (val < 0n) return 0n;
+  return val;
+}
+
+
 export interface EndlessSupplyJobRow {
   id: string;
   policyVersion: string;
@@ -335,10 +351,10 @@ export function createMemoryDb(): DbPort {
     async updateStageStats(stageId: string, stats: { plays: number; clears: number; clearTotalMs: bigint; avgClearMs: number }) {
       const s = stages.get(stageId);
       if (s) {
-        s.plays = stats.plays;
-        s.clears = stats.clears;
-        s.clearTotalMs = stats.clearTotalMs;
-        s.avgClearMs = stats.avgClearMs;
+        s.plays = clampInt32(stats.plays);
+        s.clears = clampInt32(stats.clears);
+        s.clearTotalMs = clampBigInt64(stats.clearTotalMs);
+        s.avgClearMs = clampInt32(stats.avgClearMs);
       }
     },
     async injectInconsistentProgress(userId: string, stageId: string, input: { cleared: boolean; attempts: number }) {
@@ -351,6 +367,12 @@ export function createMemoryDb(): DbPort {
     async commitEndlessClear(userId, stageId, input) {
       const key = progressKey(userId, stageId);
       const prev = endlessProgress.get(key) ?? { cleared: false, attempts: 0, lastPlayedAt: '' };
+
+      // 이미 클리어한 스테이지에 대한 중복 제출 처리 (보상 및 통계 멱등성 보장)
+      if (prev.cleared) {
+        return { balance: balanceOf(userId), clearedCount: clearedCountOf(userId), streak: streakOf(userId) };
+      }
+
       endlessProgress.set(key, { cleared: true, attempts: prev.attempts + 1, lastPlayedAt: input.atIso });
       wallets.set(userId, balanceOf(userId) + input.earned);
       seedLedger.push({ userId, amount: input.earned, season: input.season });
@@ -372,10 +394,11 @@ export function createMemoryDb(): DbPort {
 
       const st = stages.get(stageId);
       if (st) {
-        const nextPlays = (st.plays ?? 0) + 1;
-        const nextClears = (st.clears ?? 0) + 1;
-        const nextTotalMs = (st.clearTotalMs ?? BigInt(0)) + BigInt(input.elapsedMs);
-        const nextAvgMs = Math.round(Number(nextTotalMs) / nextClears);
+        const nextPlays = clampInt32((st.plays ?? 0) + 1);
+        const nextClears = clampInt32((st.clears ?? 0) + 1);
+        const nextTotalMs = clampBigInt64((st.clearTotalMs ?? BigInt(0)) + BigInt(input.elapsedMs));
+        const rawAvgMs = nextClears > 0 ? Number(nextTotalMs / BigInt(nextClears)) : 0;
+        const nextAvgMs = clampInt32(rawAvgMs);
         st.plays = nextPlays;
         st.clears = nextClears;
         st.clearTotalMs = nextTotalMs;
@@ -394,7 +417,7 @@ export function createMemoryDb(): DbPort {
 
       const st = stages.get(stageId);
       if (st) {
-        st.plays = (st.plays ?? 0) + 1;
+        st.plays = clampInt32((st.plays ?? 0) + 1);
       }
 
       return { streak: next };
@@ -947,15 +970,34 @@ export function createPrismaDb(client: PrismaClient = prisma): DbPort {
       await client.endlessStage.update({
         where: { id: stageId },
         data: {
-          plays: stats.plays,
-          clears: stats.clears,
-          clearTotalMs: stats.clearTotalMs,
-          avgClearMs: stats.avgClearMs,
+          plays: clampInt32(stats.plays),
+          clears: clampInt32(stats.clears),
+          clearTotalMs: clampBigInt64(stats.clearTotalMs),
+          avgClearMs: clampInt32(stats.avgClearMs),
         },
       });
     },
     async commitEndlessClear(userId, stageId, input) {
       return client.$transaction(async (tx) => {
+        // 행 레벨 락으로 동시 클리어 시 가산 손실 방지
+        await tx.$queryRaw`SELECT id FROM "EndlessStage" WHERE id = ${stageId} FOR UPDATE`;
+
+        const prevProgress = await tx.endlessProgress.findUnique({
+          where: { userId_stageId: { userId, stageId } },
+        });
+
+        // 이미 클리어된 스테이지에 대한 중복 제출 처리 (보상 및 통계 멱등성 보장)
+        if (prevProgress?.cleared) {
+          const wallet = await tx.seedWallet.findUnique({ where: { userId } });
+          const streak = await tx.endlessStreak.findUnique({ where: { userId } });
+          const clearedCount = await tx.endlessProgress.count({ where: { userId, cleared: true } });
+          return {
+            balance: wallet?.balance ?? 0,
+            clearedCount,
+            streak: { current: streak?.current ?? 0, best: streak?.best ?? 0 },
+          };
+        }
+
         await tx.endlessProgress.upsert({
           where: { userId_stageId: { userId, stageId } },
           create: { userId, stageId, cleared: true, attempts: 1, lastPlayedAt: new Date(input.atIso) },
@@ -983,13 +1025,15 @@ export function createPrismaDb(client: PrismaClient = prisma): DbPort {
 
         const stageRow = await tx.endlessStage.findUnique({ where: { id: stageId } });
         if (stageRow) {
-          const nextClears = stageRow.clears + 1;
-          const nextClearTotalMs = stageRow.clearTotalMs + BigInt(input.elapsedMs);
-          const nextAvgClearMs = Math.round(Number(nextClearTotalMs) / nextClears);
+          const nextPlays = clampInt32(stageRow.plays + 1);
+          const nextClears = clampInt32(stageRow.clears + 1);
+          const nextClearTotalMs = clampBigInt64(stageRow.clearTotalMs + BigInt(input.elapsedMs));
+          const rawAvgMs = nextClears > 0 ? Number(nextClearTotalMs / BigInt(nextClears)) : 0;
+          const nextAvgClearMs = clampInt32(rawAvgMs);
           await tx.endlessStage.update({
             where: { id: stageId },
             data: {
-              plays: { increment: 1 },
+              plays: nextPlays,
               clears: nextClears,
               clearTotalMs: nextClearTotalMs,
               avgClearMs: nextAvgClearMs,
@@ -1003,6 +1047,7 @@ export function createPrismaDb(client: PrismaClient = prisma): DbPort {
     },
     async commitEndlessFail(userId, stageId, atIso) {
       return client.$transaction(async (tx) => {
+        await tx.$queryRaw`SELECT id FROM "EndlessStage" WHERE id = ${stageId} FOR UPDATE`;
         await tx.endlessProgress.upsert({
           where: { userId_stageId: { userId, stageId } },
           create: { userId, stageId, cleared: false, attempts: 1, lastPlayedAt: new Date(atIso) },
@@ -1015,10 +1060,14 @@ export function createPrismaDb(client: PrismaClient = prisma): DbPort {
           update: { current: 0 },
         });
 
-        await tx.endlessStage.update({
-          where: { id: stageId },
-          data: { plays: { increment: 1 } },
-        });
+        const stageRow = await tx.endlessStage.findUnique({ where: { id: stageId } });
+        if (stageRow) {
+          const nextPlays = clampInt32(stageRow.plays + 1);
+          await tx.endlessStage.update({
+            where: { id: stageId },
+            data: { plays: nextPlays },
+          });
+        }
 
         return { streak: { current: streak.current, best: streak.best } };
       });

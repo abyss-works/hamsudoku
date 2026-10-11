@@ -121,6 +121,101 @@ describe('endless DbPort', () => {
     await db.commitEndlessClear('u1', 'e-2', { earned: 3, season: '2026-W41', seedLeft: 3, elapsedMs: 20000, suspicious: false, atIso: '2026-10-07T00:00:00.000Z' });
     expect(await db.countZeroClearStages()).toBe(0);
   });
+
+  it('동일 사용자의 중복 클리어 제출 시 보상 지급과 스테이지 클리어 통계가 중복 가산되지 않는다', async () => {
+    const db = createMemoryDb();
+    await db.insertStage(stage('e-1'));
+
+    // 첫 번째 클리어: 정상 보상 및 통계 반영
+    const s1 = await db.commitEndlessClear('u1', 'e-1', {
+      earned: 3,
+      season: '2026-W41',
+      seedLeft: 3,
+      elapsedMs: 20000,
+      suspicious: false,
+      atIso: '2026-10-07T00:00:00.000Z',
+    });
+    expect(s1.balance).toBe(3);
+    expect(s1.clearedCount).toBe(1);
+
+    const st1 = await db.getStage('e-1');
+    expect(st1?.clears).toBe(1);
+    expect(st1?.plays).toBe(1);
+
+    // 중복 클리어 제출 (네트워크 재전송 또는 중복 요청)
+    const s2 = await db.commitEndlessClear('u1', 'e-1', {
+      earned: 3,
+      season: '2026-W41',
+      seedLeft: 3,
+      elapsedMs: 25000,
+      suspicious: false,
+      atIso: '2026-10-07T00:00:10.000Z',
+    });
+    // 보상 및 클리어 수 중복 증가 방지
+    expect(s2.balance).toBe(3);
+    expect(s2.clearedCount).toBe(1);
+
+    const st2 = await db.getStage('e-1');
+    expect(st2?.clears).toBe(1);
+    expect(st2?.plays).toBe(1);
+    expect(st2?.clearTotalMs).toBe(BigInt(20000));
+  });
+
+  it('Int 및 BigInt 상한을 초과하는 대규모 경과 시간에 대해 오버플로 없이 상한값으로 안전하게 클램핑된다', async () => {
+    const db = createMemoryDb();
+    await db.insertStage(stage('e-1'));
+
+    // 32비트 부호 있는 정수 상한(2,147,483,647)을 초과하는 큰 밀리초 경과 시간
+    await db.commitEndlessClear('u1', 'e-1', {
+      earned: 1,
+      season: '2026-W41',
+      seedLeft: 3,
+      elapsedMs: 3_000_000_000,
+      suspicious: false,
+      atIso: '2026-10-07T00:00:00.000Z',
+    });
+
+    const st = await db.getStage('e-1');
+    expect(st?.avgClearMs).toBe(2_147_483_647);
+  });
+
+  it('동시 클리어 요청 시 가산 손실 없이 plays, clears, clearTotalMs가 원자적으로 누적된다', async () => {
+    const db = createMemoryDb();
+    await db.insertStage(stage('e-1'));
+
+    await Promise.all([
+      db.commitEndlessClear('u1', 'e-1', {
+        earned: 1,
+        season: '2026-W41',
+        seedLeft: 3,
+        elapsedMs: 10000,
+        suspicious: false,
+        atIso: '2026-10-07T00:00:00.000Z',
+      }),
+      db.commitEndlessClear('u2', 'e-1', {
+        earned: 1,
+        season: '2026-W41',
+        seedLeft: 3,
+        elapsedMs: 20000,
+        suspicious: false,
+        atIso: '2026-10-07T00:00:01.000Z',
+      }),
+      db.commitEndlessClear('u3', 'e-1', {
+        earned: 1,
+        season: '2026-W41',
+        seedLeft: 3,
+        elapsedMs: 30000,
+        suspicious: false,
+        atIso: '2026-10-07T00:00:02.000Z',
+      }),
+    ]);
+
+    const st = await db.getStage('e-1');
+    expect(st?.plays).toBe(3);
+    expect(st?.clears).toBe(3);
+    expect(st?.clearTotalMs).toBe(BigInt(60000));
+    expect(st?.avgClearMs).toBe(20000);
+  });
 });
 
 describe('ensureUser 경합', () => {
