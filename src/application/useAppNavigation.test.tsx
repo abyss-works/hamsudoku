@@ -3,14 +3,22 @@ import { act, cleanup, renderHook } from '@testing-library/react';
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 import { useAppNavigation } from './useAppNavigation';
 import type { Chapter } from '../features/stages/stagesApi';
+import type { Puzzle } from '../features/sudoku/model/puzzles';
+
+const dummyPuzzle: Puzzle = {
+  name: 'dummy',
+  size: 5,
+  islands: [[0]],
+  solution: [[0, 0]],
+};
 
 const dummyChapters: Chapter[] = [
   {
     id: 'ch1',
     title: '챕터 1',
     stages: [
-      { id: 's1', code: '1-1', title: '스테이지 1', locked: false, puzzle: {} as any },
-      { id: 's2', code: '1-2', title: '스테이지 2', locked: false, puzzle: {} as any },
+      { id: 's1', code: '1-1', title: '스테이지 1', locked: false, puzzle: dummyPuzzle },
+      { id: 's2', code: '1-2', title: '스테이지 2', locked: false, puzzle: dummyPuzzle },
     ],
   },
 ];

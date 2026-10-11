@@ -1,10 +1,14 @@
 // @vitest-environment jsdom
 import { act, cleanup, renderHook, waitFor } from '@testing-library/react';
 import { StrictMode } from 'react';
-import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
+import { afterEach, beforeEach, describe, expect, it, vi, type Mock } from 'vitest';
 import type { Stage } from './stagesApi';
+import type { Puzzle } from '../sudoku/model/puzzles';
 import type { ClearEntry } from '../../platform/storage/save';
-import { useStageRecordsSync } from './useStageRecordsSync';
+import {
+  useStageRecordsSync,
+  type StageRecordsAccountContext,
+} from './useStageRecordsSync';
 
 const syncMocks = vi.hoisted(() => ({
   fetchAttemptKey: vi.fn(),
@@ -21,20 +25,27 @@ vi.mock('./sync', () => ({
 }));
 
 describe('스테이지 기록 동기화 (useStageRecordsSync)', () => {
+  const dummyPuzzle: Puzzle = {
+    name: '첫 판',
+    size: 5,
+    islands: [[0]],
+    solution: [[0, 0]],
+  };
+
   const dummyStage: Stage = {
     id: 's1',
     code: '1-1',
     title: '첫 판',
     locked: false,
-    puzzle: { cells: [], givens: [] } as any,
+    puzzle: dummyPuzzle,
   };
 
   let mockClears: Map<string, ClearEntry>;
-  let mockRecord: any;
-  let mockReplace: any;
-  let mockMergeIn: any;
-  let mockOnUnauthorized: any;
-  let defaultAccount: { uid: string | null; email: string | null; cloud: boolean; loading: boolean };
+  let mockRecord: Mock<(code: string, elapsedSec: number) => void>;
+  let mockReplace: Mock<(entries: ClearEntry[]) => void>;
+  let mockMergeIn: Mock<(entries: ClearEntry[]) => void>;
+  let mockOnUnauthorized: Mock<() => void>;
+  let defaultAccount: StageRecordsAccountContext;
 
   beforeEach(() => {
     vi.clearAllMocks();

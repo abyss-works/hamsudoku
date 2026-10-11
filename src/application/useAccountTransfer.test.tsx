@@ -1,17 +1,17 @@
 // @vitest-environment jsdom
 import { act, cleanup, renderHook } from '@testing-library/react';
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
-import { useAccountTransfer } from './useAccountTransfer';
+import { useAccountTransfer, type AccountTransferOptions } from './useAccountTransfer';
 
 describe('계정 전환 조율 (useAccountTransfer)', () => {
-  const mockAccount = {
+  const mockAccount: AccountTransferOptions['account'] = {
     signin: vi.fn(),
     signout: vi.fn(),
   };
-  const mockSummary = {
+  const mockSummary: AccountTransferOptions['summary'] = {
     refreshSoft: vi.fn(),
   };
-  const mockRecordsSync = {
+  const mockRecordsSync: AccountTransferOptions['recordsSync'] = {
     markSwitched: vi.fn(),
     beginSwitch: vi.fn(),
     cancelSwitch: vi.fn(),
@@ -22,9 +22,9 @@ describe('계정 전환 조율 (useAccountTransfer)', () => {
 
   beforeEach(() => {
     vi.clearAllMocks();
-    mockAccount.signin.mockResolvedValue({ ok: true });
-    mockAccount.signout.mockResolvedValue(undefined);
-    mockSummary.refreshSoft.mockResolvedValue(undefined);
+    vi.mocked(mockAccount.signin).mockResolvedValue({ ok: true });
+    vi.mocked(mockAccount.signout).mockResolvedValue(undefined);
+    vi.mocked(mockSummary.refreshSoft).mockResolvedValue(null);
   });
 
   afterEach(cleanup);
@@ -32,9 +32,9 @@ describe('계정 전환 조율 (useAccountTransfer)', () => {
   it('signinThenSwitch 성공 시 recordsSync.markSwitched를 호출하고 로그인 결과를 반환한다', async () => {
     const { result } = renderHook(() =>
       useAccountTransfer({
-        account: mockAccount as any,
-        summary: mockSummary as any,
-        recordsSync: mockRecordsSync as any,
+        account: mockAccount,
+        summary: mockSummary,
+        recordsSync: mockRecordsSync,
         resetClears: mockResetClears,
         onLogoutComplete: mockOnLogoutComplete,
       })
@@ -50,13 +50,13 @@ describe('계정 전환 조율 (useAccountTransfer)', () => {
   });
 
   it('signinThenSwitch 실패 시 cancelSwitch를 호출하여 플래그를 복구한다', async () => {
-    mockAccount.signin.mockResolvedValue({ ok: false, error: 'fail' });
+    vi.mocked(mockAccount.signin).mockResolvedValue({ ok: false, msg: 'fail' });
 
     const { result } = renderHook(() =>
       useAccountTransfer({
-        account: mockAccount as any,
-        summary: mockSummary as any,
-        recordsSync: mockRecordsSync as any,
+        account: mockAccount,
+        summary: mockSummary,
+        recordsSync: mockRecordsSync,
         resetClears: mockResetClears,
         onLogoutComplete: mockOnLogoutComplete,
       })
@@ -68,15 +68,15 @@ describe('계정 전환 조율 (useAccountTransfer)', () => {
 
     expect(mockRecordsSync.markSwitched).toHaveBeenCalledWith(true);
     expect(mockRecordsSync.cancelSwitch).toHaveBeenCalled();
-    expect(res).toEqual({ ok: false, error: 'fail' });
+    expect(res).toEqual({ ok: false, msg: 'fail' });
   });
 
   it('beginSwitch 호출 시 recordsSync.beginSwitch를 호출한다', () => {
     const { result } = renderHook(() =>
       useAccountTransfer({
-        account: mockAccount as any,
-        summary: mockSummary as any,
-        recordsSync: mockRecordsSync as any,
+        account: mockAccount,
+        summary: mockSummary,
+        recordsSync: mockRecordsSync,
         resetClears: mockResetClears,
         onLogoutComplete: mockOnLogoutComplete,
       })
@@ -89,9 +89,9 @@ describe('계정 전환 조율 (useAccountTransfer)', () => {
   it('cancelSignin 호출 시 cancelSwitch를 실행하고 signout 및 summary.refreshSoft를 호출한다', async () => {
     const { result } = renderHook(() =>
       useAccountTransfer({
-        account: mockAccount as any,
-        summary: mockSummary as any,
-        recordsSync: mockRecordsSync as any,
+        account: mockAccount,
+        summary: mockSummary,
+        recordsSync: mockRecordsSync,
         resetClears: mockResetClears,
         onLogoutComplete: mockOnLogoutComplete,
       })
@@ -107,9 +107,9 @@ describe('계정 전환 조율 (useAccountTransfer)', () => {
   it('handleLogout 호출 시 resetSync를 실행하고 signout 후 resetClears 및 onLogoutComplete를 호출한다', async () => {
     const { result } = renderHook(() =>
       useAccountTransfer({
-        account: mockAccount as any,
-        summary: mockSummary as any,
-        recordsSync: mockRecordsSync as any,
+        account: mockAccount,
+        summary: mockSummary,
+        recordsSync: mockRecordsSync,
         resetClears: mockResetClears,
         onLogoutComplete: mockOnLogoutComplete,
       })

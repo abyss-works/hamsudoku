@@ -5,7 +5,7 @@ import type { useStageRecordsSync } from '../features/stages/useStageRecordsSync
 export interface AccountTransferOptions {
   account: Pick<ReturnType<typeof useAccount>, 'signin' | 'signout'>;
   summary: Pick<ReturnType<typeof useEndlessSummary>, 'refreshSoft'>;
-  recordsSync: ReturnType<typeof useStageRecordsSync>;
+  recordsSync: Pick<ReturnType<typeof useStageRecordsSync>, 'markSwitched' | 'beginSwitch' | 'cancelSwitch' | 'resetSync'>;
   resetClears: () => void;
   onLogoutComplete: () => void;
 }
