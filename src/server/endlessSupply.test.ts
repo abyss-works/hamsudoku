@@ -1,5 +1,8 @@
-import { describe, expect, it } from 'vitest';
-import { createMemoryDb } from './db';
+import { describe, expect, it, vi } from 'vitest';
+import { PrismaPg } from '@prisma/adapter-pg';
+import type { PrismaClient } from '@prisma/client';
+import { Pool } from 'pg';
+import { createMemoryDb, createPrismaDb } from './db';
 import {
   evaluateSupplyDecision,
   requestSupply,
@@ -252,21 +255,29 @@ describe('requestSupply with DB integration', () => {
     expect(res2.jobId).not.toBe(res1.jobId);
   });
 
-  it('Prisma 어댑터 fake transaction 경계에서도 advisory lock과 원자적 공급 결정이 동작한다', async () => {
-    const fakePrismaDb = createMemoryDb();
-    let lockCalls = 0;
-
-    // Prisma $queryRaw 및 transaction 시뮬레이션
-    const origAtomic = fakePrismaDb.atomicRequestSupply;
-    if (origAtomic) {
-      fakePrismaDb.atomicRequestSupply = async (nowIso, params) => {
-        lockCalls += 1;
-        return origAtomic.call(fakePrismaDb, nowIso, params);
-      };
+  it('실제 PrismaPg 어댑터에서 공급 잠금의 void 반환값을 역직렬화하지 않는다', async () => {
+    const pool = new Pool();
+    vi.spyOn(pool, 'query').mockResolvedValue({
+      fields: [{ name: 'pg_advisory_xact_lock', dataTypeID: 2278 }],
+      rows: [['']], rowCount: 1, command: 'SELECT', oid: 0,
+    } as never);
+    const adapter = await new PrismaPg(pool).connect();
+    const query = { sql: "SELECT pg_advisory_xact_lock(hashtext('endless_supply_lock'))", args: [], argTypes: [] };
+    const tx = {
+      $queryRaw: () => adapter.queryRaw(query),
+      $executeRaw: () => adapter.executeRaw(query),
+      endlessStage: { count: async () => 20 },
+    };
+    const client = {
+      $transaction: async (run: (transaction: typeof tx) => Promise<unknown>) => run(tx),
+    } as unknown as PrismaClient;
+    try {
+      const result = await createPrismaDb(client).atomicRequestSupply('2026-10-11T12:00:00.000Z');
+      expect(result.action).toBe('sufficient_stock');
+      expect(pool.query).toHaveBeenCalledOnce();
+    } finally {
+      await adapter.dispose();
+      await pool.end();
     }
-
-    const res = await requestSupply(fakePrismaDb, '2026-10-11T12:00:00.000Z');
-    expect(res.action).toBe('enqueued');
-    expect(lockCalls).toBe(1);
   });
 });

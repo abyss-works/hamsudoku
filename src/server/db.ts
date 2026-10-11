@@ -1863,7 +1863,7 @@ export function createPrismaDb(client: PrismaClient = prisma): DbPort {
     async atomicRequestSupply(nowIso, options = {}) {
       return client.$transaction(async (tx) => {
         // 공급 scope advisory lock 획득
-        await tx.$queryRaw`SELECT pg_advisory_xact_lock(hashtext('endless_supply_lock'))`;
+        await tx.$executeRaw`SELECT pg_advisory_xact_lock(hashtext('endless_supply_lock'))`;
 
         const stockThreshold = options.stockThreshold ?? 20;
         const cooldownMs = options.cooldownMs ?? 60_000;
