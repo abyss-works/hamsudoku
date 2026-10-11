@@ -1,124 +1,85 @@
-import { createHash, createHmac, timingSafeEqual } from 'node:crypto';
+import { Receiver } from '@upstash/qstash';
+import { timingSafeEqual } from 'node:crypto';
 
 export interface VerifyQStashOptions {
   signature: string | null | undefined;
   body?: string;
+  url?: string;
   currentSigningKey?: string;
   nextSigningKey?: string;
-  clockToleranceSeconds?: number;
+  clockTolerance?: number;
 }
 
-export function computeBodyHash(body: string): { base64: string; base64url: string } {
-  const hash = createHash('sha256').update(body).digest();
-  return {
-    base64: hash.toString('base64'),
-    base64url: hash.toString('base64url'),
-  };
-}
-
-export function createTestQStashSignature(
-  claims: {
-    iss?: string;
-    sub?: string;
-    exp?: number;
-    nbf?: number;
-    body?: string;
-    [key: string]: unknown;
-  },
-  key: string,
-): string {
-  const header = { alg: 'HS256', typ: 'JWT' };
-  const encode = (obj: unknown) => Buffer.from(JSON.stringify(obj)).toString('base64url');
-  const unsignedToken = `${encode(header)}.${encode(claims)}`;
-  const sig = createHmac('sha256', key).update(unsignedToken).digest('base64url');
-  return `${unsignedToken}.${sig}`;
-}
-
-export function verifyQStashSignature(options: VerifyQStashOptions): boolean {
+/**
+ * 공식 @upstash/qstash Receiver를 사용하여 QStash 웹훅 서명을 검증한다.
+ * URL(sub), body hash, issuer(Upstash), 만료시간(exp), not-before(nbf), 서명 키 회전을 검증한다.
+ */
+export async function verifyQStashSignature(options: VerifyQStashOptions): Promise<boolean> {
   const {
     signature,
-    body,
+    body = '',
+    url,
     currentSigningKey = process.env.QSTASH_CURRENT_SIGNING_KEY,
     nextSigningKey = process.env.QSTASH_NEXT_SIGNING_KEY,
-    clockToleranceSeconds = 300,
+    clockTolerance = 300,
   } = options;
 
   if (!signature) return false;
+  if (!currentSigningKey && !nextSigningKey) return false;
 
-  const keys = [currentSigningKey, nextSigningKey].filter((k): k is string => Boolean(k));
-  if (keys.length === 0) return false;
-
-  const parts = signature.split('.');
-  if (parts.length !== 3) return false;
-
-  const [headerB64, payloadB64, sigB64] = parts;
-  const unsignedToken = `${headerB64}.${payloadB64}`;
-
-  let validKey = false;
-  let sigBuf: Buffer;
-  try {
-    sigBuf = Buffer.from(sigB64, 'base64url');
-  } catch {
-    return false;
-  }
-
-  for (const key of keys) {
-    const expectedSigBuf = createHmac('sha256', key).update(unsignedToken).digest();
-    if (sigBuf.length === expectedSigBuf.length && timingSafeEqual(sigBuf, expectedSigBuf)) {
-      validKey = true;
-      break;
-    }
-  }
-  if (!validKey) return false;
+  // Receiver는 currentSigningKey와 nextSigningKey가 둘 다 제공되어야 동작하므로 회전 전 단일 키 상태면 폴백한다.
+  const receiver = new Receiver({
+    currentSigningKey: currentSigningKey || nextSigningKey,
+    nextSigningKey: nextSigningKey || currentSigningKey,
+  });
 
   try {
-    const payloadJson = Buffer.from(payloadB64, 'base64url').toString('utf8');
-    const payload = JSON.parse(payloadJson);
-
-    if (payload.iss && payload.iss !== 'Upstash') return false;
-
-    const now = Math.floor(Date.now() / 1000);
-    if (typeof payload.exp === 'number' && payload.exp < now) {
-      return false;
-    }
-    if (typeof payload.nbf === 'number' && payload.nbf > now + clockToleranceSeconds) {
-      return false;
-    }
-
-    if (payload.body !== undefined && body !== undefined) {
-      const hashes = computeBodyHash(body);
-      if (payload.body !== hashes.base64 && payload.body !== hashes.base64url) {
-        return false;
-      }
-    }
-
-    return true;
+    return await receiver.verify({
+      signature,
+      body,
+      url,
+      clockTolerance,
+    });
   } catch {
     return false;
   }
 }
 
-export function verifyInternalRequest(
+function safeCompare(a: string, b: string): boolean {
+  const bufA = Buffer.from(a);
+  const bufB = Buffer.from(b);
+  if (bufA.length !== bufB.length) return false;
+  return timingSafeEqual(bufA, bufB);
+}
+
+/**
+ * 내부 작업 요청 인증을 수행한다.
+ * 1. QStash 서명(upstash-signature 헤더)을 우선 검증한다.
+ * 2. QStash 서명이 없거나 유효하지 않은 경우, 관리자/긴급 수동 호출을 위해 의도적으로 Bearer admin fallback을 timing-safe 비교로 검증한다.
+ */
+export async function verifyInternalRequest(
   req: Request,
   rawBody: string,
   env: Record<string, string | undefined> = process.env,
-): boolean {
+): Promise<boolean> {
   const qstashSig = req.headers.get('upstash-signature');
   if (qstashSig) {
-    const ok = verifyQStashSignature({
+    const ok = await verifyQStashSignature({
       signature: qstashSig,
       body: rawBody,
+      url: req.url,
       currentSigningKey: env.QSTASH_CURRENT_SIGNING_KEY,
       nextSigningKey: env.QSTASH_NEXT_SIGNING_KEY,
     });
     if (ok) return true;
   }
 
+  // Bearer admin fallback: 의도적으로 별도 명시된 관리자 및 수동 복구용 경로 (timing-safe 비교)
   const authHeader = req.headers.get('authorization');
   if (authHeader?.startsWith('Bearer ')) {
     const token = authHeader.slice(7).trim();
     const internalSecret = env.INTERNAL_SECRET || env.CRON_SECRET;
-    if (internalSecret && token === internalSecret) {
+    if (internalSecret && safeCompare(token, internalSecret)) {
       return true;
     }
   }

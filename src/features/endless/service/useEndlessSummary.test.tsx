@@ -116,6 +116,25 @@ describe('useEndlessSummary', () => {
     // 상태가 바뀌기 전 렌더의 값이 아니라 방금 가져온 값을 쓴다.
     expect(returned).toBe(72);
   });
+
+  it('랭킹 API(/api/endless/rank)가 실패해도 개인 요약(/api/endless/me)은 정상 로드된다', async () => {
+    vi.stubGlobal(
+      'fetch',
+      vi.fn(async (url: string) => {
+        if (url === '/api/endless/me')
+          return Response.json({ wallet: { balance: 15 }, clearedCount: 4, streak: { current: 2, best: 5 }, season: '2026-W41' });
+        if (url === '/api/endless/rank')
+          return new Response(null, { status: 500 });
+        throw new Error(`unexpected ${url}`);
+      }),
+    );
+    const { result } = renderHook(() => useEndlessSummary(true), { wrapper: QueryProvider });
+    await waitFor(() => {
+      expect(result.current.me?.wallet.balance).toBe(15);
+    });
+    expect(result.current.rank).toBeNull();
+  });
 });
+
 
 

@@ -84,15 +84,17 @@ model SeedWallet {
 }
 
 model SeedLedger {
-  id        String   @id @default(uuid())
-  userId    String
-  kind      String
-  amount    Int
-  stageId   String?
-  season    String
-  createdAt DateTime @default(now())
+  id              String   @id @default(uuid())
+  userId          String
+  kind            String
+  amount          Int
+  stageId         String?
+  season          String
+  rankingEligible Boolean  @default(true)
+  createdAt       DateTime @default(now())
 
   @@index([season, kind])
+  @@index([season, rankingEligible])
   @@index([userId, season])
 }
 

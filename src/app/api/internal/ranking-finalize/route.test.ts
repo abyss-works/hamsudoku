@@ -2,7 +2,7 @@
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 import { GET as getRankRoute } from '../../endless/rank/route';
 import { createMemoryDb, type DbPort } from '../../../../server/db';
-import { createTestQStashSignature } from '../../../../server/qstash';
+import { createTestQStashSignature } from '../../../../server/qstashTestHelper';
 import { POST } from './route';
 
 const TEST_SECRET = 'test_internal_secret_value';
@@ -68,6 +68,45 @@ describe('/api/internal/ranking-finalize 및 자동 확정/복구', () => {
     expect(resBadSig.status).toBe(401);
   });
 
+  it('zod 요청 검증: null, 배열, 숫자, 유효하지 않은 season은 500이 아닌 400을 반환한다', async () => {
+    // 1. 배열 본문
+    const reqArray = new Request('http://localhost/api/internal/ranking-finalize', {
+      method: 'POST',
+      headers: { authorization: `Bearer ${TEST_SECRET}` },
+      body: JSON.stringify([1, 2, 3]),
+    });
+    const resArray = await POST(reqArray);
+    expect(resArray.status).toBe(400);
+
+    // 2. 숫자 본문
+    const reqNum = new Request('http://localhost/api/internal/ranking-finalize', {
+      method: 'POST',
+      headers: { authorization: `Bearer ${TEST_SECRET}` },
+      body: '12345',
+    });
+    const resNum = await POST(reqNum);
+    expect(resNum.status).toBe(400);
+
+    // 3. null 본문
+    const reqNull = new Request('http://localhost/api/internal/ranking-finalize', {
+      method: 'POST',
+      headers: { authorization: `Bearer ${TEST_SECRET}` },
+      body: 'null',
+    });
+    const resNull = await POST(reqNull);
+    expect(resNull.status).toBe(400);
+
+    // 4. 잘못된 형식의 season
+    const reqBadSeason = new Request('http://localhost/api/internal/ranking-finalize', {
+      method: 'POST',
+      headers: { authorization: `Bearer ${TEST_SECRET}` },
+      body: JSON.stringify({ season: 'invalid-season-format' }),
+    });
+    const resBadSeason = await POST(reqBadSeason);
+    expect(resBadSeason.status).toBe(400);
+  });
+
+
   it('정상 확정 후 재전달(재시도) 시 멱등하게 동일 결과를 반환한다', async () => {
     // 2026-W41 (2026-10-05 04:00 KST ~ 2026-10-12 00:00 KST)
     // 2026-10-05 04:00 KST = 2026-10-04 19:00:00 UTC
@@ -96,6 +135,7 @@ describe('/api/internal/ranking-finalize 및 자동 확정/복구', () => {
     const sig = createTestQStashSignature(
       { iss: 'Upstash', exp: Math.floor(Date.now() / 1000) + 300 },
       TEST_KEY,
+      payload,
     );
 
     // 1회차 호출

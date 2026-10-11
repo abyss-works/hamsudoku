@@ -15,15 +15,21 @@ export function rankModel(
   uid: string | null,
   signedIn: boolean,
 ) {
-  const live = myRank ? { score: myRank.score, nickname: myRank.nickname } : undefined;
+  // 시즌/요청세대가 다른 hot 응답은 병합하지 않는다.
+  const isMatchingSeason = !myRank?.season || !rank?.season || myRank.season === rank.season;
+  const effectiveMyRank = isMatchingSeason ? myRank : null;
+
+  const live = effectiveMyRank ? { score: effectiveMyRank.score, nickname: effectiveMyRank.nickname } : undefined;
   const merged = rank && uid && signedIn ? mergeRankEntries(rank, uid, live) : null;
   const entries = merged?.entries ?? rank?.top ?? [];
-  const myScore = myRank?.score ?? rank?.me.score ?? 0;
+  const myScore = effectiveMyRank?.score ?? rank?.me.score ?? 0;
   const fallbackNo = rank?.me.rank ?? null;
-  const myRankNo = myRank ? myRank.rank : fallbackNo === null ? null : (merged?.meRank ?? fallbackNo);
+  const myRankNo = effectiveMyRank ? effectiveMyRank.rank : fallbackNo === null ? null : (merged?.meRank ?? fallbackNo);
 
   const season = rank?.season ?? null;
   const frozen = Boolean(rank?.frozen);
+  const status = rank?.status ?? (frozen ? 'aggregating' : 'active');
+  const isAggregating = status === 'aggregating';
   const rows: RankRowModel[] = entries.map((e, i) => ({
     userId: e.userId,
     rankNo: i + 1,
@@ -44,6 +50,8 @@ export function rankModel(
     myRankNo,
     season,
     frozen,
+    status,
+    isAggregating,
     rows,
     empty,
     myRankSummary,

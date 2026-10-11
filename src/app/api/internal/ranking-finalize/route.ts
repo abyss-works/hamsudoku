@@ -1,7 +1,16 @@
 import { NextResponse } from 'next/server';
+import { z } from 'zod';
+import { seasonIdSchema } from '../../../../shared/endless';
 import { createPrismaDb } from '../../../../server/db';
 import { verifyInternalRequest } from '../../../../server/qstash';
 import { finalizeSeason, recoverUnfinalizedSeasons } from '../../../../server/seasonFinalization';
+
+const finalizeBodySchema = z
+  .object({
+    season: seasonIdSchema.optional(),
+    recover: z.boolean().optional(),
+  })
+  .strict();
 
 export async function POST(req: Request) {
   let rawBody = '';
@@ -11,14 +20,20 @@ export async function POST(req: Request) {
     rawBody = '';
   }
 
-  if (!verifyInternalRequest(req, rawBody)) {
+  const authenticated = await verifyInternalRequest(req, rawBody);
+  if (!authenticated) {
     return NextResponse.json({ ok: false, msg: '인증에 실패했어요.' }, { status: 401 });
   }
 
-  let body: { season?: string; recover?: boolean } = {};
+  let body: z.infer<typeof finalizeBodySchema> = {};
   if (rawBody.trim()) {
     try {
-      body = JSON.parse(rawBody);
+      const parsedJson = JSON.parse(rawBody);
+      const result = finalizeBodySchema.safeParse(parsedJson);
+      if (!result.success) {
+        return NextResponse.json({ ok: false, msg: '잘못된 본문 형식이에요.' }, { status: 400 });
+      }
+      body = result.data;
     } catch {
       return NextResponse.json({ ok: false, msg: '잘못된 본문 형식이에요.' }, { status: 400 });
     }

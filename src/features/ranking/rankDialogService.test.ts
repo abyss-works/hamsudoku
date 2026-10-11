@@ -8,6 +8,7 @@ describe('rankDialogService', () => {
       season: '2026-W41',
       snapshotAt: '2026-10-10T00:00:00Z',
       frozen: false,
+      status: 'active',
       top: [
         { userId: 'u1', nickname: '햄찌', score: 100 },
         { userId: 'u2', nickname: null, score: 50 },

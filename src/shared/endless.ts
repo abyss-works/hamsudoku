@@ -59,10 +59,12 @@ export const rankResponseSchema = z.object({
   snapshotAt: z.iso.datetime(),
   me: z.object({ rank: z.number().int().min(1).nullable(), score: z.number().int().min(0) }),
   frozen: z.boolean(),
+  status: z.enum(['active', 'aggregating', 'finalized']).default('active'),
 });
 
 /** 내 순위 별도 조회 응답. 스냅샷을 거치지 않은 실시간 값이다. */
 export const myRankResponseSchema = z.object({
+  season: seasonIdSchema.optional(),
   rank: z.number().int().min(1).nullable(),
   score: z.number().int().min(0),
   nickname: z.string().nullable(),

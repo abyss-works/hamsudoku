@@ -4,7 +4,8 @@ import { rankedSeasonId, rankingFrozen, seasonWindow } from '../../../../shared/
 import { getSessionUser } from '../../../../server/auth';
 import { createPrismaDb } from '../../../../server/db';
 import { rankStoreFromEnv } from '../../../../server/rank';
-import { getFinalizedSeasonRank } from '../../../../server/seasonFinalization';
+import { createQStashPublisher } from '../../../../server/qstashPublisher';
+import { getFinalizedSeasonTop, getFinalizedUserRank } from '../../../../server/seasonFinalization';
 
 export async function GET() {
   const { uid } = await getSessionUser();
@@ -14,25 +15,26 @@ export async function GET() {
   const season = rankedSeasonId(now);
   const db = createPrismaDb();
 
-  // 1. 이미 확정된 시즌이면 DB의 확정 결과를 우선 반환한다.
-  const finalized = await getFinalizedSeasonRank(db, season);
-  if (finalized) {
-    const top50 = finalized.results.slice(0, 50);
+  // 1. 이미 확정된 시즌이면 DB의 확정 결과를 우선 반환한다 (Top 50 및 유저 순위 분할 조회).
+  const finalizedTop = await getFinalizedSeasonTop(db, season, 50);
+  if (finalizedTop) {
+    const top50 = finalizedTop.results.slice(0, 50);
     const nicknames = await db.lookupNicknames(top50.map((r) => r.userId));
     const top: RankEntry[] = top50.map((r) => ({
       userId: r.userId,
       nickname: nicknames[r.userId] ?? null,
       score: r.score,
     }));
-    const meRes = finalized.results.find((r) => r.userId === uid);
+    const meRes = await getFinalizedUserRank(db, season, uid);
     const me = { rank: meRes?.rank ?? null, score: meRes?.score ?? 0 };
     return NextResponse.json(
       rankResponseSchema.parse({
         season,
         top,
-        snapshotAt: finalized.header.finalizedAt,
+        snapshotAt: finalizedTop.header.finalizedAt,
         me,
         frozen,
+        status: 'finalized',
       }),
     );
   }
@@ -41,8 +43,11 @@ export async function GET() {
   const meData = await db.getUserSeasonRank(season, uid, seasonWindow(season));
   const me = { rank: meData.rank, score: meData.score };
 
-  // 2. 마감 창이지만 아직 미확정 상태인 경우: 오래된 표시 캐시를 확정으로 보여주지 않는다.
+  // 2. 마감 창이지만 아직 미확정 상태인 경우: 중복 방지된 QStash 작업 등록 및 집계 중 상태 반환
   if (frozen) {
+    const publisher = createQStashPublisher();
+    publisher.enqueueFinalize(season).catch(() => {});
+
     return NextResponse.json(
       rankResponseSchema.parse({
         season,
@@ -50,6 +55,7 @@ export async function GET() {
         snapshotAt: now.toISOString(),
         me,
         frozen: true,
+        status: 'aggregating',
       }),
     );
   }
@@ -58,7 +64,7 @@ export async function GET() {
   const store = rankStoreFromEnv();
   if (!store) {
     return NextResponse.json(
-      rankResponseSchema.parse({ season, top: [], snapshotAt: now.toISOString(), me, frozen: false }),
+      rankResponseSchema.parse({ season, top: [], snapshotAt: now.toISOString(), me, frozen: false, status: 'active' }),
     );
   }
 
@@ -78,6 +84,7 @@ export async function GET() {
     nickname: nicknames[e.userId] ?? null,
     score: e.score,
   }));
-  return NextResponse.json(rankResponseSchema.parse({ season, top, snapshotAt, me, frozen: false }));
+  return NextResponse.json(
+    rankResponseSchema.parse({ season, top, snapshotAt, me, frozen: false, status: 'active' }),
+  );
 }
-

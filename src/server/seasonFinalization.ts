@@ -19,8 +19,9 @@ export async function finalizeSeason(
   season: string,
   now: Date = new Date(),
 ): Promise<FinalizedSeasonResult> {
-  return db.runWithSeasonLock(season, async () => {
-    const existing = await db.getSeasonFinalization(season);
+  return db.runWithSeasonLock(season, async (txDb) => {
+    const targetDb = txDb ?? db;
+    const existing = await targetDb.getSeasonFinalization(season);
     if (existing) {
       return existing;
     }
@@ -30,7 +31,7 @@ export async function finalizeSeason(
       throw new Error(`Season ${season} has not ended yet (ends at ${window.endAt.toISOString()})`);
     }
 
-    const aggregated = await db.aggregateSeasonLedger(season, window);
+    const aggregated = await targetDb.aggregateSeasonLedger(season, window);
     const results: SeasonRankResultRow[] = aggregated.map((entry, index) => ({
       season,
       userId: entry.userId,
@@ -46,7 +47,7 @@ export async function finalizeSeason(
       status: 'finalized',
     };
 
-    await db.saveSeasonFinalization(header, results);
+    await targetDb.saveSeasonFinalization(header, results);
 
     return { header, results };
   });
@@ -57,6 +58,22 @@ export async function getFinalizedSeasonRank(
   season: string,
 ): Promise<FinalizedSeasonResult | null> {
   return db.getSeasonFinalization(season);
+}
+
+export async function getFinalizedSeasonTop(
+  db: DbPort,
+  season: string,
+  limit: number = 50,
+): Promise<FinalizedSeasonResult | null> {
+  return db.getFinalizedSeasonTop(season, limit);
+}
+
+export async function getFinalizedUserRank(
+  db: DbPort,
+  season: string,
+  userId: string,
+): Promise<{ rank: number | null; score: number } | null> {
+  return db.getFinalizedUserRank(season, userId);
 }
 
 export async function isSeasonFinalized(db: DbPort, season: string): Promise<boolean> {

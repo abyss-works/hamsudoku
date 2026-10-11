@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest';
-import { createMemoryDb } from './db';
+import { createMemoryDb, type DbPort } from './db';
 import { finalizeSeason, getFinalizedSeasonRank } from './seasonFinalization';
 
 describe('시즌 집계와 영속화 (Step 1)', () => {
@@ -156,14 +156,24 @@ describe('시즌 집계와 영속화 (Step 1)', () => {
   });
 
   it('처리 중 제출 경쟁: 마감 이전 승인된 쓰기가 직렬화되어 누락되지 않고, 확정 후 이전 시즌 적립은 제외된다', async () => {
-    const db = createMemoryDb();
-    await db.insertStage(stage('e-1'));
+    const underlyingDb = createMemoryDb();
+    await underlyingDb.insertStage(stage('e-1'));
 
-    // 처리 중 지연 쓰기 모사
+    // 처리 중 지연 쓰기 모사: 테스트 fake adapter 경계로 경쟁을 유발한다
     let resolveWrite: () => void = () => {};
     const writeGate = new Promise<void>((r) => {
       resolveWrite = r;
     });
+
+    const db: DbPort = {
+      ...underlyingDb,
+      async commitEndlessClear(userId, stageId, input) {
+        return underlyingDb.runWithSeasonLock(input.season, async () => {
+          await writeGate;
+          return underlyingDb.commitEndlessClear(userId, stageId, input);
+        });
+      },
+    };
 
     const inFlightWrite = db.commitEndlessClear('user-inflight', 'e-1', {
       earned: 3,
@@ -172,7 +182,6 @@ describe('시즌 집계와 영속화 (Step 1)', () => {
       elapsedMs: 15000,
       suspicious: false,
       atIso: '2026-10-11T14:59:58.000Z',
-      delayBeforeCommit: writeGate,
     });
 
     // 확정 실행 시도 (in-flight 쓰기가 직렬화 잠금을 쥐고 있으므로 대기해야 함)

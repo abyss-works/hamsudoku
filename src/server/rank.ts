@@ -24,6 +24,31 @@ export interface RankStore {
 
 const TOP_TTL_SEC = 60;
 const SEASON_TTL_SEC = 14 * 24 * 60 * 60;
+const LOCK_TTL_SEC = 5;
+
+function parseAndValidateSnapshot(cached: string | null, season: string): RankSnapshot | null {
+  if (!cached) return null;
+  try {
+    const parsed = JSON.parse(cached);
+    if (!parsed || typeof parsed !== 'object' || Array.isArray(parsed)) return null;
+    if (parsed.season && parsed.season !== season) return null;
+    if (typeof parsed.at !== 'string') return null;
+    const atMs = Date.parse(parsed.at);
+    if (Number.isNaN(atMs)) return null;
+    const now = Date.now();
+    if (atMs > now + 5000) return null;
+    if (now - atMs >= TOP_TTL_SEC * 1000) return null;
+    if (!Array.isArray(parsed.entries)) return null;
+    for (const entry of parsed.entries) {
+      if (!entry || typeof entry !== 'object' || Array.isArray(entry)) return null;
+      if (typeof entry.userId !== 'string' || entry.userId.length === 0) return null;
+      if (typeof entry.score !== 'number' || !Number.isFinite(entry.score) || entry.score < 0) return null;
+    }
+    return parsed as RankSnapshot;
+  } catch {
+    return null;
+  }
+}
 
 export function createRankStore(opts: { url: string; token: string; fetchImpl?: typeof fetch }): RankStore {
   const doFetch = opts.fetchImpl ?? fetch;
@@ -35,12 +60,16 @@ export function createRankStore(opts: { url: string; token: string; fetchImpl?: 
       body: JSON.stringify(command),
     });
     if (!res.ok) throw new Error(`rank store ${res.status}`);
-    const data = (await res.json()) as { result: T };
-    return data.result;
+    const data = (await res.json()) as { result?: T; error?: string };
+    if (data && typeof data === 'object' && data.error) {
+      throw new Error(data.error);
+    }
+    return data.result as T;
   }
 
   const key = (season: string) => `rank:${season}`;
   const topKey = (season: string) => `rank:${season}:top`;
+  const lockKey = (season: string) => `rank:${season}:top:lock`;
 
   return {
     async increment(season, userId, amount) {
@@ -66,40 +95,56 @@ export function createRankStore(opts: { url: string; token: string; fetchImpl?: 
     },
     async top(season, limit) {
       const cached = await cmd<string | null>(['get', topKey(season)]);
-      if (cached) {
-        try {
-          const parsed = JSON.parse(cached) as RankSnapshot;
-          if (
-            parsed &&
-            typeof parsed.at === 'string' &&
-            Array.isArray(parsed.entries) &&
-            (!parsed.season || parsed.season === season)
-          ) {
-            const ageMs = Date.now() - Date.parse(parsed.at);
-            if (!Number.isNaN(ageMs) && ageMs < TOP_TTL_SEC * 1000) {
-              return parsed;
-            }
-          }
-        } catch {
-          // JSON 오류 시 캐시 미스로 처리
-        }
+      const valid = parseAndValidateSnapshot(cached, season);
+      if (valid) {
+        return valid;
       }
-      const rawFlat = await cmd<(string | number)[] | null>(['zrevrange', key(season), 0, limit - 1, 'withscores']);
-      const flat = rawFlat ?? [];
-      const seen = new Set<string>();
-      const entries: RankEntry[] = [];
-      for (let i = 0; i < flat.length; i += 2) {
 
-        const uid = String(flat[i]);
-        const score = Number(flat[i + 1]);
-        if (!seen.has(uid)) {
-          seen.add(uid);
-          entries.push({ userId: uid, score });
+      // NX 갱신 잠금 획득 시도 (만료 TTL 5초, split SET/EXPIRE 금지)
+      const lockToken = `tok_${Date.now()}_${Math.random().toString(36).slice(2)}`;
+      const lockRes = await cmd<string | null>(['set', lockKey(season), lockToken, 'ex', LOCK_TTL_SEC, 'nx']);
+      const isLockOwner = lockRes === 'OK';
+
+      if (!isLockOwner) {
+        // 다른 요청이 잠금을 쥐고 갱신 중이므로 대기 후 캐시 확인
+        for (let attempt = 0; attempt < 5; attempt++) {
+          await new Promise((r) => setTimeout(r, 60));
+          const retryCached = await cmd<string | null>(['get', topKey(season)]);
+          const retryValid = parseAndValidateSnapshot(retryCached, season);
+          if (retryValid) {
+            return retryValid;
+          }
         }
       }
-      const snapshot: RankSnapshot = { at: new Date().toISOString(), season, entries };
-      await cmd(['set', topKey(season), JSON.stringify(snapshot), 'ex', TOP_TTL_SEC]);
-      return snapshot;
+
+      try {
+        const rawFlat = await cmd<(string | number)[] | null>(['zrevrange', key(season), 0, limit - 1, 'withscores']);
+        const flat = rawFlat ?? [];
+        const seen = new Set<string>();
+        const entries: RankEntry[] = [];
+        for (let i = 0; i < flat.length; i += 2) {
+          const uid = String(flat[i]);
+          const score = Number(flat[i + 1]);
+          if (!seen.has(uid)) {
+            seen.add(uid);
+            entries.push({ userId: uid, score });
+          }
+        }
+        const snapshot: RankSnapshot = { at: new Date().toISOString(), season, entries };
+        await cmd(['set', topKey(season), JSON.stringify(snapshot), 'ex', TOP_TTL_SEC]);
+        return snapshot;
+      } finally {
+        if (isLockOwner) {
+          // 안전한 해제: 소유자 토큰 일치 시에만 삭제
+          await cmd([
+            'eval',
+            "if redis.call('get', KEYS[1]) == ARGV[1] then return redis.call('del', KEYS[1]) else return 0 end",
+            1,
+            lockKey(season),
+            lockToken,
+          ]).catch(() => {});
+        }
+      }
     },
 
     async rankOf(season, userId) {

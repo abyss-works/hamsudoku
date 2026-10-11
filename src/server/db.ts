@@ -1,8 +1,9 @@
+import { AsyncLocalStorage } from 'node:async_hooks';
 import { PrismaPg } from '@prisma/adapter-pg';
 import { Pool } from 'pg';
 import { PrismaClient } from '../../prisma/generated/prisma/client';
 import { mergeClear, type ClearRecord } from '../shared/merge';
-import { rankedSeasonId, seasonWindow } from '../shared/season';
+import { rankedSeasonId, rankingFrozen, seasonWindow } from '../shared/season';
 
 export interface Attempt {
   id: string;
@@ -84,7 +85,6 @@ export interface DbPort {
       elapsedMs: number;
       suspicious: boolean;
       atIso: string;
-      delayBeforeCommit?: Promise<void>;
     },
   ): Promise<EndlessSummary>;
   commitEndlessFail(userId: string, stageId: string, atIso: string): Promise<{ streak: StreakRow }>;
@@ -99,8 +99,10 @@ export interface DbPort {
   aggregateSeasonLedger(season: string, window: { startAt: Date; endAt: Date }): Promise<{ userId: string; score: number }[]>;
   saveSeasonFinalization(header: SeasonFinalizationRow, results: SeasonRankResultRow[]): Promise<void>;
   getSeasonFinalization(season: string): Promise<{ header: SeasonFinalizationRow; results: SeasonRankResultRow[] } | null>;
+  getFinalizedSeasonTop(season: string, limit: number): Promise<{ header: SeasonFinalizationRow; results: SeasonRankResultRow[] } | null>;
+  getFinalizedUserRank(season: string, userId: string): Promise<{ rank: number | null; score: number } | null>;
   isSeasonFinalized(season: string): Promise<boolean>;
-  runWithSeasonLock<T>(season: string, op: () => Promise<T>): Promise<T>;
+  runWithSeasonLock<T>(season: string, op: (txDb: DbPort) => Promise<T>): Promise<T>;
   getUserSeasonRank(season: string, userId: string, window: { startAt: Date; endAt: Date }): Promise<{ rank: number | null; score: number }>;
   listUnfinalizedSeasons(now: Date): Promise<string[]>;
 }
@@ -109,8 +111,14 @@ export interface DbPort {
 
 class SeasonSerialization {
   private queue = new Map<string, Promise<void>>();
+  private storage = new AsyncLocalStorage<Set<string>>();
 
   async runExclusive<T>(season: string, op: () => Promise<T>): Promise<T> {
+    const activeSeasons = this.storage.getStore();
+    if (activeSeasons?.has(season)) {
+      return op();
+    }
+
     const prev = this.queue.get(season) ?? Promise.resolve();
     let release: () => void = () => {};
     const current = new Promise<void>((r) => {
@@ -124,11 +132,15 @@ class SeasonSerialization {
       ),
     );
     await prev;
-    try {
-      return await op();
-    } finally {
-      release();
-    }
+    const nextSet = new Set(activeSeasons);
+    nextSet.add(season);
+    return this.storage.run(nextSet, async () => {
+      try {
+        return await op();
+      } finally {
+        release();
+      }
+    });
   }
 }
 
@@ -156,7 +168,7 @@ export function createMemoryDb(): DbPort {
     reason?: string;
     createdAt: string;
   }[] = [];
-  const seedLedger: { userId: string; amount: number; season: string; createdAt: string }[] = [];
+  const seedLedger: { userId: string; amount: number; season: string; rankingEligible: boolean; createdAt: string }[] = [];
 
   const progressKey = (userId: string, stageId: string) => `${userId}:${stageId}`;
 
@@ -165,7 +177,7 @@ export function createMemoryDb(): DbPort {
   const clearedCountOf = (userId: string) =>
     [...endlessProgress.entries()].filter(([k, v]) => k.startsWith(`${userId}:`) && v.cleared).length;
 
-  return {
+  const memoryDb: DbPort & { getRawSeedLedger?: () => typeof seedLedger } = {
     async ensureUser(userId: string, email: string | null) {
       const prev = users.get(userId);
       users.set(userId, { email: email ?? prev?.email ?? null, hasProfile: true });
@@ -242,16 +254,28 @@ export function createMemoryDb(): DbPort {
     },
     async commitEndlessClear(userId, stageId, input) {
       return seasonSerializer.runExclusive(input.season, async () => {
-        if (input.delayBeforeCommit) {
-          await input.delayBeforeCommit;
-        }
         const key = progressKey(userId, stageId);
         const prev = endlessProgress.get(key) ?? { cleared: false, attempts: 0, lastPlayedAt: '' };
         endlessProgress.set(key, { cleared: true, attempts: prev.attempts + 1, lastPlayedAt: input.atIso });
         wallets.set(userId, balanceOf(userId) + input.earned);
-        if (!finalizations.has(input.season)) {
-          seedLedger.push({ userId, amount: input.earned, season: input.season, createdAt: input.atIso });
-        }
+
+        const fin = finalizations.get(input.season);
+        const window = seasonWindow(input.season);
+        const atDate = new Date(input.atIso);
+        const atMs = atDate.getTime();
+        const inWindow = atMs >= window.startAt.getTime() && atMs < window.endAt.getTime();
+        const isFinalized = fin?.header.status === 'finalized';
+        const isFrozen = rankingFrozen(atDate);
+        const rankingEligible = !isFinalized && inWindow && !isFrozen;
+
+        seedLedger.push({
+          userId,
+          amount: input.earned,
+          season: input.season,
+          rankingEligible,
+          createdAt: input.atIso,
+        });
+
         const s = streakOf(userId);
         const next =
           input.seedLeft === 3
@@ -300,9 +324,12 @@ export function createMemoryDb(): DbPort {
       return { balance: balanceOf(userId), clearedCount: clearedCountOf(userId), streak: streakOf(userId) };
     },
     async listSeasonEarnings(season) {
+      const window = seasonWindow(season);
       const sums = new Map<string, number>();
       for (const e of seedLedger) {
-        if (e.season !== season) continue;
+        if (e.season !== season || e.rankingEligible === false) continue;
+        const t = Date.parse(e.createdAt);
+        if (t < window.startAt.getTime() || t >= window.endAt.getTime()) continue;
         sums.set(e.userId, (sums.get(e.userId) ?? 0) + e.amount);
       }
       return [...sums.entries()].map(([userId, amount]) => ({ userId, amount }));
@@ -310,7 +337,7 @@ export function createMemoryDb(): DbPort {
     async aggregateSeasonLedger(season, window) {
       const sums = new Map<string, number>();
       for (const e of seedLedger) {
-        if (e.season !== season) continue;
+        if (e.season !== season || e.rankingEligible === false) continue;
         const t = Date.parse(e.createdAt);
         if (t >= window.startAt.getTime() && t < window.endAt.getTime()) {
           sums.set(e.userId, (sums.get(e.userId) ?? 0) + e.amount);
@@ -326,12 +353,23 @@ export function createMemoryDb(): DbPort {
     async getSeasonFinalization(season) {
       return finalizations.get(season) ?? null;
     },
+    async getFinalizedSeasonTop(season, limit) {
+      const f = finalizations.get(season);
+      if (!f || f.header.status !== 'finalized') return null;
+      return { header: f.header, results: f.results.slice(0, limit) };
+    },
+    async getFinalizedUserRank(season, userId) {
+      const f = finalizations.get(season);
+      if (!f || f.header.status !== 'finalized') return null;
+      const found = f.results.find((r) => r.userId === userId);
+      return found ? { rank: found.rank, score: found.score } : { rank: null, score: 0 };
+    },
     async isSeasonFinalized(season) {
       const f = finalizations.get(season);
       return f?.header.status === 'finalized';
     },
-    async runWithSeasonLock<T>(season: string, op: () => Promise<T>): Promise<T> {
-      return seasonSerializer.runExclusive(season, op);
+    async runWithSeasonLock<T>(season: string, op: (txDb: DbPort) => Promise<T>): Promise<T> {
+      return seasonSerializer.runExclusive(season, () => op(memoryDb));
     },
     async getUserSeasonRank(season, userId, window) {
       const aggregated = await this.aggregateSeasonLedger(season, window);
@@ -360,9 +398,13 @@ export function createMemoryDb(): DbPort {
       }
       return unfinalized.sort();
     },
+    getRawSeedLedger() {
+      return [...seedLedger];
+    },
   };
-}
 
+  return memoryDb;
+}
 
 const globalForPrisma = globalThis as unknown as {
   prisma?: PrismaClient;
@@ -536,9 +578,7 @@ export function createPrismaDb(client: PrismaClient = prisma): DbPort {
     },
     async commitEndlessClear(userId, stageId, input) {
       return client.$transaction(async (tx) => {
-        if (input.delayBeforeCommit) {
-          await input.delayBeforeCommit;
-        }
+        await tx.$executeRaw`SELECT pg_advisory_xact_lock(hashtext('season:' || ${input.season}))`;
         await tx.endlessProgress.upsert({
           where: { userId_stageId: { userId, stageId } },
           create: { userId, stageId, cleared: true, attempts: 1, lastPlayedAt: new Date(input.atIso) },
@@ -549,12 +589,28 @@ export function createPrismaDb(client: PrismaClient = prisma): DbPort {
           create: { userId, balance: input.earned },
           update: { balance: { increment: input.earned } },
         });
+
         const fin = await tx.seasonFinalization.findUnique({ where: { season: input.season } });
-        if (!fin || fin.status !== 'finalized') {
-          await tx.seedLedger.create({
-            data: { userId, kind: 'earn', amount: input.earned, stageId, season: input.season, createdAt: new Date(input.atIso) },
-          });
-        }
+        const window = seasonWindow(input.season);
+        const atDate = new Date(input.atIso);
+        const atMs = atDate.getTime();
+        const inWindow = atMs >= window.startAt.getTime() && atMs < window.endAt.getTime();
+        const isFinalized = fin?.status === 'finalized';
+        const isFrozen = rankingFrozen(atDate);
+        const rankingEligible = !isFinalized && inWindow && !isFrozen;
+
+        await tx.seedLedger.create({
+          data: {
+            userId,
+            kind: 'earn',
+            amount: input.earned,
+            stageId,
+            season: input.season,
+            rankingEligible,
+            createdAt: atDate,
+          },
+        });
+
         const prev = await tx.endlessStreak.findUnique({ where: { userId } });
         const current = input.seedLeft === 3 ? (prev?.current ?? 0) + 1 : 0;
         const best = Math.max(prev?.best ?? 0, current);
@@ -617,12 +673,18 @@ export function createPrismaDb(client: PrismaClient = prisma): DbPort {
       };
     },
     async listSeasonEarnings(season) {
-      const rows = await client.seedLedger.groupBy({
-        by: ['userId'],
-        where: { season, kind: 'earn' },
-        _sum: { amount: true },
-      });
-      return rows.map((r) => ({ userId: r.userId, amount: r._sum.amount ?? 0 }));
+      const window = seasonWindow(season);
+      const rows = await client.$queryRaw<{ userId: string; amount: number }[]>`
+        SELECT "userId", SUM("amount")::int AS amount
+        FROM "SeedLedger"
+        WHERE "season" = ${season}
+          AND "kind" = 'earn'
+          AND "rankingEligible" = true
+          AND "createdAt" >= ${window.startAt}
+          AND "createdAt" < ${window.endAt}
+        GROUP BY "userId"
+      `;
+      return rows.map((r) => ({ userId: r.userId, amount: Number(r.amount) }));
     },
     async aggregateSeasonLedger(season, window) {
       const rows = await client.$queryRaw<{ userId: string; score: number }[]>`
@@ -630,15 +692,16 @@ export function createPrismaDb(client: PrismaClient = prisma): DbPort {
         FROM "SeedLedger"
         WHERE "season" = ${season}
           AND "kind" = 'earn'
+          AND "rankingEligible" = true
           AND "createdAt" >= ${window.startAt}
           AND "createdAt" < ${window.endAt}
         GROUP BY "userId"
-        ORDER BY score DESC, "userId" DESC
+        ORDER BY score DESC, "userId" COLLATE "C" DESC
       `;
       return rows.map((r) => ({ userId: r.userId, score: Number(r.score) }));
     },
     async saveSeasonFinalization(header, results) {
-      await client.$transaction(async (tx) => {
+      const runSave = async (tx: any) => {
         await tx.seasonFinalization.upsert({
           where: { season: header.season },
           create: {
@@ -664,7 +727,12 @@ export function createPrismaDb(client: PrismaClient = prisma): DbPort {
             skipDuplicates: true,
           });
         }
-      });
+      };
+      if (typeof (client as any).$transaction === 'function') {
+        await (client as any).$transaction(runSave);
+      } else {
+        await runSave(client);
+      }
     },
     async getSeasonFinalization(season) {
       const h = await client.seasonFinalization.findUnique({
@@ -692,14 +760,49 @@ export function createPrismaDb(client: PrismaClient = prisma): DbPort {
         })),
       };
     },
+    async getFinalizedSeasonTop(season, limit) {
+      const h = await client.seasonFinalization.findUnique({
+        where: { season },
+        include: {
+          results: {
+            orderBy: { rank: 'asc' },
+            take: limit,
+          },
+        },
+      });
+      if (!h || h.status !== 'finalized') return null;
+      return {
+        header: {
+          season: h.season,
+          startAt: h.startAt.toISOString(),
+          endAt: h.endAt.toISOString(),
+          finalizedAt: h.finalizedAt.toISOString(),
+          status: h.status,
+        },
+        results: h.results.map((r) => ({
+          season: r.season,
+          userId: r.userId,
+          score: r.score,
+          rank: r.rank,
+        })),
+      };
+    },
+    async getFinalizedUserRank(season, userId) {
+      const r = await client.seasonRankResult.findUnique({
+        where: { season_userId: { season, userId } },
+      });
+      if (!r) return { rank: null, score: 0 };
+      return { rank: r.rank, score: r.score };
+    },
     async isSeasonFinalized(season) {
       const h = await client.seasonFinalization.findUnique({ where: { season } });
       return h?.status === 'finalized';
     },
-    async runWithSeasonLock<T>(season: string, op: () => Promise<T>): Promise<T> {
+    async runWithSeasonLock<T>(season: string, op: (txDb: DbPort) => Promise<T>): Promise<T> {
       return client.$transaction(async (tx) => {
         await tx.$executeRaw`SELECT pg_advisory_xact_lock(hashtext('season:' || ${season}))`;
-        return op();
+        const txDb = createPrismaDb(tx as unknown as PrismaClient);
+        return op(txDb);
       });
     },
     async getUserSeasonRank(season, userId, window) {
@@ -709,6 +812,7 @@ export function createPrismaDb(client: PrismaClient = prisma): DbPort {
           FROM "SeedLedger"
           WHERE "season" = ${season}
             AND "kind" = 'earn'
+            AND "rankingEligible" = true
             AND "createdAt" >= ${window.startAt}
             AND "createdAt" < ${window.endAt}
           GROUP BY "userId"
@@ -719,7 +823,7 @@ export function createPrismaDb(client: PrismaClient = prisma): DbPort {
             SELECT COUNT(*)::int
             FROM user_scores
             WHERE score > (SELECT score FROM user_scores WHERE "userId" = ${userId})
-               OR (score = (SELECT score FROM user_scores WHERE "userId" = ${userId}) AND "userId" > ${userId})
+               OR (score = (SELECT score FROM user_scores WHERE "userId" = ${userId}) AND "userId" COLLATE "C" > ${userId})
           ) + 1 AS rank
       `;
       if (rows.length === 0 || rows[0].score === null || rows[0].score <= 0) {
