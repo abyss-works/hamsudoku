@@ -1,7 +1,7 @@
 // @vitest-environment jsdom
 import { afterEach, describe, expect, it, vi } from 'vitest';
 import { act, cleanup, renderHook } from '@testing-library/react';
-import { formatElapsed, useElapsed } from './useElapsed';
+import { useElapsed } from './useElapsed';
 
 afterEach(() => {
   cleanup();
@@ -44,13 +44,5 @@ describe('useElapsed', () => {
     expect(result.current).toBe(3);
     rerender({ resetKey: 1 });
     expect(result.current).toBe(0);
-  });
-});
-
-describe('formatElapsed', () => {
-  it('m:ss 형식이다', () => {
-    expect(formatElapsed(0)).toBe('0:00');
-    expect(formatElapsed(7)).toBe('0:07');
-    expect(formatElapsed(65)).toBe('1:05');
   });
 });

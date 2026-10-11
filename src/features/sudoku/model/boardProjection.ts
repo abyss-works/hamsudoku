@@ -16,21 +16,6 @@ export function cellAriaLabel(state: CellState, islandId: number): string {
   return `${CELL_STATE_LABEL[state]} (색 ${islandId + 1})`;
 }
 
-export function clearDialogModel(total: number) {
-  return {
-    title: `햄스터 ${total}마리를 다 찾았다!`,
-    partyIndices: [0, 1, 2, 3, 4],
-  };
-}
-
-export function probeButtonModel(active: boolean, slots: number) {
-  return {
-    active,
-    toggleLabel: active ? '임시 정답 끄기' : '임시 정답 켜기',
-    slotText: `${slots}/3`,
-  };
-}
-
 export function projectBoard(
   cells: CellState[][],
   puzzle: Puzzle,
