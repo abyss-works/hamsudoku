@@ -1,7 +1,7 @@
 import { useRef, useState } from 'react';
 import type { Stage } from './stagesApi';
-import { formatElapsed, useElapsed } from '../sudoku/useElapsed';
-import { useHamSudoku } from '../sudoku/useHamSudoku';
+import { formatElapsed, useElapsed } from '../sudoku/service/useElapsed';
+import { useHamSudoku } from '../sudoku/service/useHamSudoku';
 import { playClearSound } from '../../platform/audio/sound';
 import { stageHudModel } from './selectionLogic';
 import { useOverlayScope } from '../../ui/useOverlayScope';

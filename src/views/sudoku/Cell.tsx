@@ -3,7 +3,7 @@ import { Heart, X } from 'lucide-react';
 import { HamsterFace } from '../../ui/HamsterFace';
 import type { CellState } from '../../features/sudoku/model/puzzles';
 import type { TapKind } from '../../features/sudoku/model/tap';
-import { useCellInteraction } from '../../features/sudoku/useCellInteraction';
+import { useCellInteraction } from '../../features/sudoku/service/useCellInteraction';
 
 export interface CellProps {
   row: number;

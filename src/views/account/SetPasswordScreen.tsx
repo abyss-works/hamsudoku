@@ -1,7 +1,7 @@
 import { Button } from '../../ui/Button';
 import { HamsterFace } from '../../ui/HamsterFace';
-import { useSetPasswordService } from '../../features/account/useSetPasswordService';
-import type { SetPasswordServiceOptions } from '../../features/account/setPassword.types';
+import { useSetPasswordService } from '../../features/account/service/useSetPasswordService';
+import type { SetPasswordServiceOptions } from '../../features/account/model/setPassword.types';
 
 export interface SetPasswordScreenProps extends SetPasswordServiceOptions {
   linkError: boolean;

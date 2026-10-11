@@ -1,7 +1,7 @@
 import type { ReactNode } from 'react';
 import { Board } from '../sudoku/Board';
 import { ProbeButton } from '../sudoku/ProbeButton';
-import { useEndlessBoard } from '../../features/endless/useEndlessBoard';
+import { useEndlessBoard } from '../../features/endless/service/useEndlessBoard';
 import type { Puzzle } from '../../features/sudoku/model/puzzles';
 
 export interface EndlessBoardProps {

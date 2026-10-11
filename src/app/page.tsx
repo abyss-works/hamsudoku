@@ -1,6 +1,6 @@
 'use client';
 
-import App from "../application/App";
+import App from "../core/App";
 import { ErrorBoundary } from "../ui/ErrorBoundary";
 
 export default function Page() {

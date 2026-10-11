@@ -1,8 +1,8 @@
 import { ChevronLeft, LogIn } from 'lucide-react';
 import { Button } from '../../ui/Button';
 import { Overlay } from '../../ui/Overlay';
-import { useAuthDialogService } from '../../features/account/useAuthDialogService';
-import type { AuthDialogOptions, AuthFn } from '../../features/account/authDialog.types';
+import { useAuthDialogService } from '../../features/account/service/useAuthDialogService';
+import type { AuthDialogOptions, AuthFn } from '../../features/account/model/authDialog.types';
 import { CredentialsView } from './auth/CredentialsView';
 import { BaseSelectionView } from './auth/BaseSelectionView';
 import { LinkConfirmationView } from './auth/LinkConfirmationView';
