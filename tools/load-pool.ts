@@ -12,17 +12,9 @@ function loadEnvLocal() {
   }
 }
 
-export function serializeRegions(islands: number[][]): string {
-  return islands.flat().join('');
-}
+import { serializeRegions, serializeSolution, stageId } from '../src/shared/endlessStageFormat';
 
-export function serializeSolution(spots: [number, number][]): string {
-  return spots.map(([r, c]) => `${r},${c}`).join(';');
-}
-
-export function stageId(seed: number, index: number): string {
-  return `e-${seed}-${index}`;
-}
+export { serializeRegions, serializeSolution, stageId };
 
 function argValue(argv: string[], name: string): string | undefined {
   const i = argv.indexOf(name);

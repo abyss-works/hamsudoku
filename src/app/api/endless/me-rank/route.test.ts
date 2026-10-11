@@ -11,7 +11,11 @@ vi.mock('../../../../server/auth', () => ({
 
 vi.mock('../../../../server/db', () => ({
   createPrismaDb: vi.fn(() => ({
+    getSeasonFinalization: vi.fn(async () => null),
+    getFinalizedUserRank: vi.fn(async () => null),
+    getUserSeasonRank: vi.fn(async () => ({ rank: 2, score: 52 })),
     lookupNicknames: vi.fn(async () => ({ u1: '햄찌' })),
+    getNickname: vi.fn(async () => '햄찌'),
   })),
 }));
 
@@ -26,10 +30,16 @@ afterEach(() => {
 });
 
 describe('GET /api/endless/me-rank', () => {
-  it('스냅샷을 거치지 않은 실시간 순위·점수·닉네임을 내린다', async () => {
+  it('스냅샷을 거치지 않은 실시간 순위·점수·닉네임 및 season을 내린다', async () => {
     const res = await GET();
     expect(res.status).toBe(200);
-    expect(await res.json()).toEqual({ rank: 2, score: 52, nickname: '햄찌' });
+    const body = await res.json();
+    expect(body).toEqual({
+      season: expect.any(String),
+      rank: 2,
+      score: 52,
+      nickname: '햄찌',
+    });
   });
 
   it('세션이 없으면 401을 내린다', async () => {
@@ -38,16 +48,34 @@ describe('GET /api/endless/me-rank', () => {
     expect(res.status).toBe(401);
   });
 
-  it('저장소가 없으면 빈 순위를 내린다', async () => {
+  it('Redis 미설정 상태여도 DB에서 순위를 정상 조회한다', async () => {
     vi.mocked(rankStoreFromEnv).mockReturnValueOnce(null);
     const res = await GET();
     expect(res.status).toBe(200);
-    expect(await res.json()).toEqual({ rank: null, score: 0, nickname: null });
+    const body = await res.json();
+    expect(body).toEqual({
+      season: expect.any(String),
+      rank: 2,
+      score: 52,
+      nickname: '햄찌',
+    });
   });
 
   it('닉네임이 없으면 null로 내린다', async () => {
-    vi.mocked(createPrismaDb).mockReturnValueOnce({ lookupNicknames: vi.fn(async () => ({})) } as never);
+    vi.mocked(createPrismaDb).mockReturnValueOnce({
+      getSeasonFinalization: vi.fn(async () => null),
+      getFinalizedUserRank: vi.fn(async () => null),
+      getUserSeasonRank: vi.fn(async () => ({ rank: 2, score: 52 })),
+      lookupNicknames: vi.fn(async () => ({})),
+      getNickname: vi.fn(async () => null),
+    } as never);
     const res = await GET();
-    expect(await res.json()).toEqual({ rank: 2, score: 52, nickname: null });
+    const body = await res.json();
+    expect(body).toEqual({
+      season: expect.any(String),
+      rank: 2,
+      score: 52,
+      nickname: null,
+    });
   });
 });

@@ -7,12 +7,13 @@ export interface RankEntry {
 
 export interface RankSnapshot {
   at: string;
+  season?: string;
   entries: RankEntry[];
 }
 
 export interface RankStore {
   increment(season: string, userId: string, amount: number): Promise<void>;
-  top(season: string, limit: number): Promise<RankSnapshot>;
+  top(season: string, limit: number, loadScores?: () => Promise<RankEntry[]>): Promise<RankSnapshot>;
   /** 관리자용 전체 게임 스코어 목록(내림차순) — UPSTASH ZREVRANGE 원본. */
   topAll(season: string, limit: number): Promise<RankSnapshot>;
   /** 관리자용 엔트리 삭제 — UPSTASH ZREM. 실제 삭제된 수를 돌려준다. */
@@ -23,6 +24,42 @@ export interface RankStore {
 
 const TOP_TTL_SEC = 60;
 const SEASON_TTL_SEC = 14 * 24 * 60 * 60;
+const LOCK_TTL_SEC = 5;
+
+const PUBLISH_LEDGER_SNAPSHOT = `
+if redis.call('get', KEYS[1]) ~= ARGV[1] then return 0 end
+redis.call('del', KEYS[2])
+for i = 5, #ARGV, 2 do
+  redis.call('zadd', KEYS[2], ARGV[i], ARGV[i + 1])
+end
+if #ARGV > 4 then redis.call('expire', KEYS[2], ARGV[2]) end
+redis.call('set', KEYS[3], ARGV[4], 'EX', ARGV[3])
+return 1
+`;
+
+function parseAndValidateSnapshot(cached: string | null, season: string): RankSnapshot | null {
+  if (!cached) return null;
+  try {
+    const parsed = JSON.parse(cached);
+    if (!parsed || typeof parsed !== 'object' || Array.isArray(parsed)) return null;
+    if (parsed.season && parsed.season !== season) return null;
+    if (typeof parsed.at !== 'string') return null;
+    const atMs = Date.parse(parsed.at);
+    if (Number.isNaN(atMs)) return null;
+    const now = Date.now();
+    if (atMs > now + 5000) return null;
+    if (now - atMs >= TOP_TTL_SEC * 1000) return null;
+    if (!Array.isArray(parsed.entries)) return null;
+    for (const entry of parsed.entries) {
+      if (!entry || typeof entry !== 'object' || Array.isArray(entry)) return null;
+      if (typeof entry.userId !== 'string' || entry.userId.length === 0) return null;
+      if (typeof entry.score !== 'number' || !Number.isFinite(entry.score) || entry.score < 0) return null;
+    }
+    return parsed as RankSnapshot;
+  } catch {
+    return null;
+  }
+}
 
 export function createRankStore(opts: { url: string; token: string; fetchImpl?: typeof fetch }): RankStore {
   const doFetch = opts.fetchImpl ?? fetch;
@@ -34,12 +71,16 @@ export function createRankStore(opts: { url: string; token: string; fetchImpl?: 
       body: JSON.stringify(command),
     });
     if (!res.ok) throw new Error(`rank store ${res.status}`);
-    const data = (await res.json()) as { result: T };
-    return data.result;
+    const data = (await res.json()) as { result?: T; error?: string };
+    if (data && typeof data === 'object' && data.error) {
+      throw new Error(data.error);
+    }
+    return data.result as T;
   }
 
   const key = (season: string) => `rank:${season}`;
   const topKey = (season: string) => `rank:${season}:top`;
+  const lockKey = (season: string) => `rank:${season}:top:lock`;
 
   return {
     async increment(season, userId, amount) {
@@ -48,27 +89,88 @@ export function createRankStore(opts: { url: string; token: string; fetchImpl?: 
     },
     async topAll(season, limit) {
       const flat = await cmd<(string | number)[]>(['zrevrange', key(season), 0, limit - 1, 'withscores']);
+      const seen = new Set<string>();
       const entries: RankEntry[] = [];
       for (let i = 0; i < flat.length; i += 2) {
-        entries.push({ userId: String(flat[i]), score: Number(flat[i + 1]) });
+        const uid = String(flat[i]);
+        const score = Number(flat[i + 1]);
+        if (!seen.has(uid)) {
+          seen.add(uid);
+          entries.push({ userId: uid, score });
+        }
       }
-      return { at: new Date().toISOString(), entries };
+      return { at: new Date().toISOString(), season, entries };
     },
     async remove(season, userId) {
       return cmd<number>(['zrem', key(season), userId]);
     },
-    async top(season, limit) {
+    async top(season, limit, loadScores) {
       const cached = await cmd<string | null>(['get', topKey(season)]);
-      if (cached) return JSON.parse(cached) as RankSnapshot;
-      const flat = await cmd<(string | number)[]>(['zrevrange', key(season), 0, limit - 1, 'withscores']);
-      const entries: RankEntry[] = [];
-      for (let i = 0; i < flat.length; i += 2) {
-        entries.push({ userId: String(flat[i]), score: Number(flat[i + 1]) });
+      const valid = parseAndValidateSnapshot(cached, season);
+      if (valid) {
+        return valid;
       }
-      const snapshot: RankSnapshot = { at: new Date().toISOString(), entries };
-      await cmd(['set', topKey(season), JSON.stringify(snapshot), 'ex', TOP_TTL_SEC]);
-      return snapshot;
+
+      // NX 갱신 잠금 획득 시도 (만료 TTL 5초, split SET/EXPIRE 금지)
+      const lockToken = `tok_${Date.now()}_${Math.random().toString(36).slice(2)}`;
+      const lockRes = await cmd<string | null>(['set', lockKey(season), lockToken, 'ex', LOCK_TTL_SEC, 'nx']);
+      const isLockOwner = lockRes === 'OK';
+
+      if (!isLockOwner) {
+        // 다른 요청이 잠금을 쥐고 갱신 중이므로 대기 후 캐시 확인
+        for (let attempt = 0; attempt < 5; attempt++) {
+          await new Promise((r) => setTimeout(r, 60));
+          const retryCached = await cmd<string | null>(['get', topKey(season)]);
+          const retryValid = parseAndValidateSnapshot(retryCached, season);
+          if (retryValid) {
+            return retryValid;
+          }
+        }
+        throw new Error('Ranking refresh is in progress');
+      }
+
+      try {
+        if (loadScores) {
+          const rows = await loadScores();
+          rows.sort((a, b) => b.score - a.score || (a.userId < b.userId ? 1 : a.userId > b.userId ? -1 : 0));
+          const snapshot: RankSnapshot = { at: new Date().toISOString(), season, entries: rows.slice(0, limit) };
+          const published = await cmd<number>([
+            'eval', PUBLISH_LEDGER_SNAPSHOT, 3, lockKey(season), key(season), topKey(season),
+            lockToken, SEASON_TTL_SEC, TOP_TTL_SEC, JSON.stringify(snapshot),
+            ...rows.flatMap((row) => [row.score, row.userId]),
+          ]);
+          if (published !== 1) throw new Error('Ranking refresh lock expired');
+          return snapshot;
+        }
+        const rawFlat = await cmd<(string | number)[] | null>(['zrevrange', key(season), 0, limit - 1, 'withscores']);
+        const flat = rawFlat ?? [];
+        const seen = new Set<string>();
+        const entries: RankEntry[] = [];
+        for (let i = 0; i < flat.length; i += 2) {
+          const uid = String(flat[i]);
+          const score = Number(flat[i + 1]);
+          if (!seen.has(uid)) {
+            seen.add(uid);
+            entries.push({ userId: uid, score });
+          }
+        }
+        const snapshot: RankSnapshot = { at: new Date().toISOString(), season, entries };
+        await cmd(['set', topKey(season), JSON.stringify(snapshot), 'ex', TOP_TTL_SEC]);
+        return snapshot;
+      } finally {
+        if (isLockOwner) {
+          // 안전한 해제: 소유자 토큰 일치 시에만 삭제
+          await cmd([
+            'eval',
+            "if redis.call('get', KEYS[1]) == ARGV[1] then return redis.call('del', KEYS[1]) else return 0 end",
+            1,
+            lockKey(season),
+            lockToken,
+          ]).catch(() => {});
+        }
+      }
     },
+
     async rankOf(season, userId) {
       const rank = await cmd<number | null>(['zrevrank', key(season), userId]);
       const score = await cmd<string | null>(['zscore', key(season), userId]);

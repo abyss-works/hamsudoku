@@ -30,6 +30,13 @@ async function userClient(): Promise<SupabaseClient | null> {
   });
 }
 
+export async function exchangeRecoveryCode(code: string): Promise<boolean> {
+  const supabase = await userClient();
+  if (!supabase) return false;
+  const { error } = await supabase.auth.exchangeCodeForSession(code);
+  return !error;
+}
+
 const AUTH_MSG: Record<string, string> = {
   user_already_exists: '이미 가입된 이메일이에요.',
   email_exists: '이미 가입된 이메일이에요.',

@@ -1,5 +1,5 @@
-import { createContext, useCallback, useContext, useState, type ReactNode } from 'react';
-import { useDelayedLoading } from './useDelayedLoading';
+import { createContext, useContext, type ReactNode } from 'react';
+import { useLoadingService } from './useLoadingService';
 
 interface LoadingStore {
   track<T>(promise: Promise<T>): Promise<T>;
@@ -13,23 +13,7 @@ export function useLoading(): LoadingStore {
 }
 
 export function LoadingProvider({ children }: { children: ReactNode }) {
-  const [pending, setPending] = useState(0);
-  const track = useCallback(<T,>(promise: Promise<T>): Promise<T> => {
-    setPending((n) => n + 1);
-    const done = () => setPending((n) => Math.max(0, n - 1));
-    return promise.then(
-      (v) => {
-        done();
-        return v;
-      },
-      (e) => {
-        done();
-        throw e;
-      },
-    );
-  }, []);
-  // 베일도 전역 정책(150ms blank·400ms 유지)을 따른다.
-  const show = useDelayedLoading(pending > 0);
+  const { track, show } = useLoadingService();
 
   return (
     <LoadingContext.Provider value={{ track }}>
