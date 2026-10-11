@@ -115,3 +115,27 @@ model EndlessStreak {
   current Int    @default(0)
   best    Int    @default(0)
 }
+
+model SeasonFinalization {
+  season      String             @id
+  startAt     DateTime
+  endAt       DateTime
+  finalizedAt DateTime           @default(now())
+  status      String             @default("finalized")
+  results     SeasonRankResult[]
+
+  @@index([status])
+}
+
+model SeasonRankResult {
+  season       String
+  userId       String
+  score        Int
+  rank         Int
+  finalization SeasonFinalization @relation(fields: [season], references: [season], onDelete: Cascade)
+
+  @@id([season, userId])
+  @@index([season, rank])
+  @@index([userId])
+}
+

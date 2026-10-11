@@ -1,6 +1,6 @@
 import { describe, expect, it } from 'vitest';
 import { seasonIdSchema } from './endless';
-import { rankedSeasonId, rankingFrozen, seasonId, seasonStartUtc } from './season';
+import { rankedSeasonId, rankingFrozen, seasonId, seasonStartUtc, seasonWindow } from './season';
 
 describe('seasonId', () => {
   it('월요일 00:00 KST에 새 시즌이 시작된다', () => {
@@ -44,3 +44,14 @@ describe('rankedSeasonId', () => {
     expect(rankedSeasonId(new Date('2026-10-06T00:00:00Z'))).toBe('2026-W41');
   });
 });
+
+describe('seasonWindow', () => {
+  it('집계 구간은 월요일 04:00 KST부터 다음 월요일 00:00 KST 미만이다', () => {
+    const { startAt, endAt } = seasonWindow('2026-W41');
+    // 2026-W41 월요일 04:00 KST = 2026-10-04T19:00:00.000Z
+    expect(startAt.toISOString()).toBe('2026-10-04T19:00:00.000Z');
+    // 2026-W41 다음 월요일 00:00 KST = 2026-10-11T15:00:00.000Z
+    expect(endAt.toISOString()).toBe('2026-10-11T15:00:00.000Z');
+  });
+});
+
