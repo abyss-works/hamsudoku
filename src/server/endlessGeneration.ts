@@ -46,6 +46,7 @@ export async function executeSupplyChunk(
     };
   }
 
+  const claimToken = claim.claimToken;
   const seed = (claim.seedStart ?? 10000) + params.chunkIndex;
   const targetCount = claim.targetCount ?? 10;
 
@@ -53,7 +54,7 @@ export async function executeSupplyChunk(
     // 2. CPU 퍼즐 생성 (DB 트랜잭션 밖에서 실행)
     const rawCandidates = generateEndlessPool(seed, targetCount);
     if (rawCandidates.length < targetCount) {
-      await db.failSupplyChunk(params.jobId, params.chunkIndex, 'TARGET_COUNT_UNMET');
+      await db.failSupplyChunk(params.jobId, params.chunkIndex, 'TARGET_COUNT_UNMET', claimToken);
       return { ok: false, reason: 'TARGET_COUNT_UNMET' };
     }
 
@@ -66,7 +67,7 @@ export async function executeSupplyChunk(
     }
 
     if (validatedCandidates.length < targetCount) {
-      await db.failSupplyChunk(params.jobId, params.chunkIndex, 'VALIDATION_FAILED');
+      await db.failSupplyChunk(params.jobId, params.chunkIndex, 'VALIDATION_FAILED', claimToken);
       return { ok: false, reason: 'VALIDATION_FAILED' };
     }
 
@@ -86,9 +87,9 @@ export async function executeSupplyChunk(
 
     // 5. 단일 DB 트랜잭션 적재 및 완료 상태 갱신 (실제 성공 시각은 DB 적재 완료 시각)
     const commitTimeIso = new Date().toISOString();
-    const success = await db.insertSupplyBatch(params.jobId, params.chunkIndex, stageRows, commitTimeIso);
+    const success = await db.insertSupplyBatch(params.jobId, params.chunkIndex, stageRows, commitTimeIso, claimToken);
     if (!success) {
-      await db.failSupplyChunk(params.jobId, params.chunkIndex, 'CONTENT_DUPLICATE_OR_TARGET_UNMET');
+      await db.failSupplyChunk(params.jobId, params.chunkIndex, 'CONTENT_DUPLICATE_OR_TARGET_UNMET', claimToken);
       return { ok: false, reason: 'CONTENT_DUPLICATE_OR_TARGET_UNMET' };
     }
 
@@ -99,7 +100,7 @@ export async function executeSupplyChunk(
       chunkIndex: params.chunkIndex,
     };
   } catch (err) {
-    await db.failSupplyChunk(params.jobId, params.chunkIndex, 'EXCEPTION_OCCURRED');
+    await db.failSupplyChunk(params.jobId, params.chunkIndex, 'EXCEPTION_OCCURRED', claimToken);
     throw err;
   }
 }

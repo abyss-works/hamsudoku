@@ -189,6 +189,7 @@ export interface DbPort {
   ): Promise<{
     claimed: boolean;
     alreadyCompleted: boolean;
+    claimToken?: string;
     stageCount?: number;
     seedStart?: number;
     targetCount?: number;
@@ -199,8 +200,9 @@ export interface DbPort {
     chunkIndex: number,
     stages: EndlessStageRow[],
     completedAtIso: string,
+    claimToken?: string,
   ): Promise<boolean>;
-  failSupplyChunk(jobId: string, chunkIndex: number, reason: string): Promise<void>;
+  failSupplyChunk(jobId: string, chunkIndex: number, reason: string, claimToken?: string): Promise<void>;
   getHighestReservedSeed(): Promise<number>;
   atomicRequestSupply(
     nowIso: string,
@@ -669,15 +671,27 @@ export function createMemoryDb(): DbPort {
       return {
         claimed: true,
         alreadyCompleted: false,
+        claimToken: newLease,
         stageCount: chunk.stageCount,
         seedStart: job.seedStart,
         targetCount: job.targetCount,
       };
     },
-    async insertSupplyBatch(jobId, chunkIndex, stageRows, completedAtIso) {
+    async insertSupplyBatch(jobId, chunkIndex, stageRows, completedAtIso, claimToken) {
       const job = supplyJobs.get(jobId);
       const chunk = supplyChunks.get(`${jobId}:${chunkIndex}`);
       if (!job || !chunk) return false;
+      if (chunk.status === 'completed') return false;
+
+      // fencing token 및 lease 소유권 검증
+      if (claimToken) {
+        if (!job.leaseExpiresAt || job.leaseExpiresAt !== claimToken) {
+          return false;
+        }
+        if (Date.parse(completedAtIso) > Date.parse(job.leaseExpiresAt)) {
+          return false;
+        }
+      }
 
       // 콘텐츠 해시 및 기존 stage 중복 검사
       const existingSignatures = new Map<string, string>();
@@ -716,17 +730,27 @@ export function createMemoryDb(): DbPort {
 
       return true;
     },
-    async failSupplyChunk(jobId, chunkIndex, _reason) {
+    async failSupplyChunk(jobId, chunkIndex, _reason, claimToken) {
       const job = supplyJobs.get(jobId);
       const chunk = supplyChunks.get(`${jobId}:${chunkIndex}`);
-      if (chunk) {
-        chunk.status = 'failed';
+      if (!chunk || !job) return;
+
+      // 완료된 작업은 오래된 실패 호출이 failed로 바꾸지 못한다
+      if (chunk.status === 'completed' || job.status === 'completed') {
+        return;
       }
-      if (job) {
-        job.status = 'failed';
-        job.leaseExpiresAt = null;
-        job.updatedAt = new Date().toISOString();
+
+      // fencing token 검증: 이전 만료 실행자가 신규 실행자 상태를 덮어쓰지 못하도록 차단
+      if (claimToken) {
+        if (!job.leaseExpiresAt || job.leaseExpiresAt !== claimToken) {
+          return;
+        }
       }
+
+      chunk.status = 'failed';
+      job.status = 'failed';
+      job.leaseExpiresAt = null;
+      job.updatedAt = new Date().toISOString();
     },
     async getHighestReservedSeed() {
       let maxSeed = 10000;
@@ -1686,6 +1710,7 @@ export function createPrismaDb(client: PrismaClient = prisma): DbPort {
           return { claimed: false, alreadyCompleted: false, reason: 'CLAIM_BUSY' };
         }
         const newLease = new Date(now + leaseDurationMs);
+        const claimToken = newLease.toISOString();
         await tx.endlessSupplyChunk.update({
           where: { jobId_chunkIndex: { jobId, chunkIndex } },
           data: { status: 'running' },
@@ -1697,17 +1722,42 @@ export function createPrismaDb(client: PrismaClient = prisma): DbPort {
         return {
           claimed: true,
           alreadyCompleted: false,
+          claimToken,
           stageCount: chunk.stageCount,
           seedStart: job.seedStart,
           targetCount: job.targetCount,
         };
       });
     },
-    async insertSupplyBatch(jobId, chunkIndex, stageRows, completedAtIso) {
+    async insertSupplyBatch(jobId, chunkIndex, stageRows, completedAtIso, claimToken) {
       return client.$transaction(async (tx) => {
+        // 행 레벨 락 획득
+        if (typeof (tx as any).$queryRaw === 'function') {
+          await tx.$queryRaw`SELECT id FROM "EndlessSupplyJob" WHERE id = ${jobId} FOR UPDATE`;
+          await tx.$queryRaw`SELECT id FROM "EndlessSupplyChunk" WHERE "jobId" = ${jobId} AND "chunkIndex" = ${chunkIndex} FOR UPDATE`;
+        }
+
         const completedDate = new Date(completedAtIso);
         const job = await tx.endlessSupplyJob.findUnique({ where: { id: jobId } });
-        if (!job) return false;
+        const chunk = await tx.endlessSupplyChunk.findUnique({
+          where: { jobId_chunkIndex: { jobId, chunkIndex } },
+        });
+        if (!job || !chunk) return false;
+
+        // 완료된 청크는 중복 적재 불가
+        if (chunk.status === 'completed') {
+          return false;
+        }
+
+        // fencing token 및 lease 소유권 검증
+        if (claimToken) {
+          if (!job.leaseExpiresAt || new Date(job.leaseExpiresAt).getTime() !== new Date(claimToken).getTime()) {
+            return false;
+          }
+          if (completedDate.getTime() > new Date(job.leaseExpiresAt).getTime()) {
+            return false;
+          }
+        }
 
         // 콘텐츠 중복 검사: regions + solution 중복 확인
         const duplicate = await tx.endlessStage.findFirst({
@@ -1767,8 +1817,30 @@ export function createPrismaDb(client: PrismaClient = prisma): DbPort {
         return true;
       });
     },
-    async failSupplyChunk(jobId, chunkIndex, _reason) {
+    async failSupplyChunk(jobId, chunkIndex, _reason, claimToken) {
       await client.$transaction(async (tx) => {
+        if (typeof (tx as any).$queryRaw === 'function') {
+          await tx.$queryRaw`SELECT id FROM "EndlessSupplyJob" WHERE id = ${jobId} FOR UPDATE`;
+          await tx.$queryRaw`SELECT id FROM "EndlessSupplyChunk" WHERE "jobId" = ${jobId} AND "chunkIndex" = ${chunkIndex} FOR UPDATE`;
+        }
+        const chunk = await tx.endlessSupplyChunk.findUnique({
+          where: { jobId_chunkIndex: { jobId, chunkIndex } },
+        });
+        const job = await tx.endlessSupplyJob.findUnique({ where: { id: jobId } });
+        if (!chunk || !job) return;
+
+        // 완료된 작업은 오래된 실패 호출이 failed로 바꾸지 못한다
+        if (chunk.status === 'completed' || job.status === 'completed') {
+          return;
+        }
+
+        // fencing token 검증: 이전 만료 실행자가 신규 실행자 상태를 덮어쓰지 못하도록 차단
+        if (claimToken) {
+          if (!job.leaseExpiresAt || new Date(job.leaseExpiresAt).getTime() !== new Date(claimToken).getTime()) {
+            return;
+          }
+        }
+
         await tx.endlessSupplyChunk.update({
           where: { jobId_chunkIndex: { jobId, chunkIndex } },
           data: { status: 'failed' },
