@@ -1,5 +1,5 @@
 import { generateEndlessPool } from '../../tools/generate';
-import { serializeRegions, serializeSolution, stageId } from '../../tools/load-pool';
+import { serializeRegions, serializeSolution, stageId } from '../shared/endlessStageFormat';
 import type { DbPort } from './db';
 
 export interface ChunkExecutionResult {
