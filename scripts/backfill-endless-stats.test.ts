@@ -18,7 +18,7 @@ describe('backfillEndlessStats', () => {
       atIso: '2026-10-07T00:00:00.000Z',
     });
     // 강제로 stage stats를 0으로 리셋하여 불일치 상태 조성
-    await db.updateStageStats?.('e-1', { plays: 0, clears: 0, clearTotalMs: 0n, avgClearMs: 0 });
+    await db.updateStageStats?.('e-1', { plays: 0, clears: 0, clearTotalMs: BigInt(0), avgClearMs: 0 });
 
     const report = await backfillEndlessStats(db, { dryRun: true });
     expect(report.ok).toBe(true);
@@ -51,7 +51,7 @@ describe('backfillEndlessStats', () => {
       atIso: '2026-10-07T00:01:00.000Z',
     });
     // 강제로 0으로 리셋
-    await db.updateStageStats?.('e-1', { plays: 0, clears: 0, clearTotalMs: 0n, avgClearMs: 0 });
+    await db.updateStageStats?.('e-1', { plays: 0, clears: 0, clearTotalMs: BigInt(0), avgClearMs: 0 });
 
     const report = await backfillEndlessStats(db, { dryRun: false });
     expect(report.ok).toBe(true);
@@ -61,7 +61,7 @@ describe('backfillEndlessStats', () => {
     const s = await db.getStage('e-1');
     expect(s?.plays).toBe(2);
     expect(s?.clears).toBe(2);
-    expect(s?.clearTotalMs).toBe(60000n);
+    expect(s?.clearTotalMs).toEqual(BigInt(60000));
     expect(s?.avgClearMs).toBe(30000);
   });
 

@@ -239,7 +239,7 @@ export function createMemoryDb(): DbPort {
         plays: 0,
         clears: 0,
         avgClearMs: 0,
-        clearTotalMs: 0n,
+        clearTotalMs: BigInt(0),
         ...stage,
       });
     },
@@ -256,7 +256,7 @@ export function createMemoryDb(): DbPort {
         plays: s.plays ?? 0,
         clears: s.clears ?? 0,
         avgClearMs: s.avgClearMs ?? 0,
-        clearTotalMs: s.clearTotalMs ?? 0n,
+        clearTotalMs: s.clearTotalMs ?? BigInt(0),
       };
     },
     async pickUnclearedStage(userId) {
@@ -281,7 +281,7 @@ export function createMemoryDb(): DbPort {
         plays: s.plays ?? 0,
         clears: s.clears ?? 0,
         avgClearMs: s.avgClearMs ?? 0,
-        clearTotalMs: s.clearTotalMs ?? 0n,
+        clearTotalMs: s.clearTotalMs ?? BigInt(0),
       }));
     },
     async getStageAggregation(stageId: string) {
@@ -296,7 +296,7 @@ export function createMemoryDb(): DbPort {
       }
       const verifiedEvents = endlessEvents.filter((e) => e.stageId === stageId && e.verified);
       const verifiedClearCount = verifiedEvents.length;
-      const verifiedClearTotalMs = verifiedEvents.reduce((acc, e) => acc + BigInt(e.elapsedMs), 0n);
+      const verifiedClearTotalMs = verifiedEvents.reduce((acc, e) => acc + BigInt(e.elapsedMs), BigInt(0));
       return { totalAttempts, clearedUserCount, verifiedClearCount, verifiedClearTotalMs };
     },
     async updateStageStats(stageId: string, stats: { plays: number; clears: number; clearTotalMs: bigint; avgClearMs: number }) {
@@ -341,7 +341,7 @@ export function createMemoryDb(): DbPort {
       if (st) {
         const nextPlays = (st.plays ?? 0) + 1;
         const nextClears = (st.clears ?? 0) + 1;
-        const nextTotalMs = (st.clearTotalMs ?? 0n) + BigInt(input.elapsedMs);
+        const nextTotalMs = (st.clearTotalMs ?? BigInt(0)) + BigInt(input.elapsedMs);
         const nextAvgMs = Math.round(Number(nextTotalMs) / nextClears);
         st.plays = nextPlays;
         st.clears = nextClears;
@@ -625,7 +625,7 @@ export function createPrismaDb(client: PrismaClient = prisma): DbPort {
           plays: stage.plays ?? 0,
           clears: stage.clears ?? 0,
           avgClearMs: stage.avgClearMs ?? 0,
-          clearTotalMs: stage.clearTotalMs ?? 0n,
+          clearTotalMs: stage.clearTotalMs ?? BigInt(0),
         },
       });
     },

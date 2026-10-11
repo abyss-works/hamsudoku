@@ -66,7 +66,7 @@ export async function executeSupplyChunk(
         plays: 0,
         clears: 0,
         avgClearMs: 0,
-        clearTotalMs: 0n,
+        clearTotalMs: BigInt(0),
       });
     }
   }

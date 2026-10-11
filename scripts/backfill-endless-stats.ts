@@ -44,7 +44,7 @@ export async function backfillEndlessStats(
 
     const currentPlays = stage.plays ?? 0;
     const currentClears = stage.clears ?? 0;
-    const currentTotalMs = stage.clearTotalMs ?? 0n;
+    const currentTotalMs = stage.clearTotalMs ?? BigInt(0);
     const currentAvgMs = stage.avgClearMs ?? 0;
 
     const needsUpdate =
