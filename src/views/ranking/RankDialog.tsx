@@ -1,14 +1,15 @@
 import { Trophy } from 'lucide-react';
-import { useRankDialogService, type RankDialogOptions } from '../../features/ranking/useRankDialogService';
+import { rankDialogService, type RankDialogOptions } from '../../features/ranking/rankDialogService';
 import { Button } from '../../ui/Button';
 import { Overlay } from '../../ui/Overlay';
+import { RankList } from './RankList';
 
 export interface RankDialogProps extends RankDialogOptions {
   onClose: () => void;
 }
 
 export function RankDialog({ rank, myRank, uid, signedIn, onClose }: RankDialogProps) {
-  const { season, frozen, rows, empty, myRankSummary } = useRankDialogService({ rank, myRank, uid, signedIn });
+  const { season, frozen, rows, empty, myRankSummary } = rankDialogService({ rank, myRank, uid, signedIn });
 
   return (
     <Overlay label="랭킹">
@@ -21,21 +22,7 @@ export function RankDialog({ rank, myRank, uid, signedIn, onClose }: RankDialogP
           {season && <span className="rank-season">{season}</span>}
         </p>
         {frozen && <p className="rank-frozen">집계가 마감됐어요. 새 시즌은 4시에 시작해요.</p>}
-        <ol className="rank-list rank-scroll">
-          {rows.map((row) => (
-            <li key={row.userId} className={row.isMe ? 'rank-row me' : 'rank-row'}>
-              <span className="rank-no" aria-hidden="true">
-                {row.rankNo}
-              </span>
-              <span className="rank-name">{row.displayName}</span>
-              <span className="rank-score">
-                {row.score}
-                <span className="rank-unit">개</span>
-              </span>
-            </li>
-          ))}
-          {empty && <li className="rank-row empty">아직 기록이 없어요</li>}
-        </ol>
+        <RankList rows={rows} empty={empty} />
         {myRankSummary && <p className="rank-me">{myRankSummary}</p>}
         <div className="rank-actions">
           <Button variant="sticker" className="btn-primary" onClick={onClose}>

@@ -1,5 +1,5 @@
 import { useEffect, useRef, useState } from 'react';
-import { cloudAuthApi } from '../account/accountApi';
+import { fetchRemoteSessionUser } from '../account/remoteSessionService';
 import { useAdminRank } from './useAdminRank';
 import { adminRankModel } from './rankLogic';
 
@@ -7,10 +7,8 @@ export function useAdminRankPanelService() {
   const [uid, setUid] = useState<string | null | undefined>(undefined);
   useEffect(() => {
     let alive = true;
-    void cloudAuthApi.me().then((me) => {
-      if (alive) setUid(me.uid);
-    }).catch(() => {
-      if (alive) setUid(null);
+    void fetchRemoteSessionUser().then((user) => {
+      if (alive) setUid(user.uid);
     });
     return () => {
       alive = false;
