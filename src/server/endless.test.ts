@@ -102,6 +102,29 @@ describe('submitEndlessClear', () => {
     const r = await submitEndlessClear(db, null, input('k', 'e-1'), new Date().toISOString());
     expect(r.status).toBe(401);
   });
+
+  it('무효 제출과 재사용 키는 스테이지 통계를 변경하지 않는다', async () => {
+    const db = createMemoryDb();
+    await db.insertStage(stage('e-1'));
+    const a = await db.issueAttempt('u1', 'e-1');
+    const nowIso = new Date(Date.parse(a.issuedAt) + 11_000).toISOString();
+    // 1회 유효 클리어
+    await submitEndlessClear(db, 'u1', input(a.id, 'e-1'), nowIso);
+    const s1 = await db.getStage('e-1');
+    expect(s1).toMatchObject({ plays: 1, clears: 1 });
+
+    // 동일 키 재사용 시도
+    await submitEndlessClear(db, 'u1', input(a.id, 'e-1'), nowIso);
+    const s2 = await db.getStage('e-1');
+    expect(s2).toMatchObject({ plays: 1, clears: 1 });
+
+    // 정답 불일치 무효 제출
+    const a2 = await db.issueAttempt('u1', 'e-1');
+    const t2 = new Date(Date.parse(a2.issuedAt) + 11_000).toISOString();
+    await submitEndlessClear(db, 'u1', { ...input(a2.id, 'e-1'), solution: [[9, 9]] }, t2);
+    const s3 = await db.getStage('e-1');
+    expect(s3).toMatchObject({ plays: 1, clears: 1 });
+  });
 });
 
 describe('submitEndlessFail', () => {

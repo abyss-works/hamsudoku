@@ -18,6 +18,10 @@ export interface EndlessStageRow {
   solution: string;
   tier: number;
   seed: number;
+  plays?: number;
+  clears?: number;
+  avgClearMs?: number;
+  clearTotalMs?: bigint;
 }
 
 export interface StreakRow {
@@ -58,6 +62,23 @@ export interface DbPort {
   getStage(stageId: string): Promise<EndlessStageRow | null>;
   pickUnclearedStage(userId: string): Promise<EndlessStageRow | null>;
   countStages(): Promise<number>;
+  countZeroClearStages(): Promise<number>;
+  listAllStages(): Promise<EndlessStageRow[]>;
+  getStageAggregation(stageId: string): Promise<{
+    totalAttempts: number;
+    clearedUserCount: number;
+    verifiedClearCount: number;
+    verifiedClearTotalMs: bigint;
+  }>;
+  updateStageStats(
+    stageId: string,
+    stats: { plays: number; clears: number; clearTotalMs: bigint; avgClearMs: number },
+  ): Promise<void>;
+  injectInconsistentProgress?(
+    userId: string,
+    stageId: string,
+    input: { cleared: boolean; attempts: number },
+  ): Promise<void>;
   commitEndlessClear(
     userId: string,
     stageId: string,
@@ -166,10 +187,29 @@ export function createMemoryDb(): DbPort {
       return { clears };
     },
     async insertStage(stage) {
-      stages.set(stage.id, stage);
+      stages.set(stage.id, {
+        plays: 0,
+        clears: 0,
+        avgClearMs: 0,
+        clearTotalMs: 0n,
+        ...stage,
+      });
     },
     async getStage(stageId) {
-      return stages.get(stageId) ?? null;
+      const s = stages.get(stageId);
+      if (!s) return null;
+      return {
+        id: s.id,
+        size: s.size,
+        regions: s.regions,
+        solution: s.solution,
+        tier: s.tier,
+        seed: s.seed,
+        plays: s.plays ?? 0,
+        clears: s.clears ?? 0,
+        avgClearMs: s.avgClearMs ?? 0,
+        clearTotalMs: s.clearTotalMs ?? 0n,
+      };
     },
     async pickUnclearedStage(userId) {
       const open = [...stages.values()].filter((s) => !endlessProgress.get(progressKey(userId, s.id))?.cleared);
@@ -178,6 +218,54 @@ export function createMemoryDb(): DbPort {
     },
     async countStages() {
       return stages.size;
+    },
+    async countZeroClearStages() {
+      return [...stages.values()].filter((s) => (s.clears ?? 0) === 0).length;
+    },
+    async listAllStages() {
+      return [...stages.values()].map((s) => ({
+        id: s.id,
+        size: s.size,
+        regions: s.regions,
+        solution: s.solution,
+        tier: s.tier,
+        seed: s.seed,
+        plays: s.plays ?? 0,
+        clears: s.clears ?? 0,
+        avgClearMs: s.avgClearMs ?? 0,
+        clearTotalMs: s.clearTotalMs ?? 0n,
+      }));
+    },
+    async getStageAggregation(stageId: string) {
+      let totalAttempts = 0;
+      let clearedUserCount = 0;
+      for (const [key, p] of endlessProgress.entries()) {
+        const [, sid] = key.split(':');
+        if (sid === stageId) {
+          totalAttempts += p.attempts;
+          if (p.cleared) clearedUserCount += 1;
+        }
+      }
+      const verifiedEvents = endlessEvents.filter((e) => e.stageId === stageId && e.verified);
+      const verifiedClearCount = verifiedEvents.length;
+      const verifiedClearTotalMs = verifiedEvents.reduce((acc, e) => acc + BigInt(e.elapsedMs), 0n);
+      return { totalAttempts, clearedUserCount, verifiedClearCount, verifiedClearTotalMs };
+    },
+    async updateStageStats(stageId: string, stats: { plays: number; clears: number; clearTotalMs: bigint; avgClearMs: number }) {
+      const s = stages.get(stageId);
+      if (s) {
+        s.plays = stats.plays;
+        s.clears = stats.clears;
+        s.clearTotalMs = stats.clearTotalMs;
+        s.avgClearMs = stats.avgClearMs;
+      }
+    },
+    async injectInconsistentProgress(userId: string, stageId: string, input: { cleared: boolean; attempts: number }) {
+      endlessProgress.set(progressKey(userId, stageId), {
+        cleared: input.cleared,
+        attempts: input.attempts,
+        lastPlayedAt: new Date().toISOString(),
+      });
     },
     async commitEndlessClear(userId, stageId, input) {
       const key = progressKey(userId, stageId);
@@ -200,6 +288,19 @@ export function createMemoryDb(): DbPort {
         suspicious: input.suspicious,
         createdAt: input.atIso,
       });
+
+      const st = stages.get(stageId);
+      if (st) {
+        const nextPlays = (st.plays ?? 0) + 1;
+        const nextClears = (st.clears ?? 0) + 1;
+        const nextTotalMs = (st.clearTotalMs ?? 0n) + BigInt(input.elapsedMs);
+        const nextAvgMs = Math.round(Number(nextTotalMs) / nextClears);
+        st.plays = nextPlays;
+        st.clears = nextClears;
+        st.clearTotalMs = nextTotalMs;
+        st.avgClearMs = nextAvgMs;
+      }
+
       return { balance: balanceOf(userId), clearedCount: clearedCountOf(userId), streak: next };
     },
     async commitEndlessFail(userId, stageId, atIso) {
@@ -209,6 +310,12 @@ export function createMemoryDb(): DbPort {
       const s = streakOf(userId);
       const next = { current: 0, best: s.best };
       streaks.set(userId, next);
+
+      const st = stages.get(stageId);
+      if (st) {
+        st.plays = (st.plays ?? 0) + 1;
+      }
+
       return { streak: next };
     },
     async appendEndlessEvent(userId, stageId, input) {
@@ -389,12 +496,36 @@ export function createPrismaDb(client: PrismaClient = prisma): DbPort {
       };
     },
     async insertStage(stage) {
-      await client.endlessStage.create({ data: stage });
+      await client.endlessStage.create({
+        data: {
+          id: stage.id,
+          size: stage.size,
+          regions: stage.regions,
+          solution: stage.solution,
+          tier: stage.tier,
+          seed: stage.seed,
+          plays: stage.plays ?? 0,
+          clears: stage.clears ?? 0,
+          avgClearMs: stage.avgClearMs ?? 0,
+          clearTotalMs: stage.clearTotalMs ?? 0n,
+        },
+      });
     },
     async getStage(stageId) {
       const s = await client.endlessStage.findUnique({ where: { id: stageId } });
       return s
-        ? { id: s.id, size: s.size, regions: s.regions, solution: s.solution, tier: s.tier, seed: s.seed }
+        ? {
+            id: s.id,
+            size: s.size,
+            regions: s.regions,
+            solution: s.solution,
+            tier: s.tier,
+            seed: s.seed,
+            plays: s.plays,
+            clears: s.clears,
+            avgClearMs: s.avgClearMs,
+            clearTotalMs: s.clearTotalMs,
+          }
         : null;
     },
     async pickUnclearedStage(userId) {
@@ -407,10 +538,72 @@ export function createPrismaDb(client: PrismaClient = prisma): DbPort {
         ORDER BY random() LIMIT 1`;
       if (rows.length === 0) return null;
       const s = await client.endlessStage.findUniqueOrThrow({ where: { id: rows[0].id } });
-      return { id: s.id, size: s.size, regions: s.regions, solution: s.solution, tier: s.tier, seed: s.seed };
+      return {
+        id: s.id,
+        size: s.size,
+        regions: s.regions,
+        solution: s.solution,
+        tier: s.tier,
+        seed: s.seed,
+        plays: s.plays,
+        clears: s.clears,
+        avgClearMs: s.avgClearMs,
+        clearTotalMs: s.clearTotalMs,
+      };
     },
     async countStages() {
       return client.endlessStage.count();
+    },
+    async countZeroClearStages() {
+      return client.endlessStage.count({ where: { clears: 0 } });
+    },
+    async listAllStages() {
+      const rows = await client.endlessStage.findMany();
+      return rows.map((s) => ({
+        id: s.id,
+        size: s.size,
+        regions: s.regions,
+        solution: s.solution,
+        tier: s.tier,
+        seed: s.seed,
+        plays: s.plays,
+        clears: s.clears,
+        avgClearMs: s.avgClearMs,
+        clearTotalMs: s.clearTotalMs,
+      }));
+    },
+    async getStageAggregation(stageId: string) {
+      const [progressAgg, clearedUserCount, eventAgg] = await Promise.all([
+        client.endlessProgress.aggregate({
+          where: { stageId },
+          _sum: { attempts: true },
+        }),
+        client.endlessProgress.count({
+          where: { stageId, cleared: true },
+        }),
+        client.endlessEvent.aggregate({
+          where: { stageId, verified: true },
+          _count: { _all: true },
+          _sum: { elapsedMs: true },
+        }),
+      ]);
+      return {
+        totalAttempts: progressAgg._sum.attempts ?? 0,
+        clearedUserCount,
+        verifiedClearCount: eventAgg._count._all,
+        verifiedClearTotalMs: BigInt(eventAgg._sum.elapsedMs ?? 0),
+      };
+    },
+    async updateStageStats(stageId: string, stats: { plays: number; clears: number; clearTotalMs: bigint; avgClearMs: number }) {
+      await client.endlessStage.update({
+        where: { id: stageId },
+        data: {
+          plays: stats.plays,
+          clears: stats.clears,
+          clearTotalMs: stats.clearTotalMs,
+          avgClearMs: stats.avgClearMs,
+        },
+      });
     },
     async commitEndlessClear(userId, stageId, input) {
       return client.$transaction(async (tx) => {
@@ -438,6 +631,23 @@ export function createPrismaDb(client: PrismaClient = prisma): DbPort {
         await tx.endlessEvent.create({
           data: { userId, stageId, seedLeft: input.seedLeft, elapsedMs: input.elapsedMs, verified: true, suspicious: input.suspicious },
         });
+
+        const stageRow = await tx.endlessStage.findUnique({ where: { id: stageId } });
+        if (stageRow) {
+          const nextClears = stageRow.clears + 1;
+          const nextClearTotalMs = stageRow.clearTotalMs + BigInt(input.elapsedMs);
+          const nextAvgClearMs = Math.round(Number(nextClearTotalMs) / nextClears);
+          await tx.endlessStage.update({
+            where: { id: stageId },
+            data: {
+              plays: { increment: 1 },
+              clears: nextClears,
+              clearTotalMs: nextClearTotalMs,
+              avgClearMs: nextAvgClearMs,
+            },
+          });
+        }
+
         const clearedCount = await tx.endlessProgress.count({ where: { userId, cleared: true } });
         return { balance: wallet.balance, clearedCount, streak: { current: streak.current, best: streak.best } };
       });
@@ -455,6 +665,12 @@ export function createPrismaDb(client: PrismaClient = prisma): DbPort {
           create: { userId, current: 0, best: prev?.best ?? 0 },
           update: { current: 0 },
         });
+
+        await tx.endlessStage.update({
+          where: { id: stageId },
+          data: { plays: { increment: 1 } },
+        });
+
         return { streak: { current: streak.current, best: streak.best } };
       });
     },

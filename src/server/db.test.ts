@@ -89,6 +89,38 @@ describe('endless DbPort', () => {
     await db.commitEndlessClear('u2', 'e-1', { earned: 1, season: '2026-W40', seedLeft: 1, elapsedMs: 30000, suspicious: false, atIso: '2026-10-07T00:02:00.000Z' });
     expect(await db.listSeasonEarnings('2026-W41')).toEqual([{ userId: 'u1', amount: 5 }]);
   });
+
+  it('commitEndlessClear는 stage의 plays, clears, clearTotalMs, avgClearMs를 트랜잭션에서 갱신한다', async () => {
+    const db = createMemoryDb();
+    await db.insertStage(stage('e-1'));
+    await db.commitEndlessClear('u1', 'e-1', { earned: 3, season: '2026-W41', seedLeft: 3, elapsedMs: 20000, suspicious: false, atIso: '2026-10-07T00:00:00.000Z' });
+    const s1 = await db.getStage('e-1');
+    expect(s1).toMatchObject({ plays: 1, clears: 1, clearTotalMs: 20000n, avgClearMs: 20000 });
+
+    await db.commitEndlessClear('u2', 'e-1', { earned: 3, season: '2026-W41', seedLeft: 3, elapsedMs: 40000, suspicious: false, atIso: '2026-10-07T00:01:00.000Z' });
+    const s2 = await db.getStage('e-1');
+    expect(s2).toMatchObject({ plays: 2, clears: 2, clearTotalMs: 60000n, avgClearMs: 30000 });
+  });
+
+  it('commitEndlessFail은 plays만 증가시키고 clears, avgClearMs는 변경하지 않는다', async () => {
+    const db = createMemoryDb();
+    await db.insertStage(stage('e-1'));
+    await db.commitEndlessClear('u1', 'e-1', { earned: 3, season: '2026-W41', seedLeft: 3, elapsedMs: 20000, suspicious: false, atIso: '2026-10-07T00:00:00.000Z' });
+    await db.commitEndlessFail('u2', 'e-1', '2026-10-07T00:01:00.000Z');
+    const s = await db.getStage('e-1');
+    expect(s).toMatchObject({ plays: 2, clears: 1, clearTotalMs: 20000n, avgClearMs: 20000 });
+  });
+
+  it('countZeroClearStages는 clears가 0인 스테이지 수만 센다', async () => {
+    const db = createMemoryDb();
+    await db.insertStage(stage('e-1'));
+    await db.insertStage(stage('e-2'));
+    expect(await db.countZeroClearStages()).toBe(2);
+    await db.commitEndlessClear('u1', 'e-1', { earned: 3, season: '2026-W41', seedLeft: 3, elapsedMs: 20000, suspicious: false, atIso: '2026-10-07T00:00:00.000Z' });
+    expect(await db.countZeroClearStages()).toBe(1);
+    await db.commitEndlessClear('u1', 'e-2', { earned: 3, season: '2026-W41', seedLeft: 3, elapsedMs: 20000, suspicious: false, atIso: '2026-10-07T00:00:00.000Z' });
+    expect(await db.countZeroClearStages()).toBe(0);
+  });
 });
 
 describe('ensureUser 경합', () => {
