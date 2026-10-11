@@ -55,16 +55,49 @@ model Attempt {
 }
 
 model EndlessStage {
-  id         String   @id
-  size       Int
-  regions    String
-  solution   String
-  tier       Int
-  seed       Int
-  plays      Int      @default(0)
-  clears     Int      @default(0)
-  avgClearMs Int      @default(0)
-  createdAt  DateTime @default(now())
+  id           String   @id
+  size         Int
+  regions      String
+  solution     String
+  tier         Int
+  seed         Int
+  plays        Int      @default(0)
+  clears       Int      @default(0)
+  avgClearMs   Int      @default(0)
+  clearTotalMs BigInt   @default(0)
+  createdAt    DateTime @default(now())
+
+  @@index([clears])
+}
+
+model EndlessSupplyJob {
+  id             String               @id
+  policyVersion  String
+  seedStart      Int
+  seedEnd        Int
+  targetCount    Int                  @default(10)
+  status         String               @default("pending")
+  leaseExpiresAt DateTime?
+  lastSuccessAt  DateTime?
+  createdAt      DateTime             @default(now())
+  updatedAt      DateTime             @updatedAt
+  chunks         EndlessSupplyChunk[]
+
+  @@index([status, leaseExpiresAt])
+}
+
+model EndlessSupplyChunk {
+  id          String           @id
+  jobId       String
+  chunkIndex  Int
+  status      String           @default("pending")
+  stageCount  Int              @default(0)
+  completedAt DateTime?
+  createdAt   DateTime         @default(now())
+  job         EndlessSupplyJob @relation(fields: [jobId], references: [id], onDelete: Cascade)
+
+  @@unique([jobId, chunkIndex])
+  @@index([jobId])
 }
 
 model EndlessProgress {

@@ -102,6 +102,70 @@ describe('submitEndlessClear', () => {
     const r = await submitEndlessClear(db, null, input('k', 'e-1'), new Date().toISOString());
     expect(r.status).toBe(401);
   });
+
+  it('무효 제출과 재사용 키는 스테이지 통계를 변경하지 않는다', async () => {
+    const db = createMemoryDb();
+    await db.insertStage(stage('e-1'));
+    const a = await db.issueAttempt('u1', 'e-1');
+    const nowIso = new Date(Date.parse(a.issuedAt) + 11_000).toISOString();
+    // 1회 유효 클리어
+    await submitEndlessClear(db, 'u1', input(a.id, 'e-1'), nowIso);
+    const s1 = await db.getStage('e-1');
+    expect(s1).toMatchObject({ plays: 1, clears: 1 });
+
+    // 동일 키 재사용 시도
+    await submitEndlessClear(db, 'u1', input(a.id, 'e-1'), nowIso);
+    const s2 = await db.getStage('e-1');
+    expect(s2).toMatchObject({ plays: 1, clears: 1 });
+
+    // 정답 불일치 무효 제출
+    const a2 = await db.issueAttempt('u1', 'e-1');
+    const t2 = new Date(Date.parse(a2.issuedAt) + 11_000).toISOString();
+    await submitEndlessClear(db, 'u1', { ...input(a2.id, 'e-1'), solution: [[9, 9]] }, t2);
+    const s3 = await db.getStage('e-1');
+    expect(s3).toMatchObject({ plays: 1, clears: 1 });
+  });
+
+  it('동일 attempt 재전송 시 보상 및 통계 중복이 차단되고, 서로 다른 유효 attempt는 상태·원장·통계·응답이 일치하게 기록된다', async () => {
+    const db = createMemoryDb();
+    await db.insertStage(stage('e-1'));
+
+    // 1. 첫 번째 유효 attempt 발급 및 제출
+    const a1 = await db.issueAttempt('u1', 'e-1');
+    const t1 = new Date(Date.parse(a1.issuedAt) + 12_000).toISOString();
+    const r1 = await submitEndlessClear(db, 'u1', input(a1.id, 'e-1'), t1);
+    expect(r1.status).toBe(200);
+    expect(r1.body).toMatchObject({ ok: true, balance: 3, earned: 3 });
+
+    // 2. 동일 attempt 재전송 -> useAttempt 경계에서 거부, 중복 보상/통계 없음
+    const r1Duplicate = await submitEndlessClear(db, 'u1', input(a1.id, 'e-1'), t1);
+    expect(r1Duplicate.body).toMatchObject({ ok: false });
+    expect((await db.getEndlessSummary('u1')).balance).toBe(3);
+    const stageAfterDup = await db.getStage('e-1');
+    expect(stageAfterDup?.clears).toBe(1);
+    expect(stageAfterDup?.plays).toBe(1);
+
+    // 3. 다른 별도의 유효 attempt 발급 및 제출 (동일 사용자, 동일 스테이지)
+    const a2 = await db.issueAttempt('u1', 'e-1');
+    const t2 = new Date(Date.parse(a2.issuedAt) + 20_000).toISOString();
+    const r2 = await submitEndlessClear(db, 'u1', input(a2.id, 'e-1'), t2);
+    expect(r2.status).toBe(200);
+    expect(r2.body).toMatchObject({ ok: true, earned: 3, balance: 6 });
+
+    // 상태, 원장, 통계, 응답 일치 확인
+    const summary = await db.getEndlessSummary('u1');
+    expect(summary.balance).toBe(6);
+    expect(r2.body).toMatchObject({ balance: summary.balance });
+
+    const stageAfterSecond = await db.getStage('e-1');
+    expect(stageAfterSecond?.clears).toBe(2);
+    expect(stageAfterSecond?.plays).toBe(2);
+    expect(stageAfterSecond?.clearTotalMs).toBe(BigInt(32000));
+
+    // 원장에 두 건의 적립 기록이 존재함을 확인
+    const events = await db.listRecentEndlessEvents('u1', 5);
+    expect(events.filter((e) => e.verified)).toHaveLength(2);
+  });
 });
 
 describe('submitEndlessFail', () => {

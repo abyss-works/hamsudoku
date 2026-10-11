@@ -10,11 +10,21 @@ export interface VerifyQStashOptions {
   clockTolerance?: number;
 }
 
+export interface QStashVerifyOptions {
+  currentSigningKey?: string;
+  nextSigningKey?: string;
+  clockTolerance?: number;
+}
+
+export interface QStashVerifier {
+  verify(req: Request, rawBody: string): Promise<boolean>;
+}
+
 /**
  * 공식 @upstash/qstash Receiver를 사용하여 QStash 웹훅 서명을 검증한다.
  * URL(sub), body hash, issuer(Upstash), 만료시간(exp), not-before(nbf), 서명 키 회전을 검증한다.
  */
-export async function verifyQStashSignature(options: VerifyQStashOptions): Promise<boolean> {
+async function verifyQStashSignatureInternal(options: VerifyQStashOptions): Promise<boolean> {
   const {
     signature,
     body = '',
@@ -42,6 +52,50 @@ export async function verifyQStashSignature(options: VerifyQStashOptions): Promi
     });
   } catch {
     return false;
+  }
+}
+
+export async function verifyQStashSignature(options: VerifyQStashOptions): Promise<boolean>;
+export async function verifyQStashSignature(
+  req: Request,
+  rawBody: string,
+  options?: QStashVerifyOptions,
+): Promise<boolean>;
+export async function verifyQStashSignature(
+  arg1: VerifyQStashOptions | Request,
+  arg2?: string,
+  arg3?: QStashVerifyOptions,
+): Promise<boolean> {
+  if (
+    arg1 instanceof Request ||
+    (typeof arg1 === 'object' && arg1 !== null && 'headers' in arg1 && typeof arg2 === 'string')
+  ) {
+    const req = arg1 as Request;
+    const rawBody = arg2 as string;
+    const options = arg3;
+    const signature = req.headers.get('upstash-signature');
+    if (!signature) return false;
+    return verifyQStashSignatureInternal({
+      signature,
+      body: rawBody,
+      url: req.url,
+      currentSigningKey: options?.currentSigningKey,
+      nextSigningKey: options?.nextSigningKey,
+      clockTolerance: options?.clockTolerance,
+    });
+  }
+  return verifyQStashSignatureInternal(arg1 as VerifyQStashOptions);
+}
+
+export class OfficialQStashVerifier implements QStashVerifier {
+  private options: QStashVerifyOptions;
+
+  constructor(options: QStashVerifyOptions = {}) {
+    this.options = options;
+  }
+
+  async verify(req: Request, rawBody: string): Promise<boolean> {
+    return verifyQStashSignature(req, rawBody, this.options);
   }
 }
 
@@ -85,4 +139,40 @@ export async function verifyInternalRequest(
   }
 
   return false;
+}
+
+export async function publishQStashChunk(
+  jobId: string,
+  chunkIndex: number,
+  options?: { destinationUrl?: string; token?: string },
+): Promise<{ messageId: string }> {
+  const token = options?.token ?? process.env.QSTASH_TOKEN;
+  if (!token) {
+    throw new Error('QStash publish failed: QSTASH_TOKEN is not configured');
+  }
+
+  const destinationUrl =
+    options?.destinationUrl ??
+    (process.env.APP_URL ? `${process.env.APP_URL}/api/internal/endless-generate` : undefined);
+  if (!destinationUrl) {
+    throw new Error('QStash publish failed: APP_URL is not configured');
+  }
+
+  const qstashUrl = `https://qstash.upstash.io/v2/publish/${destinationUrl}`;
+  const res = await fetch(qstashUrl, {
+    method: 'POST',
+    headers: {
+      Authorization: `Bearer ${token}`,
+      'Content-Type': 'application/json',
+      'Upstash-Retries': '3',
+    },
+    body: JSON.stringify({ jobId, chunkIndex }),
+  });
+
+  if (!res.ok) {
+    throw new Error(`QStash publish failed with status ${res.status}`);
+  }
+
+  const data = (await res.json()) as { messageId: string };
+  return { messageId: data.messageId };
 }

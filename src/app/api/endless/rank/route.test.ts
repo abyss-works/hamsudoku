@@ -7,11 +7,12 @@ vi.mock('../../../../server/auth', () => ({
 }));
 
 let enqueuedSeason: string | null = null;
+let enqueueResult: Promise<{ messageId: string }> | null = null;
 vi.mock('../../../../server/qstashPublisher', () => ({
   createQStashPublisher: () => ({
     enqueueFinalize: async (season: string) => {
       enqueuedSeason = season;
-      return { messageId: 'msg-test' };
+      return enqueueResult ?? { messageId: 'msg-test' };
     },
   }),
 }));
@@ -35,6 +36,7 @@ vi.mock('../../../../server/db', () => ({
       return null;
     }),
     getUserSeasonRank: vi.fn(async () => ({ rank: 1, score: 50 })),
+    listSeasonEarnings: vi.fn(async () => [{ userId: 'u1', amount: 50 }]),
     lookupNicknames: vi.fn(async () => ({ u1: '햄찌' })),
   })),
 }));
@@ -49,11 +51,34 @@ vi.mock('../../../../server/rank', () => ({
 
 afterEach(() => {
   enqueuedSeason = null;
+  enqueueResult = null;
   vi.useRealTimers();
   vi.restoreAllMocks();
 });
 
 describe('GET /api/endless/rank 마감 창 및 확정 상태', () => {
+  it('미확정 시즌 보완 큐의 등록 응답이 도착한 뒤 조회 응답을 완료한다', async () => {
+    vi.useFakeTimers();
+    vi.setSystemTime(new Date('2026-10-11T15:30:00Z'));
+    let acknowledge!: (value: { messageId: string }) => void;
+    enqueueResult = new Promise((resolve) => { acknowledge = resolve; });
+    let responded = false;
+    const pending = GET().then((res) => { responded = true; return res; });
+    await vi.waitFor(() => expect(enqueuedSeason).toBe('2026-W41'));
+    expect(responded).toBe(false);
+    acknowledge({ messageId: 'acknowledged' });
+    expect((await pending).status).toBe(200);
+  });
+
+  it('큐 등록 실패는 관측하고 미확정 조회를 집계 중 상태로 유지한다', async () => {
+    vi.useFakeTimers();
+    vi.setSystemTime(new Date('2026-10-11T15:30:00Z'));
+    enqueueResult = Promise.reject(new Error('publish failed'));
+    const warn = vi.spyOn(console, 'warn').mockImplementation(() => {});
+    const res = await GET();
+    expect((await res.json()).status).toBe('aggregating');
+    expect(warn).toHaveBeenCalledWith('Ranking finalization enqueue failed');
+  });
   it('마감 중 확정된 시즌은 확정 결과를 status: finalized로 반환한다', async () => {
     vi.useFakeTimers();
     vi.setSystemTime(new Date('2026-10-04T15:30:00Z')); // 2026-W40 마감 창 (확정된 상태)

@@ -13,7 +13,7 @@ export interface RankSnapshot {
 
 export interface RankStore {
   increment(season: string, userId: string, amount: number): Promise<void>;
-  top(season: string, limit: number): Promise<RankSnapshot>;
+  top(season: string, limit: number, loadScores?: () => Promise<RankEntry[]>): Promise<RankSnapshot>;
   /** 관리자용 전체 게임 스코어 목록(내림차순) — UPSTASH ZREVRANGE 원본. */
   topAll(season: string, limit: number): Promise<RankSnapshot>;
   /** 관리자용 엔트리 삭제 — UPSTASH ZREM. 실제 삭제된 수를 돌려준다. */
@@ -25,6 +25,17 @@ export interface RankStore {
 const TOP_TTL_SEC = 60;
 const SEASON_TTL_SEC = 14 * 24 * 60 * 60;
 const LOCK_TTL_SEC = 5;
+
+const PUBLISH_LEDGER_SNAPSHOT = `
+if redis.call('get', KEYS[1]) ~= ARGV[1] then return 0 end
+redis.call('del', KEYS[2])
+for i = 5, #ARGV, 2 do
+  redis.call('zadd', KEYS[2], ARGV[i], ARGV[i + 1])
+end
+if #ARGV > 4 then redis.call('expire', KEYS[2], ARGV[2]) end
+redis.call('set', KEYS[3], ARGV[4], 'EX', ARGV[3])
+return 1
+`;
 
 function parseAndValidateSnapshot(cached: string | null, season: string): RankSnapshot | null {
   if (!cached) return null;
@@ -93,7 +104,7 @@ export function createRankStore(opts: { url: string; token: string; fetchImpl?: 
     async remove(season, userId) {
       return cmd<number>(['zrem', key(season), userId]);
     },
-    async top(season, limit) {
+    async top(season, limit, loadScores) {
       const cached = await cmd<string | null>(['get', topKey(season)]);
       const valid = parseAndValidateSnapshot(cached, season);
       if (valid) {
@@ -119,6 +130,18 @@ export function createRankStore(opts: { url: string; token: string; fetchImpl?: 
       }
 
       try {
+        if (loadScores) {
+          const rows = await loadScores();
+          rows.sort((a, b) => b.score - a.score || (a.userId < b.userId ? 1 : a.userId > b.userId ? -1 : 0));
+          const snapshot: RankSnapshot = { at: new Date().toISOString(), season, entries: rows.slice(0, limit) };
+          const published = await cmd<number>([
+            'eval', PUBLISH_LEDGER_SNAPSHOT, 3, lockKey(season), key(season), topKey(season),
+            lockToken, SEASON_TTL_SEC, TOP_TTL_SEC, JSON.stringify(snapshot),
+            ...rows.flatMap((row) => [row.score, row.userId]),
+          ]);
+          if (published !== 1) throw new Error('Ranking refresh lock expired');
+          return snapshot;
+        }
         const rawFlat = await cmd<(string | number)[] | null>(['zrevrange', key(season), 0, limit - 1, 'withscores']);
         const flat = rawFlat ?? [];
         const seen = new Set<string>();

@@ -20,6 +20,10 @@ export interface EndlessStageRow {
   solution: string;
   tier: number;
   seed: number;
+  plays?: number;
+  clears?: number;
+  avgClearMs?: number;
+  clearTotalMs?: bigint;
 }
 
 export interface StreakRow {
@@ -39,6 +43,44 @@ export interface EndlessEventRow {
   verified: boolean;
   suspicious: boolean;
   reason?: string;
+  createdAt: string;
+}
+
+export const MAX_INT32 = 2_147_483_647;
+export const MAX_BIGINT64 = BigInt('9223372036854775807');
+
+export function clampInt32(val: number): number {
+  if (val > MAX_INT32) return MAX_INT32;
+  if (val < 0) return 0;
+  return Math.round(val);
+}
+
+export function clampBigInt64(val: bigint): bigint {
+  if (val > MAX_BIGINT64) return MAX_BIGINT64;
+  if (val < BigInt(0)) return BigInt(0);
+  return val;
+}
+
+export interface EndlessSupplyJobRow {
+  id: string;
+  policyVersion: string;
+  seedStart: number;
+  seedEnd: number;
+  targetCount: number;
+  status: string;
+  leaseExpiresAt: string | null;
+  lastSuccessAt: string | null;
+  createdAt: string;
+  updatedAt: string;
+}
+
+export interface EndlessSupplyChunkRow {
+  id: string;
+  jobId: string;
+  chunkIndex: number;
+  status: string;
+  stageCount: number;
+  completedAt: string | null;
   createdAt: string;
 }
 
@@ -75,6 +117,26 @@ export interface DbPort {
   getStage(stageId: string): Promise<EndlessStageRow | null>;
   pickUnclearedStage(userId: string): Promise<EndlessStageRow | null>;
   countStages(): Promise<number>;
+  countZeroClearStages(): Promise<number>;
+  listAllStages(): Promise<EndlessStageRow[]>;
+  getStageAggregation(stageId: string): Promise<{
+    totalAttempts: number;
+    clearedUserCount: number;
+    verifiedClearCount: number;
+    verifiedClearTotalMs: bigint;
+  }>;
+  updateStageStats(
+    stageId: string,
+    stats: { plays: number; clears: number; clearTotalMs: bigint; avgClearMs: number },
+  ): Promise<void>;
+  atomicReaggregateStageStats?(
+    stageId: string,
+  ): Promise<{ ok: boolean; updated: boolean; error?: string }>;
+  injectInconsistentProgress?(
+    userId: string,
+    stageId: string,
+    input: { cleared: boolean; attempts: number },
+  ): Promise<void>;
   commitEndlessClear(
     userId: string,
     stageId: string,
@@ -96,6 +158,63 @@ export interface DbPort {
   listRecentEndlessEvents(userId: string, limit: number): Promise<EndlessEventRow[]>;
   getEndlessSummary(userId: string): Promise<EndlessSummary>;
   listSeasonEarnings(season: string): Promise<{ userId: string; amount: number }[]>;
+  findActiveSupplyJob(nowIso: string): Promise<EndlessSupplyJobRow | null>;
+  getLatestSupplySuccessAt(): Promise<string | null>;
+  createSupplyJob(data: {
+    id: string;
+    policyVersion: string;
+    seedStart: number;
+    seedEnd: number;
+    targetCount: number;
+    leaseExpiresAt: string | null;
+  }): Promise<EndlessSupplyJobRow>;
+  updateSupplyJob(
+    jobId: string,
+    data: { status?: string; leaseExpiresAt?: string | null; lastSuccessAt?: string | null },
+  ): Promise<void>;
+  findSupplyJob(jobId: string): Promise<EndlessSupplyJobRow | null>;
+  createSupplyChunk(data: { id: string; jobId: string; chunkIndex: number; status: string }): Promise<void>;
+  findSupplyChunk(jobId: string, chunkIndex: number): Promise<EndlessSupplyChunkRow | null>;
+  updateSupplyChunk(
+    jobId: string,
+    chunkIndex: number,
+    data: { status: string; stageCount?: number; completedAt?: string | null },
+  ): Promise<void>;
+  getHighestStageSeed(): Promise<number>;
+  claimSupplyChunk(
+    jobId: string,
+    chunkIndex: number,
+    nowIso: string,
+    leaseDurationMs: number,
+  ): Promise<{
+    claimed: boolean;
+    alreadyCompleted: boolean;
+    claimToken?: string;
+    stageCount?: number;
+    seedStart?: number;
+    targetCount?: number;
+    reason?: string;
+  }>;
+  insertSupplyBatch(
+    jobId: string,
+    chunkIndex: number,
+    stages: EndlessStageRow[],
+    completedAtIso: string,
+    claimToken?: string,
+  ): Promise<boolean>;
+  failSupplyChunk(jobId: string, chunkIndex: number, reason: string, claimToken?: string): Promise<void>;
+  getHighestReservedSeed(): Promise<number>;
+  atomicRequestSupply(
+    nowIso: string,
+    options?: { batchCount?: number; cooldownMs?: number; leaseDurationMs?: number; stockThreshold?: number },
+  ): Promise<{
+    shouldEnqueue: boolean;
+    action: 'enqueued' | 'merged' | 'cooldown' | 'sufficient_stock';
+    jobId?: string;
+    seedStart?: number;
+    seedEnd?: number;
+  }>;
+  markSupplyJobPublishFailed(jobId: string): Promise<void>;
   aggregateSeasonLedger(season: string, window: { startAt: Date; endAt: Date }): Promise<{ userId: string; score: number }[]>;
   saveSeasonFinalization(header: SeasonFinalizationRow, results: SeasonRankResultRow[]): Promise<void>;
   getSeasonFinalization(season: string): Promise<{ header: SeasonFinalizationRow; results: SeasonRankResultRow[] } | null>;
@@ -155,6 +274,7 @@ export function createMemoryDb(): DbPort {
   const records = new Map<string, ClearRecord & { updatedAt: string }>();
   const events: { userId: string; stageCode: string; elapsedSec: number; verified: boolean; clearedAt: string }[] = [];
   const stages = new Map<string, EndlessStageRow>();
+  const stageJobMap = new Map<string, string>();
   const endlessProgress = new Map<string, { cleared: boolean; attempts: number; lastPlayedAt: string }>();
   const wallets = new Map<string, number>();
   const streaks = new Map<string, StreakRow>();
@@ -169,6 +289,8 @@ export function createMemoryDb(): DbPort {
     createdAt: string;
   }[] = [];
   const seedLedger: { userId: string; amount: number; season: string; rankingEligible: boolean; createdAt: string }[] = [];
+  const supplyJobs = new Map<string, EndlessSupplyJobRow>();
+  const supplyChunks = new Map<string, EndlessSupplyChunkRow>();
 
   const progressKey = (userId: string, stageId: string) => `${userId}:${stageId}`;
 
@@ -239,10 +361,29 @@ export function createMemoryDb(): DbPort {
       return { clears };
     },
     async insertStage(stage) {
-      stages.set(stage.id, stage);
+      stages.set(stage.id, {
+        plays: 0,
+        clears: 0,
+        avgClearMs: 0,
+        clearTotalMs: BigInt(0),
+        ...stage,
+      });
     },
     async getStage(stageId) {
-      return stages.get(stageId) ?? null;
+      const s = stages.get(stageId);
+      if (!s) return null;
+      return {
+        id: s.id,
+        size: s.size,
+        regions: s.regions,
+        solution: s.solution,
+        tier: s.tier,
+        seed: s.seed,
+        plays: s.plays ?? 0,
+        clears: s.clears ?? 0,
+        avgClearMs: s.avgClearMs ?? 0,
+        clearTotalMs: s.clearTotalMs ?? BigInt(0),
+      };
     },
     async pickUnclearedStage(userId) {
       const open = [...stages.values()].filter((s) => !endlessProgress.get(progressKey(userId, s.id))?.cleared);
@@ -251,6 +392,90 @@ export function createMemoryDb(): DbPort {
     },
     async countStages() {
       return stages.size;
+    },
+    async countZeroClearStages() {
+      return [...stages.values()].filter((s) => (s.clears ?? 0) === 0).length;
+    },
+    async listAllStages() {
+      return [...stages.values()].map((s) => ({
+        id: s.id,
+        size: s.size,
+        regions: s.regions,
+        solution: s.solution,
+        tier: s.tier,
+        seed: s.seed,
+        plays: s.plays ?? 0,
+        clears: s.clears ?? 0,
+        avgClearMs: s.avgClearMs ?? 0,
+        clearTotalMs: s.clearTotalMs ?? BigInt(0),
+      }));
+    },
+    async getStageAggregation(stageId: string) {
+      let totalAttempts = 0;
+      let clearedUserCount = 0;
+      for (const [key, p] of endlessProgress.entries()) {
+        const [, sid] = key.split(':');
+        if (sid === stageId) {
+          totalAttempts += p.attempts;
+          if (p.cleared) clearedUserCount += 1;
+        }
+      }
+      const verifiedEvents = endlessEvents.filter((e) => e.stageId === stageId && e.verified);
+      const verifiedClearCount = verifiedEvents.length;
+      const verifiedClearTotalMs = verifiedEvents.reduce((acc, e) => acc + BigInt(e.elapsedMs), BigInt(0));
+      return { totalAttempts, clearedUserCount, verifiedClearCount, verifiedClearTotalMs };
+    },
+    async updateStageStats(stageId: string, stats: { plays: number; clears: number; clearTotalMs: bigint; avgClearMs: number }) {
+      const s = stages.get(stageId);
+      if (s) {
+        s.plays = clampInt32(stats.plays);
+        s.clears = clampInt32(stats.clears);
+        s.clearTotalMs = clampBigInt64(stats.clearTotalMs);
+        s.avgClearMs = clampInt32(stats.avgClearMs);
+      }
+    },
+    async atomicReaggregateStageStats(stageId: string) {
+      const s = stages.get(stageId);
+      if (!s) return { ok: false, updated: false, error: `Stage ${stageId} not found` };
+      const agg = await this.getStageAggregation(stageId);
+      if (
+        (agg.clearedUserCount > 0 && agg.verifiedClearCount === 0) ||
+        agg.clearedUserCount > agg.verifiedClearCount ||
+        agg.totalAttempts < agg.verifiedClearCount
+      ) {
+        return { ok: false, updated: false, error: `Inconsistent stage ${stageId}` };
+      }
+      const targetPlays = clampInt32(agg.totalAttempts);
+      const targetClears = clampInt32(agg.verifiedClearCount);
+      const targetTotalMs = clampBigInt64(agg.verifiedClearTotalMs);
+      const targetAvgMs = targetClears > 0 ? clampInt32(Math.round(Number(targetTotalMs / BigInt(targetClears)))) : 0;
+
+      const currentPlays = s.plays ?? 0;
+      const currentClears = s.clears ?? 0;
+      const currentTotalMs = s.clearTotalMs ?? BigInt(0);
+      const currentAvgMs = s.avgClearMs ?? 0;
+
+      const needsUpdate =
+        currentPlays !== targetPlays ||
+        currentClears !== targetClears ||
+        currentTotalMs !== targetTotalMs ||
+        currentAvgMs !== targetAvgMs;
+
+      if (needsUpdate) {
+        s.plays = targetPlays;
+        s.clears = targetClears;
+        s.clearTotalMs = targetTotalMs;
+        s.avgClearMs = targetAvgMs;
+        return { ok: true, updated: true };
+      }
+      return { ok: true, updated: false };
+    },
+    async injectInconsistentProgress(userId: string, stageId: string, input: { cleared: boolean; attempts: number }) {
+      endlessProgress.set(progressKey(userId, stageId), {
+        cleared: input.cleared,
+        attempts: input.attempts,
+        lastPlayedAt: new Date().toISOString(),
+      });
     },
     async commitEndlessClear(userId, stageId, input) {
       return seasonSerializer.runExclusive(input.season, async () => {
@@ -291,6 +516,20 @@ export function createMemoryDb(): DbPort {
           suspicious: input.suspicious,
           createdAt: input.atIso,
         });
+
+        const st = stages.get(stageId);
+        if (st) {
+          const nextPlays = clampInt32((st.plays ?? 0) + 1);
+          const nextClears = clampInt32((st.clears ?? 0) + 1);
+          const nextTotalMs = clampBigInt64((st.clearTotalMs ?? BigInt(0)) + BigInt(input.elapsedMs));
+          const rawAvgMs = nextClears > 0 ? Number(nextTotalMs / BigInt(nextClears)) : 0;
+          const nextAvgMs = clampInt32(rawAvgMs);
+          st.plays = nextPlays;
+          st.clears = nextClears;
+          st.clearTotalMs = nextTotalMs;
+          st.avgClearMs = nextAvgMs;
+        }
+
         return { balance: balanceOf(userId), clearedCount: clearedCountOf(userId), streak: next };
       });
     },
@@ -301,6 +540,12 @@ export function createMemoryDb(): DbPort {
       const s = streakOf(userId);
       const next = { current: 0, best: s.best };
       streaks.set(userId, next);
+
+      const st = stages.get(stageId);
+      if (st) {
+        st.plays = clampInt32((st.plays ?? 0) + 1);
+      }
+
       return { streak: next };
     },
     async appendEndlessEvent(userId, stageId, input) {
@@ -333,6 +578,296 @@ export function createMemoryDb(): DbPort {
         sums.set(e.userId, (sums.get(e.userId) ?? 0) + e.amount);
       }
       return [...sums.entries()].map(([userId, amount]) => ({ userId, amount }));
+    },
+    async findActiveSupplyJob(nowIso) {
+      const now = Date.parse(nowIso);
+      const active = [...supplyJobs.values()].find((j) => {
+        if (j.status !== 'pending' && j.status !== 'running') return false;
+        if (j.leaseExpiresAt && Date.parse(j.leaseExpiresAt) <= now) return false;
+        return true;
+      });
+      return active ?? null;
+    },
+    async getLatestSupplySuccessAt() {
+      let latest: string | null = null;
+      for (const j of supplyJobs.values()) {
+        if (j.lastSuccessAt) {
+          if (!latest || Date.parse(j.lastSuccessAt) > Date.parse(latest)) {
+            latest = j.lastSuccessAt;
+          }
+        }
+      }
+      return latest;
+    },
+    async createSupplyJob(data) {
+      const row: EndlessSupplyJobRow = {
+        ...data,
+        status: 'pending',
+        lastSuccessAt: null,
+        createdAt: new Date().toISOString(),
+        updatedAt: new Date().toISOString(),
+      };
+      supplyJobs.set(row.id, row);
+      return row;
+    },
+    async updateSupplyJob(jobId, data) {
+      const j = supplyJobs.get(jobId);
+      if (j) {
+        if (data.status !== undefined) j.status = data.status;
+        if (data.leaseExpiresAt !== undefined) j.leaseExpiresAt = data.leaseExpiresAt;
+        if (data.lastSuccessAt !== undefined) j.lastSuccessAt = data.lastSuccessAt;
+        j.updatedAt = new Date().toISOString();
+      }
+    },
+    async findSupplyJob(jobId) {
+      return supplyJobs.get(jobId) ?? null;
+    },
+    async createSupplyChunk(data) {
+      const chunk: EndlessSupplyChunkRow = {
+        ...data,
+        stageCount: 0,
+        completedAt: null,
+        createdAt: new Date().toISOString(),
+      };
+      supplyChunks.set(`${data.jobId}:${data.chunkIndex}`, chunk);
+    },
+    async findSupplyChunk(jobId, chunkIndex) {
+      return supplyChunks.get(`${jobId}:${chunkIndex}`) ?? null;
+    },
+    async updateSupplyChunk(jobId, chunkIndex, data) {
+      const c = supplyChunks.get(`${jobId}:${chunkIndex}`);
+      if (c) {
+        c.status = data.status;
+        if (data.stageCount !== undefined) c.stageCount = data.stageCount;
+        if (data.completedAt !== undefined) c.completedAt = data.completedAt;
+      }
+    },
+    async getHighestStageSeed() {
+      let maxSeed = 10000;
+      for (const s of stages.values()) {
+        if (s.seed > maxSeed) maxSeed = s.seed;
+      }
+      return maxSeed;
+    },
+    async claimSupplyChunk(jobId, chunkIndex, nowIso, leaseDurationMs) {
+      const job = supplyJobs.get(jobId);
+      const chunk = supplyChunks.get(`${jobId}:${chunkIndex}`);
+      if (!job || !chunk) {
+        return { claimed: false, alreadyCompleted: false, reason: 'JOB_OR_CHUNK_NOT_FOUND' };
+      }
+      if (chunk.status === 'completed') {
+        return { claimed: false, alreadyCompleted: true, stageCount: chunk.stageCount };
+      }
+      const now = Date.parse(nowIso);
+      const isLeaseActive = job.leaseExpiresAt && Date.parse(job.leaseExpiresAt) > now;
+      if (chunk.status === 'running' && isLeaseActive) {
+        return { claimed: false, alreadyCompleted: false, reason: 'CLAIM_BUSY' };
+      }
+      const newLease = new Date(now + leaseDurationMs).toISOString();
+      chunk.status = 'running';
+      job.status = 'running';
+      job.leaseExpiresAt = newLease;
+      job.updatedAt = new Date().toISOString();
+      return {
+        claimed: true,
+        alreadyCompleted: false,
+        claimToken: newLease,
+        stageCount: chunk.stageCount,
+        seedStart: job.seedStart,
+        targetCount: job.targetCount,
+      };
+    },
+    async insertSupplyBatch(jobId, chunkIndex, stageRows, completedAtIso, claimToken) {
+      const job = supplyJobs.get(jobId);
+      const chunk = supplyChunks.get(`${jobId}:${chunkIndex}`);
+      if (!job || !chunk) return false;
+      if (chunk.status === 'completed') return false;
+
+      // fencing token 및 lease 소유권 검증
+      if (claimToken) {
+        if (!job.leaseExpiresAt || job.leaseExpiresAt !== claimToken) {
+          return false;
+        }
+        if (Date.parse(completedAtIso) > Date.parse(job.leaseExpiresAt)) {
+          return false;
+        }
+      }
+
+      // 콘텐츠 해시 및 기존 stage 중복 검사
+      const existingSignatures = new Map<string, string>();
+      for (const s of stages.values()) {
+        existingSignatures.set(`${s.regions}:${s.solution}`, s.id);
+      }
+
+      for (const st of stageRows) {
+        const sig = `${st.regions}:${st.solution}`;
+        const existingId = existingSignatures.get(sig);
+        const existingJobId = stageJobMap.get(st.id);
+
+        if (existingId && existingId !== st.id) {
+          // 다른 ID의 스테이지와 콘텐츠가 동일함 -> 중복!
+          return false;
+        }
+        if (existingJobId && existingJobId !== jobId) {
+          // 다른 작업에서 이미 생성된 ID/스테이지 -> 중복!
+          return false;
+        }
+      }
+
+      for (const st of stageRows) {
+        stages.set(st.id, { ...st });
+        stageJobMap.set(st.id, jobId);
+      }
+
+      chunk.status = 'completed';
+      chunk.stageCount = stageRows.length;
+      chunk.completedAt = completedAtIso;
+
+      job.status = 'completed';
+      job.lastSuccessAt = completedAtIso;
+      job.leaseExpiresAt = null;
+      job.updatedAt = new Date().toISOString();
+
+      return true;
+    },
+    async failSupplyChunk(jobId, chunkIndex, _reason, claimToken) {
+      const job = supplyJobs.get(jobId);
+      const chunk = supplyChunks.get(`${jobId}:${chunkIndex}`);
+      if (!chunk || !job) return;
+
+      // 완료된 작업은 오래된 실패 호출이 failed로 바꾸지 못한다
+      if (chunk.status === 'completed' || job.status === 'completed') {
+        return;
+      }
+
+      // fencing token 검증: 이전 만료 실행자가 신규 실행자 상태를 덮어쓰지 못하도록 차단
+      if (claimToken) {
+        if (!job.leaseExpiresAt || job.leaseExpiresAt !== claimToken) {
+          return;
+        }
+      }
+
+      chunk.status = 'failed';
+      job.status = 'failed';
+      job.leaseExpiresAt = null;
+      job.updatedAt = new Date().toISOString();
+    },
+    async getHighestReservedSeed() {
+      let maxSeed = 10000;
+      for (const s of stages.values()) {
+        if (s.seed > maxSeed) maxSeed = s.seed;
+      }
+      for (const j of supplyJobs.values()) {
+        if (j.seedEnd > maxSeed) maxSeed = j.seedEnd;
+      }
+      return maxSeed;
+    },
+    async atomicRequestSupply(nowIso, options = {}) {
+      // 공급 scope lock (인메모리 순차 직렬화)
+      const stockThreshold = options.stockThreshold ?? 20;
+      const cooldownMs = options.cooldownMs ?? 60_000;
+      const leaseDurationMs = options.leaseDurationMs ?? 120_000;
+      const batchCount = options.batchCount ?? 10;
+
+      // 1. 재고 검사 (clears === 0)
+      const stockCount = [...stages.values()].filter((s) => (s.clears ?? 0) === 0).length;
+      if (stockCount >= stockThreshold) {
+        return { shouldEnqueue: false, action: 'sufficient_stock' };
+      }
+
+      // 2. 만료된 작업 정리 및 활성 작업 검사
+      const now = Date.parse(nowIso);
+      for (const j of supplyJobs.values()) {
+        if (
+          (j.status === 'pending' || j.status === 'running') &&
+          j.leaseExpiresAt &&
+          Date.parse(j.leaseExpiresAt) <= now
+        ) {
+          j.status = 'failed';
+          j.updatedAt = new Date().toISOString();
+        }
+      }
+
+      const activeJob = [...supplyJobs.values()].find((j) => {
+        if (j.status !== 'pending' && j.status !== 'running') return false;
+        if (j.leaseExpiresAt && Date.parse(j.leaseExpiresAt) <= now) return false;
+        return true;
+      });
+      if (activeJob) {
+        return { shouldEnqueue: false, action: 'merged', jobId: activeJob.id };
+      }
+
+      // 3. 쿨다운 검사
+      let latestSuccess: string | null = null;
+      for (const j of supplyJobs.values()) {
+        if (j.lastSuccessAt && (!latestSuccess || Date.parse(j.lastSuccessAt) > Date.parse(latestSuccess))) {
+          latestSuccess = j.lastSuccessAt;
+        }
+      }
+      if (latestSuccess) {
+        const elapsed = now - Date.parse(latestSuccess);
+        if (elapsed < cooldownMs) {
+          return { shouldEnqueue: false, action: 'cooldown' };
+        }
+      }
+
+      // 4. 시드 예약 (기존 stage + 예약 job)
+      let maxSeed = 10000;
+      for (const s of stages.values()) {
+        if (s.seed > maxSeed) maxSeed = s.seed;
+      }
+      for (const j of supplyJobs.values()) {
+        if (j.seedEnd > maxSeed) maxSeed = j.seedEnd;
+      }
+
+      const seedStart = maxSeed;
+      const seedEnd = seedStart + batchCount;
+      const jobId = `job-${Date.now()}-${Math.random().toString(36).slice(2, 8)}`;
+      const leaseExpiresAt = new Date(now + leaseDurationMs).toISOString();
+
+      const jobRow: EndlessSupplyJobRow = {
+        id: jobId,
+        policyVersion: 'v1',
+        seedStart,
+        seedEnd,
+        targetCount: batchCount,
+        status: 'pending',
+        leaseExpiresAt,
+        lastSuccessAt: null,
+        createdAt: new Date().toISOString(),
+        updatedAt: new Date().toISOString(),
+      };
+      supplyJobs.set(jobId, jobRow);
+
+      supplyChunks.set(`${jobId}:0`, {
+        id: `${jobId}:0`,
+        jobId,
+        chunkIndex: 0,
+        status: 'pending',
+        stageCount: 0,
+        completedAt: null,
+        createdAt: new Date().toISOString(),
+      });
+
+      return {
+        shouldEnqueue: true,
+        action: 'enqueued',
+        jobId,
+        seedStart,
+        seedEnd,
+      };
+    },
+    async markSupplyJobPublishFailed(jobId) {
+      const j = supplyJobs.get(jobId);
+      if (j) {
+        j.status = 'publish_failed';
+        j.leaseExpiresAt = null;
+        j.updatedAt = new Date().toISOString();
+      }
+      const c = supplyChunks.get(`${jobId}:0`);
+      if (c) {
+        c.status = 'publish_failed';
+      }
     },
     async aggregateSeasonLedger(season, window) {
       const sums = new Map<string, number>();
@@ -553,12 +1088,36 @@ export function createPrismaDb(client: PrismaClient = prisma): DbPort {
       };
     },
     async insertStage(stage) {
-      await client.endlessStage.create({ data: stage });
+      await client.endlessStage.create({
+        data: {
+          id: stage.id,
+          size: stage.size,
+          regions: stage.regions,
+          solution: stage.solution,
+          tier: stage.tier,
+          seed: stage.seed,
+          plays: stage.plays ?? 0,
+          clears: stage.clears ?? 0,
+          avgClearMs: stage.avgClearMs ?? 0,
+          clearTotalMs: stage.clearTotalMs ?? BigInt(0),
+        },
+      });
     },
     async getStage(stageId) {
       const s = await client.endlessStage.findUnique({ where: { id: stageId } });
       return s
-        ? { id: s.id, size: s.size, regions: s.regions, solution: s.solution, tier: s.tier, seed: s.seed }
+        ? {
+            id: s.id,
+            size: s.size,
+            regions: s.regions,
+            solution: s.solution,
+            tier: s.tier,
+            seed: s.seed,
+            plays: s.plays,
+            clears: s.clears,
+            avgClearMs: s.avgClearMs,
+            clearTotalMs: s.clearTotalMs,
+          }
         : null;
     },
     async pickUnclearedStage(userId) {
@@ -571,14 +1130,131 @@ export function createPrismaDb(client: PrismaClient = prisma): DbPort {
         ORDER BY random() LIMIT 1`;
       if (rows.length === 0) return null;
       const s = await client.endlessStage.findUniqueOrThrow({ where: { id: rows[0].id } });
-      return { id: s.id, size: s.size, regions: s.regions, solution: s.solution, tier: s.tier, seed: s.seed };
+      return {
+        id: s.id,
+        size: s.size,
+        regions: s.regions,
+        solution: s.solution,
+        tier: s.tier,
+        seed: s.seed,
+        plays: s.plays,
+        clears: s.clears,
+        avgClearMs: s.avgClearMs,
+        clearTotalMs: s.clearTotalMs,
+      };
     },
     async countStages() {
       return client.endlessStage.count();
     },
+    async countZeroClearStages() {
+      return client.endlessStage.count({ where: { clears: 0 } });
+    },
+    async listAllStages() {
+      const rows = await client.endlessStage.findMany();
+      return rows.map((s) => ({
+        id: s.id,
+        size: s.size,
+        regions: s.regions,
+        solution: s.solution,
+        tier: s.tier,
+        seed: s.seed,
+        plays: s.plays,
+        clears: s.clears,
+        avgClearMs: s.avgClearMs,
+        clearTotalMs: s.clearTotalMs,
+      }));
+    },
+    async getStageAggregation(stageId: string) {
+      const [progressAgg, clearedUserCount, eventAgg] = await Promise.all([
+        client.endlessProgress.aggregate({
+          where: { stageId },
+          _sum: { attempts: true },
+        }),
+        client.endlessProgress.count({
+          where: { stageId, cleared: true },
+        }),
+        client.endlessEvent.aggregate({
+          where: { stageId, verified: true },
+          _count: { _all: true },
+          _sum: { elapsedMs: true },
+        }),
+      ]);
+      return {
+        totalAttempts: progressAgg._sum.attempts ?? 0,
+        clearedUserCount,
+        verifiedClearCount: eventAgg._count._all,
+        verifiedClearTotalMs: BigInt(eventAgg._sum.elapsedMs ?? 0),
+      };
+    },
+    async updateStageStats(stageId: string, stats: { plays: number; clears: number; clearTotalMs: bigint; avgClearMs: number }) {
+      await client.endlessStage.update({
+        where: { id: stageId },
+        data: {
+          plays: clampInt32(stats.plays),
+          clears: clampInt32(stats.clears),
+          clearTotalMs: clampBigInt64(stats.clearTotalMs),
+          avgClearMs: clampInt32(stats.avgClearMs),
+        },
+      });
+    },
+    async atomicReaggregateStageStats(stageId: string) {
+      return client.$transaction(async (tx) => {
+        await tx.$queryRaw`SELECT id FROM "EndlessStage" WHERE id = ${stageId} FOR UPDATE`;
+        const s = await tx.endlessStage.findUnique({ where: { id: stageId } });
+        if (!s) return { ok: false, updated: false, error: `Stage ${stageId} not found` };
+
+        const [progressAgg, clearedUserCount, eventAgg] = await Promise.all([
+          tx.endlessProgress.aggregate({ where: { stageId }, _sum: { attempts: true } }),
+          tx.endlessProgress.count({ where: { stageId, cleared: true } }),
+          tx.endlessEvent.aggregate({ where: { stageId, verified: true }, _count: { _all: true }, _sum: { elapsedMs: true } }),
+        ]);
+
+        const totalAttempts = progressAgg._sum.attempts ?? 0;
+        const verifiedClearCount = eventAgg._count._all;
+        const verifiedClearTotalMs = BigInt(eventAgg._sum.elapsedMs ?? 0);
+
+        if (
+          (clearedUserCount > 0 && verifiedClearCount === 0) ||
+          clearedUserCount > verifiedClearCount ||
+          totalAttempts < verifiedClearCount
+        ) {
+          return { ok: false, updated: false, error: `Inconsistent stage ${stageId}` };
+        }
+
+        const targetPlays = clampInt32(totalAttempts);
+        const targetClears = clampInt32(verifiedClearCount);
+        const targetTotalMs = clampBigInt64(verifiedClearTotalMs);
+        const targetAvgMs = targetClears > 0 ? clampInt32(Math.round(Number(targetTotalMs / BigInt(targetClears)))) : 0;
+
+        const needsUpdate =
+          s.plays !== targetPlays ||
+          s.clears !== targetClears ||
+          s.clearTotalMs !== targetTotalMs ||
+          s.avgClearMs !== targetAvgMs;
+
+        if (needsUpdate) {
+          await tx.endlessStage.update({
+            where: { id: stageId },
+            data: {
+              plays: targetPlays,
+              clears: targetClears,
+              clearTotalMs: targetTotalMs,
+              avgClearMs: targetAvgMs,
+            },
+          });
+          return { ok: true, updated: true };
+        }
+        return { ok: true, updated: false };
+      });
+    },
     async commitEndlessClear(userId, stageId, input) {
       return client.$transaction(async (tx) => {
+        // 시즌 advisory lock으로 트랜잭션 내 직렬화 보장
         await tx.$executeRaw`SELECT pg_advisory_xact_lock(hashtext('season:' || ${input.season}))`;
+        // 행 레벨 락으로 동시 클리어 시 가산 손실 방지
+        if (typeof (tx as any).$queryRaw === 'function') {
+          await tx.$queryRaw`SELECT id FROM "EndlessStage" WHERE id = ${stageId} FOR UPDATE`;
+        }
         await tx.endlessProgress.upsert({
           where: { userId_stageId: { userId, stageId } },
           create: { userId, stageId, cleared: true, attempts: 1, lastPlayedAt: new Date(input.atIso) },
@@ -622,12 +1298,32 @@ export function createPrismaDb(client: PrismaClient = prisma): DbPort {
         await tx.endlessEvent.create({
           data: { userId, stageId, seedLeft: input.seedLeft, elapsedMs: input.elapsedMs, verified: true, suspicious: input.suspicious },
         });
+
+        const stageRow = tx.endlessStage ? await tx.endlessStage.findUnique({ where: { id: stageId } }) : null;
+        if (stageRow) {
+          const nextPlays = clampInt32(stageRow.plays + 1);
+          const nextClears = clampInt32(stageRow.clears + 1);
+          const nextClearTotalMs = clampBigInt64(stageRow.clearTotalMs + BigInt(input.elapsedMs));
+          const rawAvgMs = nextClears > 0 ? Number(nextClearTotalMs / BigInt(nextClears)) : 0;
+          const nextAvgClearMs = clampInt32(rawAvgMs);
+          await tx.endlessStage.update({
+            where: { id: stageId },
+            data: {
+              plays: nextPlays,
+              clears: nextClears,
+              clearTotalMs: nextClearTotalMs,
+              avgClearMs: nextAvgClearMs,
+            },
+          });
+        }
+
         const clearedCount = await tx.endlessProgress.count({ where: { userId, cleared: true } });
         return { balance: wallet.balance, clearedCount, streak: { current: streak.current, best: streak.best } };
       });
     },
     async commitEndlessFail(userId, stageId, atIso) {
       return client.$transaction(async (tx) => {
+        await tx.$queryRaw`SELECT id FROM "EndlessStage" WHERE id = ${stageId} FOR UPDATE`;
         await tx.endlessProgress.upsert({
           where: { userId_stageId: { userId, stageId } },
           create: { userId, stageId, cleared: false, attempts: 1, lastPlayedAt: new Date(atIso) },
@@ -639,6 +1335,16 @@ export function createPrismaDb(client: PrismaClient = prisma): DbPort {
           create: { userId, current: 0, best: prev?.best ?? 0 },
           update: { current: 0 },
         });
+
+        const stageRow = await tx.endlessStage.findUnique({ where: { id: stageId } });
+        if (stageRow) {
+          const nextPlays = clampInt32(stageRow.plays + 1);
+          await tx.endlessStage.update({
+            where: { id: stageId },
+            data: { plays: nextPlays },
+          });
+        }
+
         return { streak: { current: streak.current, best: streak.best } };
       });
     },
@@ -852,6 +1558,410 @@ export function createPrismaDb(client: PrismaClient = prisma): DbPort {
         }
       }
       return unfinalized.sort();
+    },
+    async findActiveSupplyJob(nowIso) {
+      const row = await client.endlessSupplyJob.findFirst({
+        where: {
+          status: { in: ['pending', 'running'] },
+          OR: [
+            { leaseExpiresAt: null },
+            { leaseExpiresAt: { gt: new Date(nowIso) } },
+          ],
+        },
+        orderBy: { createdAt: 'desc' },
+      });
+      if (!row) return null;
+      return {
+        id: row.id,
+        policyVersion: row.policyVersion,
+        seedStart: row.seedStart,
+        seedEnd: row.seedEnd,
+        targetCount: row.targetCount,
+        status: row.status,
+        leaseExpiresAt: row.leaseExpiresAt ? row.leaseExpiresAt.toISOString() : null,
+        lastSuccessAt: row.lastSuccessAt ? row.lastSuccessAt.toISOString() : null,
+        createdAt: row.createdAt.toISOString(),
+        updatedAt: row.updatedAt.toISOString(),
+      };
+    },
+    async getLatestSupplySuccessAt() {
+      const row = await client.endlessSupplyJob.findFirst({
+        where: { lastSuccessAt: { not: null } },
+        orderBy: { lastSuccessAt: 'desc' },
+      });
+      return row?.lastSuccessAt ? row.lastSuccessAt.toISOString() : null;
+    },
+    async createSupplyJob(data) {
+      const row = await client.endlessSupplyJob.create({
+        data: {
+          id: data.id,
+          policyVersion: data.policyVersion,
+          seedStart: data.seedStart,
+          seedEnd: data.seedEnd,
+          targetCount: data.targetCount,
+          leaseExpiresAt: data.leaseExpiresAt ? new Date(data.leaseExpiresAt) : null,
+        },
+      });
+      return {
+        id: row.id,
+        policyVersion: row.policyVersion,
+        seedStart: row.seedStart,
+        seedEnd: row.seedEnd,
+        targetCount: row.targetCount,
+        status: row.status,
+        leaseExpiresAt: row.leaseExpiresAt ? row.leaseExpiresAt.toISOString() : null,
+        lastSuccessAt: row.lastSuccessAt ? row.lastSuccessAt.toISOString() : null,
+        createdAt: row.createdAt.toISOString(),
+        updatedAt: row.updatedAt.toISOString(),
+      };
+    },
+    async updateSupplyJob(jobId, data) {
+      await client.endlessSupplyJob.update({
+        where: { id: jobId },
+        data: {
+          ...(data.status !== undefined && { status: data.status }),
+          ...(data.leaseExpiresAt !== undefined && {
+            leaseExpiresAt: data.leaseExpiresAt ? new Date(data.leaseExpiresAt) : null,
+          }),
+          ...(data.lastSuccessAt !== undefined && {
+            lastSuccessAt: data.lastSuccessAt ? new Date(data.lastSuccessAt) : null,
+          }),
+        },
+      });
+    },
+    async findSupplyJob(jobId) {
+      const row = await client.endlessSupplyJob.findUnique({ where: { id: jobId } });
+      if (!row) return null;
+      return {
+        id: row.id,
+        policyVersion: row.policyVersion,
+        seedStart: row.seedStart,
+        seedEnd: row.seedEnd,
+        targetCount: row.targetCount,
+        status: row.status,
+        leaseExpiresAt: row.leaseExpiresAt ? row.leaseExpiresAt.toISOString() : null,
+        lastSuccessAt: row.lastSuccessAt ? row.lastSuccessAt.toISOString() : null,
+        createdAt: row.createdAt.toISOString(),
+        updatedAt: row.updatedAt.toISOString(),
+      };
+    },
+    async createSupplyChunk(data) {
+      await client.endlessSupplyChunk.create({
+        data: {
+          id: data.id,
+          jobId: data.jobId,
+          chunkIndex: data.chunkIndex,
+          status: data.status,
+        },
+      });
+    },
+    async findSupplyChunk(jobId, chunkIndex) {
+      const row = await client.endlessSupplyChunk.findUnique({
+        where: { jobId_chunkIndex: { jobId, chunkIndex } },
+      });
+      if (!row) return null;
+      return {
+        id: row.id,
+        jobId: row.jobId,
+        chunkIndex: row.chunkIndex,
+        status: row.status,
+        stageCount: row.stageCount,
+        completedAt: row.completedAt ? row.completedAt.toISOString() : null,
+        createdAt: row.createdAt.toISOString(),
+      };
+    },
+    async updateSupplyChunk(jobId, chunkIndex, data) {
+      await client.endlessSupplyChunk.update({
+        where: { jobId_chunkIndex: { jobId, chunkIndex } },
+        data: {
+          status: data.status,
+          ...(data.stageCount !== undefined && { stageCount: data.stageCount }),
+          ...(data.completedAt !== undefined && {
+            completedAt: data.completedAt ? new Date(data.completedAt) : null,
+          }),
+        },
+      });
+    },
+    async getHighestStageSeed() {
+      const row = await client.endlessStage.findFirst({ orderBy: { seed: 'desc' } });
+      return row?.seed ?? 10000;
+    },
+    async claimSupplyChunk(jobId, chunkIndex, nowIso, leaseDurationMs) {
+      return client.$transaction(async (tx) => {
+        // 행 레벨 락으로 동시 claim 요청 직렬화
+        if (typeof (tx as any).$queryRaw === 'function') {
+          await tx.$queryRaw`SELECT id FROM "EndlessSupplyJob" WHERE id = ${jobId} FOR UPDATE`;
+          await tx.$queryRaw`SELECT id FROM "EndlessSupplyChunk" WHERE "jobId" = ${jobId} AND "chunkIndex" = ${chunkIndex} FOR UPDATE`;
+        }
+
+        const job = await tx.endlessSupplyJob.findUnique({ where: { id: jobId } });
+        const chunk = await tx.endlessSupplyChunk.findUnique({
+          where: { jobId_chunkIndex: { jobId, chunkIndex } },
+        });
+        if (!job || !chunk) {
+          return { claimed: false, alreadyCompleted: false, reason: 'JOB_OR_CHUNK_NOT_FOUND' };
+        }
+        if (chunk.status === 'completed') {
+          return { claimed: false, alreadyCompleted: true, stageCount: chunk.stageCount };
+        }
+        const now = new Date(nowIso).getTime();
+        const isLeaseActive = job.leaseExpiresAt && job.leaseExpiresAt.getTime() > now;
+        if (chunk.status === 'running' && isLeaseActive) {
+          return { claimed: false, alreadyCompleted: false, reason: 'CLAIM_BUSY' };
+        }
+        const newLease = new Date(now + leaseDurationMs);
+        const claimToken = newLease.toISOString();
+        await tx.endlessSupplyChunk.update({
+          where: { jobId_chunkIndex: { jobId, chunkIndex } },
+          data: { status: 'running' },
+        });
+        await tx.endlessSupplyJob.update({
+          where: { id: jobId },
+          data: { status: 'running', leaseExpiresAt: newLease },
+        });
+        return {
+          claimed: true,
+          alreadyCompleted: false,
+          claimToken,
+          stageCount: chunk.stageCount,
+          seedStart: job.seedStart,
+          targetCount: job.targetCount,
+        };
+      });
+    },
+    async insertSupplyBatch(jobId, chunkIndex, stageRows, completedAtIso, claimToken) {
+      return client.$transaction(async (tx) => {
+        // 행 레벨 락 획득
+        if (typeof (tx as any).$queryRaw === 'function') {
+          await tx.$queryRaw`SELECT id FROM "EndlessSupplyJob" WHERE id = ${jobId} FOR UPDATE`;
+          await tx.$queryRaw`SELECT id FROM "EndlessSupplyChunk" WHERE "jobId" = ${jobId} AND "chunkIndex" = ${chunkIndex} FOR UPDATE`;
+        }
+
+        const completedDate = new Date(completedAtIso);
+        const job = await tx.endlessSupplyJob.findUnique({ where: { id: jobId } });
+        const chunk = await tx.endlessSupplyChunk.findUnique({
+          where: { jobId_chunkIndex: { jobId, chunkIndex } },
+        });
+        if (!job || !chunk) return false;
+
+        // 완료된 청크는 중복 적재 불가
+        if (chunk.status === 'completed') {
+          return false;
+        }
+
+        // fencing token 및 lease 소유권 검증
+        if (claimToken) {
+          if (!job.leaseExpiresAt || new Date(job.leaseExpiresAt).getTime() !== new Date(claimToken).getTime()) {
+            return false;
+          }
+          if (completedDate.getTime() > new Date(job.leaseExpiresAt).getTime()) {
+            return false;
+          }
+        }
+
+        // 콘텐츠 중복 검사: regions + solution 중복 확인
+        const duplicate = await tx.endlessStage.findFirst({
+          where: {
+            OR: stageRows.map((s) => ({
+              regions: s.regions,
+              solution: s.solution,
+              id: { not: s.id },
+            })),
+          },
+        });
+        if (duplicate) {
+          return false;
+        }
+
+        // 다른 작업에서 이미 생성된 동일 id 검사
+        const existingOlder = await tx.endlessStage.findFirst({
+          where: {
+            id: { in: stageRows.map((s) => s.id) },
+            createdAt: { lt: job.createdAt },
+          },
+        });
+        if (existingOlder) {
+          return false;
+        }
+
+        // 10개 행 적재
+        for (const s of stageRows) {
+          await tx.endlessStage.upsert({
+            where: { id: s.id },
+            create: {
+              id: s.id,
+              size: s.size,
+              regions: s.regions,
+              solution: s.solution,
+              tier: s.tier,
+              seed: s.seed,
+              plays: 0,
+              clears: 0,
+              avgClearMs: 0,
+              clearTotalMs: BigInt(0),
+            },
+            update: {},
+          });
+        }
+
+        await tx.endlessSupplyChunk.update({
+          where: { jobId_chunkIndex: { jobId, chunkIndex } },
+          data: { status: 'completed', stageCount: stageRows.length, completedAt: completedDate },
+        });
+
+        await tx.endlessSupplyJob.update({
+          where: { id: jobId },
+          data: { status: 'completed', lastSuccessAt: completedDate, leaseExpiresAt: null },
+        });
+
+        return true;
+      });
+    },
+    async failSupplyChunk(jobId, chunkIndex, _reason, claimToken) {
+      await client.$transaction(async (tx) => {
+        if (typeof (tx as any).$queryRaw === 'function') {
+          await tx.$queryRaw`SELECT id FROM "EndlessSupplyJob" WHERE id = ${jobId} FOR UPDATE`;
+          await tx.$queryRaw`SELECT id FROM "EndlessSupplyChunk" WHERE "jobId" = ${jobId} AND "chunkIndex" = ${chunkIndex} FOR UPDATE`;
+        }
+        const chunk = await tx.endlessSupplyChunk.findUnique({
+          where: { jobId_chunkIndex: { jobId, chunkIndex } },
+        });
+        const job = await tx.endlessSupplyJob.findUnique({ where: { id: jobId } });
+        if (!chunk || !job) return;
+
+        // 완료된 작업은 오래된 실패 호출이 failed로 바꾸지 못한다
+        if (chunk.status === 'completed' || job.status === 'completed') {
+          return;
+        }
+
+        // fencing token 검증: 이전 만료 실행자가 신규 실행자 상태를 덮어쓰지 못하도록 차단
+        if (claimToken) {
+          if (!job.leaseExpiresAt || new Date(job.leaseExpiresAt).getTime() !== new Date(claimToken).getTime()) {
+            return;
+          }
+        }
+
+        await tx.endlessSupplyChunk.update({
+          where: { jobId_chunkIndex: { jobId, chunkIndex } },
+          data: { status: 'failed' },
+        });
+        await tx.endlessSupplyJob.update({
+          where: { id: jobId },
+          data: { status: 'failed', leaseExpiresAt: null },
+        });
+      });
+    },
+    async getHighestReservedSeed() {
+      const [maxStage, maxJob] = await Promise.all([
+        client.endlessStage.findFirst({ orderBy: { seed: 'desc' } }),
+        client.endlessSupplyJob.findFirst({ orderBy: { seedEnd: 'desc' } }),
+      ]);
+      const stageSeed = maxStage?.seed ?? 10000;
+      const jobSeed = maxJob?.seedEnd ?? 10000;
+      return Math.max(stageSeed, jobSeed);
+    },
+    async atomicRequestSupply(nowIso, options = {}) {
+      return client.$transaction(async (tx) => {
+        // 공급 scope advisory lock 획득
+        await tx.$executeRaw`SELECT pg_advisory_xact_lock(hashtext('endless_supply_lock'))`;
+
+        const stockThreshold = options.stockThreshold ?? 20;
+        const cooldownMs = options.cooldownMs ?? 60_000;
+        const leaseDurationMs = options.leaseDurationMs ?? 120_000;
+        const batchCount = options.batchCount ?? 10;
+
+        // 1. 재고 확인
+        const stockCount = await tx.endlessStage.count({ where: { clears: 0 } });
+        if (stockCount >= stockThreshold) {
+          return { shouldEnqueue: false, action: 'sufficient_stock' };
+        }
+
+        // 2. 만료 lease 회복 및 활성 작업 확인
+        const nowDate = new Date(nowIso);
+        await tx.endlessSupplyJob.updateMany({
+          where: {
+            status: { in: ['pending', 'running'] },
+            leaseExpiresAt: { lte: nowDate },
+          },
+          data: { status: 'failed' },
+        });
+
+        const activeJob = await tx.endlessSupplyJob.findFirst({
+          where: {
+            status: { in: ['pending', 'running'] },
+            OR: [{ leaseExpiresAt: null }, { leaseExpiresAt: { gt: nowDate } }],
+          },
+          orderBy: { createdAt: 'desc' },
+        });
+        if (activeJob) {
+          return { shouldEnqueue: false, action: 'merged', jobId: activeJob.id };
+        }
+
+        // 3. 쿨다운 확인
+        const latestSuccessJob = await tx.endlessSupplyJob.findFirst({
+          where: { lastSuccessAt: { not: null } },
+          orderBy: { lastSuccessAt: 'desc' },
+        });
+        if (latestSuccessJob?.lastSuccessAt) {
+          const elapsed = nowDate.getTime() - latestSuccessJob.lastSuccessAt.getTime();
+          if (elapsed < cooldownMs) {
+            return { shouldEnqueue: false, action: 'cooldown' };
+          }
+        }
+
+        // 4. 시드 충돌 방지 예약 (기존 stage + 예약 job)
+        const [maxStage, maxJob] = await Promise.all([
+          tx.endlessStage.findFirst({ orderBy: { seed: 'desc' } }),
+          tx.endlessSupplyJob.findFirst({ orderBy: { seedEnd: 'desc' } }),
+        ]);
+        const stageSeed = maxStage?.seed ?? 10000;
+        const jobSeed = maxJob?.seedEnd ?? 10000;
+        const maxSeed = Math.max(stageSeed, jobSeed);
+
+        const seedStart = maxSeed;
+        const seedEnd = seedStart + batchCount;
+        const jobId = `job-${Date.now()}-${Math.random().toString(36).slice(2, 8)}`;
+        const leaseExpiresAt = new Date(nowDate.getTime() + leaseDurationMs);
+
+        await tx.endlessSupplyJob.create({
+          data: {
+            id: jobId,
+            policyVersion: 'v1',
+            seedStart,
+            seedEnd,
+            targetCount: batchCount,
+            status: 'pending',
+            leaseExpiresAt,
+          },
+        });
+
+        await tx.endlessSupplyChunk.create({
+          data: {
+            id: `${jobId}:0`,
+            jobId,
+            chunkIndex: 0,
+            status: 'pending',
+          },
+        });
+
+        return {
+          shouldEnqueue: true,
+          action: 'enqueued',
+          jobId,
+          seedStart,
+          seedEnd,
+        };
+      });
+    },
+    async markSupplyJobPublishFailed(jobId) {
+      await client.endlessSupplyJob.update({
+        where: { id: jobId },
+        data: { status: 'publish_failed', leaseExpiresAt: null },
+      });
+      await client.endlessSupplyChunk.updateMany({
+        where: { jobId },
+        data: { status: 'publish_failed' },
+      });
     },
   };
 }

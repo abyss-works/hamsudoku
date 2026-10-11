@@ -107,6 +107,131 @@ describe('endless DbPort', () => {
     expect(await db.listSeasonEarnings('2026-W41')).toEqual([{ userId: 'u1', amount: 5 }]);
   });
 
+  it('commitEndlessClear는 stage의 plays, clears, clearTotalMs, avgClearMs를 트랜잭션에서 갱신한다', async () => {
+    const db = createMemoryDb();
+    await db.insertStage(stage('e-1'));
+    await db.commitEndlessClear('u1', 'e-1', { earned: 3, season: '2026-W41', seedLeft: 3, elapsedMs: 20000, suspicious: false, atIso: '2026-10-07T00:00:00.000Z' });
+    const s1 = await db.getStage('e-1');
+    expect(s1).toMatchObject({ plays: 1, clears: 1, clearTotalMs: BigInt(20000), avgClearMs: 20000 });
+
+    await db.commitEndlessClear('u2', 'e-1', { earned: 3, season: '2026-W41', seedLeft: 3, elapsedMs: 40000, suspicious: false, atIso: '2026-10-07T00:01:00.000Z' });
+    const s2 = await db.getStage('e-1');
+    expect(s2).toMatchObject({ plays: 2, clears: 2, clearTotalMs: BigInt(60000), avgClearMs: 30000 });
+  });
+
+  it('commitEndlessFail은 plays만 증가시키고 clears, avgClearMs는 변경하지 않는다', async () => {
+    const db = createMemoryDb();
+    await db.insertStage(stage('e-1'));
+    await db.commitEndlessClear('u1', 'e-1', { earned: 3, season: '2026-W41', seedLeft: 3, elapsedMs: 20000, suspicious: false, atIso: '2026-10-07T00:00:00.000Z' });
+    await db.commitEndlessFail('u2', 'e-1', '2026-10-07T00:01:00.000Z');
+    const s = await db.getStage('e-1');
+    expect(s).toMatchObject({ plays: 2, clears: 1, clearTotalMs: BigInt(20000), avgClearMs: 20000 });
+  });
+
+  it('countZeroClearStages는 clears가 0인 스테이지 수만 센다', async () => {
+    const db = createMemoryDb();
+    await db.insertStage(stage('e-1'));
+    await db.insertStage(stage('e-2'));
+    expect(await db.countZeroClearStages()).toBe(2);
+    await db.commitEndlessClear('u1', 'e-1', { earned: 3, season: '2026-W41', seedLeft: 3, elapsedMs: 20000, suspicious: false, atIso: '2026-10-07T00:00:00.000Z' });
+    expect(await db.countZeroClearStages()).toBe(1);
+    await db.commitEndlessClear('u1', 'e-2', { earned: 3, season: '2026-W41', seedLeft: 3, elapsedMs: 20000, suspicious: false, atIso: '2026-10-07T00:00:00.000Z' });
+    expect(await db.countZeroClearStages()).toBe(0);
+  });
+
+  it('동일 사용자가 별도의 유효 시도로 클리어 시 각각 정상 기록되고 보상과 스테이지 통계가 누적된다', async () => {
+    const db = createMemoryDb();
+    await db.insertStage(stage('e-1'));
+
+    // 첫 번째 클리어: 정상 보상 및 통계 반영
+    const s1 = await db.commitEndlessClear('u1', 'e-1', {
+      earned: 3,
+      season: '2026-W41',
+      seedLeft: 3,
+      elapsedMs: 20000,
+      suspicious: false,
+      atIso: '2026-10-07T00:00:00.000Z',
+    });
+    expect(s1.balance).toBe(3);
+    expect(s1.clearedCount).toBe(1);
+
+    const st1 = await db.getStage('e-1');
+    expect(st1?.clears).toBe(1);
+    expect(st1?.plays).toBe(1);
+
+    // 두 번째 유효 클리어 제출: 별도 유효 attempt에 따른 정상 기록
+    const s2 = await db.commitEndlessClear('u1', 'e-1', {
+      earned: 3,
+      season: '2026-W41',
+      seedLeft: 3,
+      elapsedMs: 25000,
+      suspicious: false,
+      atIso: '2026-10-07T00:00:10.000Z',
+    });
+    expect(s2.balance).toBe(6);
+    expect(s2.clearedCount).toBe(1);
+
+    const st2 = await db.getStage('e-1');
+    expect(st2?.clears).toBe(2);
+    expect(st2?.plays).toBe(2);
+    expect(st2?.clearTotalMs).toBe(BigInt(45000));
+  });
+
+  it('Int 및 BigInt 상한을 초과하는 대규모 경과 시간에 대해 오버플로 없이 상한값으로 안전하게 클램핑된다', async () => {
+    const db = createMemoryDb();
+    await db.insertStage(stage('e-1'));
+
+    // 32비트 부호 있는 정수 상한(2,147,483,647)을 초과하는 큰 밀리초 경과 시간
+    await db.commitEndlessClear('u1', 'e-1', {
+      earned: 1,
+      season: '2026-W41',
+      seedLeft: 3,
+      elapsedMs: 3_000_000_000,
+      suspicious: false,
+      atIso: '2026-10-07T00:00:00.000Z',
+    });
+
+    const st = await db.getStage('e-1');
+    expect(st?.avgClearMs).toBe(2_147_483_647);
+  });
+
+  it('동시 클리어 요청 시 가산 손실 없이 plays, clears, clearTotalMs가 원자적으로 누적된다', async () => {
+    const db = createMemoryDb();
+    await db.insertStage(stage('e-1'));
+
+    await Promise.all([
+      db.commitEndlessClear('u1', 'e-1', {
+        earned: 1,
+        season: '2026-W41',
+        seedLeft: 3,
+        elapsedMs: 10000,
+        suspicious: false,
+        atIso: '2026-10-07T00:00:00.000Z',
+      }),
+      db.commitEndlessClear('u2', 'e-1', {
+        earned: 1,
+        season: '2026-W41',
+        seedLeft: 3,
+        elapsedMs: 20000,
+        suspicious: false,
+        atIso: '2026-10-07T00:00:01.000Z',
+      }),
+      db.commitEndlessClear('u3', 'e-1', {
+        earned: 1,
+        season: '2026-W41',
+        seedLeft: 3,
+        elapsedMs: 30000,
+        suspicious: false,
+        atIso: '2026-10-07T00:00:02.000Z',
+      }),
+    ]);
+
+    const st = await db.getStage('e-1');
+    expect(st?.plays).toBe(3);
+    expect(st?.clears).toBe(3);
+    expect(st?.clearTotalMs).toBe(BigInt(60000));
+    expect(st?.avgClearMs).toBe(20000);
+  });
   it('getUserSeasonRank는 DB 원장 기반으로 점수와 순위를 정확히 계산한다', async () => {
     const db = createMemoryDb();
     await db.insertStage(stage('e-1'));

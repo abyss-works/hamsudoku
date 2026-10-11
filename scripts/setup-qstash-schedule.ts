@@ -36,7 +36,11 @@ export const SCHEDULE_DEFINITIONS: ScheduleDefinition[] = [
 
 export async function run(args: string[]) {
   const isExecute = args.includes('--execute');
-  const appBase = process.env.APP_URL?.replace(/\/+$/, '') || 'https://hamsudoku.abyssworks.dev';
+  const rawAppUrl = process.env.APP_URL?.trim();
+  if (!rawAppUrl) {
+    throw new Error('APP_URL 환경변수가 설정되지 않아 실행할 수 없습니다.');
+  }
+  const appBase = rawAppUrl.replace(/\/+$/, '');
   const destinationUrl = `${appBase}/api/internal/ranking-finalize`;
 
   console.log('=== QStash Ranking Finalization Schedule Setup ===');

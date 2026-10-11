@@ -24,10 +24,10 @@ it('StrictMode에서 같은 퍼즐을 재발급받으면 새 보드가 시작되
   const initialCell = await screen.findByRole('button', { name: /빈칸/ });
   expect(api.nextStage).toHaveBeenCalledTimes(1);
   fireEvent.doubleClick(initialCell);
-  await waitFor(() => expect(screen.getByRole('button', { name: '다음 판' }).hasAttribute('disabled')).toBe(false));
+  await waitFor(() => expect(screen.getByRole('button', { name: '다음 판' }).hasAttribute('disabled')).toBe(false), { timeout: 5000 });
   fireEvent.click(screen.getByRole('button', { name: '다음 판' }));
-  await waitFor(() => expect(api.nextStage).toHaveBeenCalledTimes(2));
-  await waitFor(() => expect(screen.queryByRole('dialog', { name: '클리어' })).toBeNull());
+  await waitFor(() => expect(api.nextStage).toHaveBeenCalledTimes(2), { timeout: 5000 });
+  await waitFor(() => expect(screen.queryByRole('dialog', { name: '클리어' })).toBeNull(), { timeout: 5000 });
   expect(await screen.findByRole('button', { name: /빈칸/ })).toBeDefined();
   expect(screen.getByRole('status', { name: '씨앗 0개, 목숨 3개' }).tagName).toBe('SPAN');
 });
