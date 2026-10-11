@@ -13,8 +13,8 @@ describe('nextState', () => {
   it('싱글클릭은 조각을 건드리지 않는다', () => {
     expect(nextState('frag', 'single', false)).toBe('frag');
   });
-  it('싱글클릭은 햄스터를 회수하고 오답은 잠근다', () => {
-    expect(nextState('hamster', 'single', false)).toBe('empty');
+  it('싱글클릭은 확정 햄스터와 오답을 유지한다', () => {
+    expect(nextState('hamster', 'single', false)).toBe('hamster');
     expect(nextState('wrong', 'single', false)).toBe('wrong');
   });
   it('더블클릭은 정답이면 햄스터, 오답이면 고정 빨강이다', () => {
