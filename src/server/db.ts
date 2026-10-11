@@ -788,6 +788,8 @@ export function createPrismaDb(client: PrismaClient = prisma): DbPort {
       };
     },
     async getFinalizedUserRank(season, userId) {
+      const header = await client.seasonFinalization.findUnique({ where: { season } });
+      if (header?.status !== 'finalized') return null;
       const r = await client.seasonRankResult.findUnique({
         where: { season_userId: { season, userId } },
       });

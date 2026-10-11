@@ -2,6 +2,23 @@ import { describe, expect, it } from 'vitest';
 import type { PrismaClient } from '../../prisma/generated/prisma/client';
 import { createMemoryDb, createPrismaDb } from './db';
 
+describe('Prisma 개인 확정 순위 조회', () => {
+  it('미확정 시즌은 null을 반환해 개인 원장 조회로 이어진다', async () => {
+    const db = createPrismaDb({
+      seasonFinalization: { findUnique: async () => null },
+      seasonRankResult: { findUnique: async () => null },
+    } as unknown as PrismaClient);
+    expect(await db.getFinalizedUserRank('2026-W41', 'u1')).toBeNull();
+  });
+  it('확정 시즌에 참여하지 않은 사용자는 0점과 순위 없음이다', async () => {
+    const db = createPrismaDb({
+      seasonFinalization: { findUnique: async () => ({ status: 'finalized' }) },
+      seasonRankResult: { findUnique: async () => null },
+    } as unknown as PrismaClient);
+    expect(await db.getFinalizedUserRank('2026-W41', 'u1')).toEqual({ rank: null, score: 0 });
+  });
+});
+
 describe('DbPort', () => {
   it('쓴 키는 재사용이 안 된다', async () => {
     const db = createMemoryDb();
