@@ -1,10 +1,8 @@
 import { describe, expect, it } from 'vitest';
 import { createMemoryDb } from './db';
 import {
-  COOLDOWN_MS,
   evaluateSupplyDecision,
   requestSupply,
-  STOCK_THRESHOLD,
   type EndlessSupplyJobRow,
 } from './endlessSupply';
 
