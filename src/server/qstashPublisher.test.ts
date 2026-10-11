@@ -27,10 +27,15 @@ describe('createQStashPublisher', () => {
     delete process.env.APP_URL;
   });
 
-  it('토큰이 없으면 네트워크 요청 없이 noop 응답을 반환한다', async () => {
+  it('토큰이 없으면 성공 응답을 만들지 않는다', async () => {
     const publisher = createQStashPublisher();
-    const res = await publisher.enqueueFinalize('2026-W41');
-    expect(res.messageId).toBe('noop-no-token');
+    await expect(publisher.enqueueFinalize('2026-W41')).rejects.toThrow('QStash token is not configured');
+    expect(mockPublishedPayload).toBeNull();
+  });
+
+  it('목적지 설정이 없으면 운영 주소를 추측하지 않는다', async () => {
+    const publisher = createQStashPublisher({ token: 'test-token' });
+    await expect(publisher.enqueueFinalize('2026-W41')).rejects.toThrow('QStash destination is not configured');
     expect(mockPublishedPayload).toBeNull();
   });
 
