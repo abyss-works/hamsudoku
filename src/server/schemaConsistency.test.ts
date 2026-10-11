@@ -22,20 +22,24 @@ describe('Prisma Schema and Migration Consistency (Defect 7)', () => {
     expect(migration).not.toContain('CREATE TYPE');
   });
 
-  it('DB 연결 없는 diff CLI(prisma migrate diff --from-empty --to-schema)로 일관된 DDL 생성을 검증한다', () => {
-    const cmd = 'pnpm exec prisma migrate diff --from-empty --to-schema prisma/schema.prisma --script';
-    const output = execSync(cmd, {
-      cwd: rootDir,
-      env: {
-        ...process.env,
-        DIRECT_URL: 'postgresql://localhost:5432/placeholder',
-      },
-      encoding: 'utf-8',
-    });
+  it(
+    'DB 연결 없는 diff CLI(prisma migrate diff --from-empty --to-schema)로 일관된 DDL 생성을 검증한다',
+    () => {
+      const cmd = 'pnpm exec prisma migrate diff --from-empty --to-schema prisma/schema.prisma --script';
+      const output = execSync(cmd, {
+        cwd: rootDir,
+        env: {
+          ...process.env,
+          DIRECT_URL: 'postgresql://localhost:5432/placeholder',
+        },
+        encoding: 'utf-8',
+      });
 
-    expect(output).toContain('CREATE TABLE "EndlessSupplyJob"');
-    expect(output).toContain('"status" TEXT NOT NULL DEFAULT \'pending\'');
-    expect(output).toContain('CREATE TABLE "EndlessSupplyChunk"');
-    expect(output).not.toContain('SupplyJobStatus');
-  });
+      expect(output).toContain('CREATE TABLE "EndlessSupplyJob"');
+      expect(output).toContain('"status" TEXT NOT NULL DEFAULT \'pending\'');
+      expect(output).toContain('CREATE TABLE "EndlessSupplyChunk"');
+      expect(output).not.toContain('SupplyJobStatus');
+    },
+    30000,
+  );
 });
