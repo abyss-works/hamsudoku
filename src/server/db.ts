@@ -44,6 +44,29 @@ export interface EndlessEventRow {
   createdAt: string;
 }
 
+export interface EndlessSupplyJobRow {
+  id: string;
+  policyVersion: string;
+  seedStart: number;
+  seedEnd: number;
+  targetCount: number;
+  status: string;
+  leaseExpiresAt: string | null;
+  lastSuccessAt: string | null;
+  createdAt: string;
+  updatedAt: string;
+}
+
+export interface EndlessSupplyChunkRow {
+  id: string;
+  jobId: string;
+  chunkIndex: number;
+  status: string;
+  stageCount: number;
+  completedAt: string | null;
+  createdAt: string;
+}
+
 export interface DbPort {
   ensureUser(userId: string, email: string | null): Promise<void>;
   listUsers(): Promise<{ userId: string; email: string | null; hasProfile: boolean }[]>;
@@ -93,6 +116,29 @@ export interface DbPort {
   listRecentEndlessEvents(userId: string, limit: number): Promise<EndlessEventRow[]>;
   getEndlessSummary(userId: string): Promise<EndlessSummary>;
   listSeasonEarnings(season: string): Promise<{ userId: string; amount: number }[]>;
+  findActiveSupplyJob(nowIso: string): Promise<EndlessSupplyJobRow | null>;
+  getLatestSupplySuccessAt(): Promise<string | null>;
+  createSupplyJob(data: {
+    id: string;
+    policyVersion: string;
+    seedStart: number;
+    seedEnd: number;
+    targetCount: number;
+    leaseExpiresAt: string | null;
+  }): Promise<EndlessSupplyJobRow>;
+  updateSupplyJob(
+    jobId: string,
+    data: { status?: string; leaseExpiresAt?: string | null; lastSuccessAt?: string | null },
+  ): Promise<void>;
+  findSupplyJob(jobId: string): Promise<EndlessSupplyJobRow | null>;
+  createSupplyChunk(data: { id: string; jobId: string; chunkIndex: number; status: string }): Promise<void>;
+  findSupplyChunk(jobId: string, chunkIndex: number): Promise<EndlessSupplyChunkRow | null>;
+  updateSupplyChunk(
+    jobId: string,
+    chunkIndex: number,
+    data: { status: string; stageCount?: number; completedAt?: string | null },
+  ): Promise<void>;
+  getHighestStageSeed(): Promise<number>;
 }
 
 let nextId = 0;
@@ -118,6 +164,8 @@ export function createMemoryDb(): DbPort {
     createdAt: string;
   }[] = [];
   const seedLedger: { userId: string; amount: number; season: string }[] = [];
+  const supplyJobs = new Map<string, EndlessSupplyJobRow>();
+  const supplyChunks = new Map<string, EndlessSupplyChunkRow>();
 
   const progressKey = (userId: string, stageId: string) => `${userId}:${stageId}`;
   const streakOf = (userId: string): StreakRow => streaks.get(userId) ?? { current: 0, best: 0 };
@@ -345,6 +393,76 @@ export function createMemoryDb(): DbPort {
         sums.set(e.userId, (sums.get(e.userId) ?? 0) + e.amount);
       }
       return [...sums.entries()].map(([userId, amount]) => ({ userId, amount }));
+    },
+    async findActiveSupplyJob(nowIso) {
+      const now = Date.parse(nowIso);
+      const active = [...supplyJobs.values()].find((j) => {
+        if (j.status !== 'pending' && j.status !== 'running') return false;
+        if (j.leaseExpiresAt && Date.parse(j.leaseExpiresAt) <= now) return false;
+        return true;
+      });
+      return active ?? null;
+    },
+    async getLatestSupplySuccessAt() {
+      let latest: string | null = null;
+      for (const j of supplyJobs.values()) {
+        if (j.lastSuccessAt) {
+          if (!latest || Date.parse(j.lastSuccessAt) > Date.parse(latest)) {
+            latest = j.lastSuccessAt;
+          }
+        }
+      }
+      return latest;
+    },
+    async createSupplyJob(data) {
+      const row: EndlessSupplyJobRow = {
+        ...data,
+        status: 'pending',
+        lastSuccessAt: null,
+        createdAt: new Date().toISOString(),
+        updatedAt: new Date().toISOString(),
+      };
+      supplyJobs.set(row.id, row);
+      return row;
+    },
+    async updateSupplyJob(jobId, data) {
+      const j = supplyJobs.get(jobId);
+      if (j) {
+        if (data.status !== undefined) j.status = data.status;
+        if (data.leaseExpiresAt !== undefined) j.leaseExpiresAt = data.leaseExpiresAt;
+        if (data.lastSuccessAt !== undefined) j.lastSuccessAt = data.lastSuccessAt;
+        j.updatedAt = new Date().toISOString();
+      }
+    },
+    async findSupplyJob(jobId) {
+      return supplyJobs.get(jobId) ?? null;
+    },
+    async createSupplyChunk(data) {
+      const chunk: EndlessSupplyChunkRow = {
+        ...data,
+        stageCount: 0,
+        completedAt: null,
+        createdAt: new Date().toISOString(),
+      };
+      supplyChunks.set(`${data.jobId}:${data.chunkIndex}`, chunk);
+    },
+    async findSupplyChunk(jobId, chunkIndex) {
+      return supplyChunks.get(`${jobId}:${chunkIndex}`) ?? null;
+    },
+    async updateSupplyChunk(jobId, chunkIndex, data) {
+      const c = supplyChunks.get(`${jobId}:${chunkIndex}`);
+      if (c) {
+        c.status = data.status;
+        if (data.stageCount !== undefined) c.stageCount = data.stageCount;
+        if (data.completedAt !== undefined) c.completedAt = data.completedAt;
+      }
+    },
+    async getHighestStageSeed() {
+      let maxSeed = 10000;
+      for (const s of stages.values()) {
+        if (s.seed > maxSeed) maxSeed = s.seed;
+      }
+      return maxSeed;
     },
   };
 }
@@ -711,6 +829,133 @@ export function createPrismaDb(client: PrismaClient = prisma): DbPort {
         _sum: { amount: true },
       });
       return rows.map((r) => ({ userId: r.userId, amount: r._sum.amount ?? 0 }));
+    },
+    async findActiveSupplyJob(nowIso) {
+      const row = await client.endlessSupplyJob.findFirst({
+        where: {
+          status: { in: ['pending', 'running'] },
+          OR: [
+            { leaseExpiresAt: null },
+            { leaseExpiresAt: { gt: new Date(nowIso) } },
+          ],
+        },
+        orderBy: { createdAt: 'desc' },
+      });
+      if (!row) return null;
+      return {
+        id: row.id,
+        policyVersion: row.policyVersion,
+        seedStart: row.seedStart,
+        seedEnd: row.seedEnd,
+        targetCount: row.targetCount,
+        status: row.status,
+        leaseExpiresAt: row.leaseExpiresAt ? row.leaseExpiresAt.toISOString() : null,
+        lastSuccessAt: row.lastSuccessAt ? row.lastSuccessAt.toISOString() : null,
+        createdAt: row.createdAt.toISOString(),
+        updatedAt: row.updatedAt.toISOString(),
+      };
+    },
+    async getLatestSupplySuccessAt() {
+      const row = await client.endlessSupplyJob.findFirst({
+        where: { lastSuccessAt: { not: null } },
+        orderBy: { lastSuccessAt: 'desc' },
+      });
+      return row?.lastSuccessAt ? row.lastSuccessAt.toISOString() : null;
+    },
+    async createSupplyJob(data) {
+      const row = await client.endlessSupplyJob.create({
+        data: {
+          id: data.id,
+          policyVersion: data.policyVersion,
+          seedStart: data.seedStart,
+          seedEnd: data.seedEnd,
+          targetCount: data.targetCount,
+          leaseExpiresAt: data.leaseExpiresAt ? new Date(data.leaseExpiresAt) : null,
+        },
+      });
+      return {
+        id: row.id,
+        policyVersion: row.policyVersion,
+        seedStart: row.seedStart,
+        seedEnd: row.seedEnd,
+        targetCount: row.targetCount,
+        status: row.status,
+        leaseExpiresAt: row.leaseExpiresAt ? row.leaseExpiresAt.toISOString() : null,
+        lastSuccessAt: row.lastSuccessAt ? row.lastSuccessAt.toISOString() : null,
+        createdAt: row.createdAt.toISOString(),
+        updatedAt: row.updatedAt.toISOString(),
+      };
+    },
+    async updateSupplyJob(jobId, data) {
+      await client.endlessSupplyJob.update({
+        where: { id: jobId },
+        data: {
+          ...(data.status !== undefined && { status: data.status }),
+          ...(data.leaseExpiresAt !== undefined && {
+            leaseExpiresAt: data.leaseExpiresAt ? new Date(data.leaseExpiresAt) : null,
+          }),
+          ...(data.lastSuccessAt !== undefined && {
+            lastSuccessAt: data.lastSuccessAt ? new Date(data.lastSuccessAt) : null,
+          }),
+        },
+      });
+    },
+    async findSupplyJob(jobId) {
+      const row = await client.endlessSupplyJob.findUnique({ where: { id: jobId } });
+      if (!row) return null;
+      return {
+        id: row.id,
+        policyVersion: row.policyVersion,
+        seedStart: row.seedStart,
+        seedEnd: row.seedEnd,
+        targetCount: row.targetCount,
+        status: row.status,
+        leaseExpiresAt: row.leaseExpiresAt ? row.leaseExpiresAt.toISOString() : null,
+        lastSuccessAt: row.lastSuccessAt ? row.lastSuccessAt.toISOString() : null,
+        createdAt: row.createdAt.toISOString(),
+        updatedAt: row.updatedAt.toISOString(),
+      };
+    },
+    async createSupplyChunk(data) {
+      await client.endlessSupplyChunk.create({
+        data: {
+          id: data.id,
+          jobId: data.jobId,
+          chunkIndex: data.chunkIndex,
+          status: data.status,
+        },
+      });
+    },
+    async findSupplyChunk(jobId, chunkIndex) {
+      const row = await client.endlessSupplyChunk.findUnique({
+        where: { jobId_chunkIndex: { jobId, chunkIndex } },
+      });
+      if (!row) return null;
+      return {
+        id: row.id,
+        jobId: row.jobId,
+        chunkIndex: row.chunkIndex,
+        status: row.status,
+        stageCount: row.stageCount,
+        completedAt: row.completedAt ? row.completedAt.toISOString() : null,
+        createdAt: row.createdAt.toISOString(),
+      };
+    },
+    async updateSupplyChunk(jobId, chunkIndex, data) {
+      await client.endlessSupplyChunk.update({
+        where: { jobId_chunkIndex: { jobId, chunkIndex } },
+        data: {
+          status: data.status,
+          ...(data.stageCount !== undefined && { stageCount: data.stageCount }),
+          ...(data.completedAt !== undefined && {
+            completedAt: data.completedAt ? new Date(data.completedAt) : null,
+          }),
+        },
+      });
+    },
+    async getHighestStageSeed() {
+      const row = await client.endlessStage.findFirst({ orderBy: { seed: 'desc' } });
+      return row?.seed ?? 10000;
     },
   };
 }
