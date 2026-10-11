@@ -39,13 +39,14 @@ describe('createRankStore', () => {
     expect(JSON.parse(String(calls[2].init.body))[0]).toBe('set');
   });
 
-  it('top은 스냅샷이 있으면 그대로 쓴다', async () => {
+  it('top은 유효한 스냅샷이 있으면 그대로 쓴다', async () => {
     const calls: Call[] = [];
-    const snap = { at: '2026-10-07T00:00:00.000Z', entries: [{ userId: 'u1', score: 9 }] };
+    const snap = { at: new Date().toISOString(), season: '2026-W41', entries: [{ userId: 'u1', score: 9 }] };
     const store = makeStore([JSON.stringify(snap)], calls);
     expect(await store.top('2026-W41', 50)).toEqual(snap);
     expect(calls).toHaveLength(1);
   });
+
 
   it('rankOf는 1-based 순위를 준다', async () => {
     const calls: Call[] = [];
@@ -59,12 +60,59 @@ describe('createRankStore', () => {
     expect(await store.rankOf('2026-W41', 'u1')).toEqual({ rank: null, score: 0 });
   });
 
+  it('top은 JSON 구문 오류 시 캐시 미스로 처리하고 ZSET에서 다시 읽는다', async () => {
+    const calls: Call[] = [];
+    const store = makeStore(['{invalid-json', ['u1', 10], 'OK'], calls);
+    const snap = await store.top('2026-W41', 50);
+    expect(snap.entries).toEqual([{ userId: 'u1', score: 10 }]);
+    expect(calls).toHaveLength(3);
+    expect(JSON.parse(String(calls[1].init.body))[0]).toBe('zrevrange');
+  });
+
+  it('top은 60초가 지난 캐시 스냅샷(TTL 누락 등)을 만료로 보고 갱신한다', async () => {
+    const calls: Call[] = [];
+    const staleSnap = {
+      at: new Date(Date.now() - 70_000).toISOString(),
+      season: '2026-W41',
+      entries: [{ userId: 'u-old', score: 99 }],
+    };
+    const store = makeStore([JSON.stringify(staleSnap), ['u-fresh', 20], 'OK'], calls);
+    const snap = await store.top('2026-W41', 50);
+    expect(snap.entries).toEqual([{ userId: 'u-fresh', score: 20 }]);
+    expect(calls).toHaveLength(3);
+    expect(JSON.parse(String(calls[1].init.body))[0]).toBe('zrevrange');
+  });
+
+  it('top은 시즌이 일치하지 않는 캐시를 무시하고 ZSET에서 새로 읽는다', async () => {
+    const calls: Call[] = [];
+    const wrongSeasonSnap = {
+      at: new Date().toISOString(),
+      season: '2026-W40',
+      entries: [{ userId: 'u-w40', score: 50 }],
+    };
+    const store = makeStore([JSON.stringify(wrongSeasonSnap), ['u-w41', 30], 'OK'], calls);
+    const snap = await store.top('2026-W41', 50);
+    expect(snap.entries).toEqual([{ userId: 'u-w41', score: 30 }]);
+    expect(calls).toHaveLength(3);
+  });
+
+  it('top은 ZSET에 동일 userId 중복이 있으면 최고 점수 1건으로 합친다', async () => {
+    const calls: Call[] = [];
+    const store = makeStore([null, ['u1', 20, 'u1', 10, 'u2', 5], 'OK'], calls);
+    const snap = await store.top('2026-W41', 50);
+    expect(snap.entries).toEqual([
+      { userId: 'u1', score: 20 },
+      { userId: 'u2', score: 5 },
+    ]);
+  });
+
   it('오류 응답은 던진다', async () => {
     const fetchImpl = (async () => new Response(null, { status: 500 })) as typeof fetch;
     const store = createRankStore({ url: 'https://example.upstash.io', token: 'tok', fetchImpl });
     await expect(store.increment('2026-W41', 'u1', 1)).rejects.toThrow();
   });
 });
+
 
 describe('rebuildFromLedger', () => {
   it('원장 합계를 ZADD로 재구성한다', async () => {

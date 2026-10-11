@@ -100,7 +100,9 @@ export interface DbPort {
   getSeasonFinalization(season: string): Promise<{ header: SeasonFinalizationRow; results: SeasonRankResultRow[] } | null>;
   isSeasonFinalized(season: string): Promise<boolean>;
   runWithSeasonLock<T>(season: string, op: () => Promise<T>): Promise<T>;
+  getUserSeasonRank(season: string, userId: string, window: { startAt: Date; endAt: Date }): Promise<{ rank: number | null; score: number }>;
 }
+
 
 
 class SeasonSerialization {
@@ -329,9 +331,17 @@ export function createMemoryDb(): DbPort {
     async runWithSeasonLock<T>(season: string, op: () => Promise<T>): Promise<T> {
       return seasonSerializer.runExclusive(season, op);
     },
+    async getUserSeasonRank(season, userId, window) {
+      const aggregated = await this.aggregateSeasonLedger(season, window);
+      const idx = aggregated.findIndex((e) => e.userId === userId);
+      if (idx === -1 || aggregated[idx].score <= 0) {
+        return { rank: null, score: 0 };
+      }
+      return { rank: idx + 1, score: aggregated[idx].score };
+    },
   };
-
 }
+
 
 const globalForPrisma = globalThis as unknown as {
   prisma?: PrismaClient;
@@ -671,6 +681,31 @@ export function createPrismaDb(client: PrismaClient = prisma): DbPort {
         return op();
       });
     },
+    async getUserSeasonRank(season, userId, window) {
+      const rows = await client.$queryRaw<{ score: number | null; rank: number }[]>`
+        WITH user_scores AS (
+          SELECT "userId", SUM("amount")::int AS score
+          FROM "SeedLedger"
+          WHERE "season" = ${season}
+            AND "kind" = 'earn'
+            AND "createdAt" >= ${window.startAt}
+            AND "createdAt" < ${window.endAt}
+          GROUP BY "userId"
+        )
+        SELECT
+          (SELECT score FROM user_scores WHERE "userId" = ${userId}) AS score,
+          (
+            SELECT COUNT(*)::int
+            FROM user_scores
+            WHERE score > (SELECT score FROM user_scores WHERE "userId" = ${userId})
+               OR (score = (SELECT score FROM user_scores WHERE "userId" = ${userId}) AND "userId" > ${userId})
+          ) + 1 AS rank
+      `;
+      if (rows.length === 0 || rows[0].score === null || rows[0].score <= 0) {
+        return { rank: null, score: 0 };
+      }
+      return { rank: Number(rows[0].rank), score: Number(rows[0].score) };
+    },
   };
-
 }
+

@@ -8,9 +8,20 @@ vi.mock('../../../../server/auth', () => ({
 
 vi.mock('../../../../server/db', () => ({
   createPrismaDb: vi.fn(() => ({
-    lookupNicknames: vi.fn(async () => ({})),
+    getSeasonFinalization: vi.fn(async (season: string) => {
+      if (season === '2026-W40') {
+        return {
+          header: { season: '2026-W40', startAt: '', endAt: '', finalizedAt: '2026-10-04T15:00:00Z', status: 'finalized' },
+          results: [{ season: '2026-W40', userId: 'u1', score: 50, rank: 1 }],
+        };
+      }
+      return null;
+    }),
+    getUserSeasonRank: vi.fn(async () => ({ rank: 1, score: 50 })),
+    lookupNicknames: vi.fn(async () => ({ u1: '햄찌' })),
   })),
 }));
+
 
 vi.mock('../../../../server/rank', () => ({
   rankStoreFromEnv: vi.fn(() => ({

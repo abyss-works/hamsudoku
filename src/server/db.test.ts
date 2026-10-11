@@ -89,7 +89,20 @@ describe('endless DbPort', () => {
     await db.commitEndlessClear('u2', 'e-1', { earned: 1, season: '2026-W40', seedLeft: 1, elapsedMs: 30000, suspicious: false, atIso: '2026-10-07T00:02:00.000Z' });
     expect(await db.listSeasonEarnings('2026-W41')).toEqual([{ userId: 'u1', amount: 5 }]);
   });
+
+  it('getUserSeasonRank는 DB 원장 기반으로 점수와 순위를 정확히 계산한다', async () => {
+    const db = createMemoryDb();
+    await db.insertStage(stage('e-1'));
+    const window = { startAt: new Date('2026-10-04T19:00:00Z'), endAt: new Date('2026-10-11T15:00:00Z') };
+    expect(await db.getUserSeasonRank('2026-W41', 'u-none', window)).toEqual({ rank: null, score: 0 });
+
+    await db.commitEndlessClear('u1', 'e-1', { earned: 3, season: '2026-W41', seedLeft: 3, elapsedMs: 30000, suspicious: false, atIso: '2026-10-07T00:00:00.000Z' });
+    await db.commitEndlessClear('u2', 'e-1', { earned: 5, season: '2026-W41', seedLeft: 3, elapsedMs: 30000, suspicious: false, atIso: '2026-10-07T00:00:00.000Z' });
+    expect(await db.getUserSeasonRank('2026-W41', 'u1', window)).toEqual({ rank: 2, score: 3 });
+    expect(await db.getUserSeasonRank('2026-W41', 'u2', window)).toEqual({ rank: 1, score: 5 });
+  });
 });
+
 
 describe('ensureUser 경합', () => {
   const conflict = () => Object.assign(new Error('Unique constraint failed'), { code: 'P2002' });

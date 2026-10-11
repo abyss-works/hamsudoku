@@ -7,6 +7,7 @@ export interface RankEntry {
 
 export interface RankSnapshot {
   at: string;
+  season?: string;
   entries: RankEntry[];
 }
 
@@ -48,27 +49,59 @@ export function createRankStore(opts: { url: string; token: string; fetchImpl?: 
     },
     async topAll(season, limit) {
       const flat = await cmd<(string | number)[]>(['zrevrange', key(season), 0, limit - 1, 'withscores']);
+      const seen = new Set<string>();
       const entries: RankEntry[] = [];
       for (let i = 0; i < flat.length; i += 2) {
-        entries.push({ userId: String(flat[i]), score: Number(flat[i + 1]) });
+        const uid = String(flat[i]);
+        const score = Number(flat[i + 1]);
+        if (!seen.has(uid)) {
+          seen.add(uid);
+          entries.push({ userId: uid, score });
+        }
       }
-      return { at: new Date().toISOString(), entries };
+      return { at: new Date().toISOString(), season, entries };
     },
     async remove(season, userId) {
       return cmd<number>(['zrem', key(season), userId]);
     },
     async top(season, limit) {
       const cached = await cmd<string | null>(['get', topKey(season)]);
-      if (cached) return JSON.parse(cached) as RankSnapshot;
-      const flat = await cmd<(string | number)[]>(['zrevrange', key(season), 0, limit - 1, 'withscores']);
+      if (cached) {
+        try {
+          const parsed = JSON.parse(cached) as RankSnapshot;
+          if (
+            parsed &&
+            typeof parsed.at === 'string' &&
+            Array.isArray(parsed.entries) &&
+            (!parsed.season || parsed.season === season)
+          ) {
+            const ageMs = Date.now() - Date.parse(parsed.at);
+            if (!Number.isNaN(ageMs) && ageMs < TOP_TTL_SEC * 1000) {
+              return parsed;
+            }
+          }
+        } catch {
+          // JSON 오류 시 캐시 미스로 처리
+        }
+      }
+      const rawFlat = await cmd<(string | number)[] | null>(['zrevrange', key(season), 0, limit - 1, 'withscores']);
+      const flat = rawFlat ?? [];
+      const seen = new Set<string>();
       const entries: RankEntry[] = [];
       for (let i = 0; i < flat.length; i += 2) {
-        entries.push({ userId: String(flat[i]), score: Number(flat[i + 1]) });
+
+        const uid = String(flat[i]);
+        const score = Number(flat[i + 1]);
+        if (!seen.has(uid)) {
+          seen.add(uid);
+          entries.push({ userId: uid, score });
+        }
       }
-      const snapshot: RankSnapshot = { at: new Date().toISOString(), entries };
+      const snapshot: RankSnapshot = { at: new Date().toISOString(), season, entries };
       await cmd(['set', topKey(season), JSON.stringify(snapshot), 'ex', TOP_TTL_SEC]);
       return snapshot;
     },
+
     async rankOf(season, userId) {
       const rank = await cmd<number | null>(['zrevrank', key(season), userId]);
       const score = await cmd<string | null>(['zscore', key(season), userId]);
