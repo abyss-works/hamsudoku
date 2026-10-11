@@ -1,5 +1,5 @@
 import { useEffect, useRef, useState } from 'react';
-import { fetchRemoteSessionUser } from '../account/remoteSessionService';
+import { fetchRemoteSessionUser } from '../account/service/remoteSessionService';
 import { useAdminRank } from './useAdminRank';
 import { adminRankModel } from './rankLogic';
 

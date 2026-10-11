@@ -1,5 +1,5 @@
-import type { useAccount } from '../features/account/useAccount';
-import type { useEndlessSummary } from '../features/endless/useEndlessSummary';
+import type { useAccount } from '../features/account/service/useAccount';
+import type { useEndlessSummary } from '../features/endless/service/useEndlessSummary';
 import type { useStageRecordsSync } from '../features/stages/useStageRecordsSync';
 
 export interface AccountTransferOptions {

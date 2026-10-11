@@ -12,12 +12,12 @@ const deps = vi.hoisted(() => ({
   reconcile: vi.fn(), pull: vi.fn(), pushClear: vi.fn(), fetchAttemptKey: vi.fn(),
   summary: { me: {} as object | null, error: null as string | null, refreshSoft: vi.fn() },
 }));
-vi.mock('../features/account/useAccount', () => ({ useAccount: () => deps.account }));
+vi.mock('../features/account/service/useAccount', () => ({ useAccount: () => deps.account }));
 vi.mock('../features/stages/useStages', () => ({ useStages: () => ({ chapters: [{ id: 'lv1', title: '레벨 1', stages: [
   { id: 's1', code: '1-1', title: '첫 판', locked: false, puzzle: PUZZLES[0] },
   { id: 's2', code: '1-2', title: '둘째 판', locked: false, puzzle: PUZZLES[0] },
 ] }], loading: false, error: null }) }));
-vi.mock('../features/endless/useEndlessSummary', () => ({ useEndlessSummary: () => deps.summary }));
+vi.mock('../features/endless/service/useEndlessSummary', () => ({ useEndlessSummary: () => deps.summary }));
 vi.mock('../ui/useFontsReady', () => ({ useFontsReady: () => true }));
 vi.mock('../features/stages/sync', () => ({ reconcile: deps.reconcile, pull: deps.pull, pushClear: deps.pushClear, fetchAttemptKey: deps.fetchAttemptKey }));
 

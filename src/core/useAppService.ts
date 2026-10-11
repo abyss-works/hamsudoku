@@ -1,6 +1,6 @@
 import { useClears } from '../features/stages/useClears';
-import { useAccount } from '../features/account/useAccount';
-import { useEndlessSummary } from '../features/endless/useEndlessSummary';
+import { useAccount } from '../features/account/service/useAccount';
+import { useEndlessSummary } from '../features/endless/service/useEndlessSummary';
 import { useStages } from '../features/stages/useStages';
 import { useStageRecordsSync } from '../features/stages/useStageRecordsSync';
 import { useAppBoot } from './useAppBoot';

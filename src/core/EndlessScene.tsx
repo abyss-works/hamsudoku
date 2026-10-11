@@ -1,4 +1,4 @@
-import { useEndlessGame } from '../features/endless/useEndlessGame';
+import { useEndlessGame } from '../features/endless/service/useEndlessGame';
 import { OverlayProvider } from '../ui/OverlayProvider';
 import { EndlessGameScreen } from '../views/endless/EndlessGameScreen';
 import {

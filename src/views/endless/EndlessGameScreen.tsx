@@ -1,7 +1,7 @@
 import type { ReactNode } from 'react';
 import { EndlessBoard } from './EndlessBoard';
 import { GameHelp } from '../sudoku/GameHelp';
-import type { useEndlessGame } from '../../features/endless/useEndlessGame';
+import type { useEndlessGame } from '../../features/endless/service/useEndlessGame';
 import { BootSplash } from '../../ui/BootSplash';
 import { GameHeader } from '../sudoku/GameHeader';
 import { SeedStatus } from '../sudoku/SeedStatus';

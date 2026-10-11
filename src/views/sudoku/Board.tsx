@@ -4,7 +4,7 @@ import { Cell } from './Cell';
 import { OverlayOutlet } from '../../ui/OverlayOutlet';
 import type { OverlayRequest } from '../../ui/overlayTypes';
 import type { Violations } from '../../features/sudoku/model/rules';
-import { useBoardInteraction } from '../../features/sudoku/useBoardInteraction';
+import { useBoardInteraction } from '../../features/sudoku/service/useBoardInteraction';
 import type { CellState, Puzzle } from '../../features/sudoku/model/puzzles';
 import type { TapKind } from '../../features/sudoku/model/tap';
 

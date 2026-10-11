@@ -1,4 +1,4 @@
-import { useNicknameService } from '../../features/account/useNicknameService';
+import { useNicknameService } from '../../features/account/service/useNicknameService';
 import { Button } from '../../ui/Button';
 import { Overlay } from '../../ui/Overlay';
 import { TextInput } from '../../ui/TextInput';

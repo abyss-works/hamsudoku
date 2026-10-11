@@ -5,7 +5,7 @@ import { HomeScene } from './HomeScene';
 import { stageCatalog } from '../features/stages/catalog';
 import { StageScene } from './StageScene';
 import { EndlessScene } from './EndlessScene';
-import * as endlessSessionModule from '../features/endless/useEndlessSession';
+import * as endlessSessionModule from '../features/endless/service/useEndlessSession';
 
 afterEach(() => {
   cleanup();

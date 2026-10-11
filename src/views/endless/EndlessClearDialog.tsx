@@ -1,7 +1,7 @@
 import { Button } from '../../ui/Button';
 import { Confetti } from '../../ui/Confetti';
 import { Overlay } from '../../ui/Overlay';
-import type { EndlessClearModel } from '../../features/endless/screenModels';
+import type { EndlessClearModel } from '../../features/endless/model/screenModels';
 
 export interface EndlessClearDialogProps {
   model: EndlessClearModel;

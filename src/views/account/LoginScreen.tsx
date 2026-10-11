@@ -1,8 +1,8 @@
 import { ChevronLeft } from 'lucide-react';
 import { Button } from '../../ui/Button';
 import { HamsterFace } from '../../ui/HamsterFace';
-import { useLoginService } from '../../features/account/useLoginService';
-import type { LoginServiceOptions } from '../../features/account/login.types';
+import { useLoginService } from '../../features/account/service/useLoginService';
+import type { LoginServiceOptions } from '../../features/account/model/login.types';
 import { LoginConfirmationView } from './login/LoginConfirmationView';
 import { AccountInput } from './AccountInput';
 

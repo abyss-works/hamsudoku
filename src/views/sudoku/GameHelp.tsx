@@ -1,4 +1,4 @@
-import { useHelpCarousel } from '../../features/sudoku/useHelpCarousel';
+import { useHelpCarousel } from '../../features/sudoku/service/useHelpCarousel';
 import { ChevronLeft, ChevronRight } from 'lucide-react';
 import { HelpCard } from '../../ui/HelpCard';
 import { ControlsPage } from './help/ControlsHelp';

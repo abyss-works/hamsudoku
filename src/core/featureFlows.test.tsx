@@ -1,11 +1,11 @@
 // @vitest-environment jsdom
 import { act, renderHook } from '@testing-library/react';
 import { afterEach, expect, it, vi } from 'vitest';
-import { useLoginService } from '../features/account/useLoginService';
-import { useAuthDialogService } from '../features/account/useAuthDialogService';
-import { useSetPasswordService } from '../features/account/useSetPasswordService';
-import { useNicknameService } from '../features/account/useNicknameService';
-import { recommendedBase, validateCredentials, validatePassword } from '../features/account/validation';
+import { useLoginService } from '../features/account/service/useLoginService';
+import { useAuthDialogService } from '../features/account/service/useAuthDialogService';
+import { useSetPasswordService } from '../features/account/service/useSetPasswordService';
+import { useNicknameService } from '../features/account/service/useNicknameService';
+import { recommendedBase, validateCredentials, validatePassword } from '../features/account/model/validation';
 afterEach(() => vi.useRealTimers());
 it('validates credentials and password confirmation without IO', () => {
  expect(validateCredentials(' ', '123456')).toBe('이메일과 6자 이상 비밀번호를 입력하세요.');
@@ -93,7 +93,7 @@ it('recovers nickname submission after rejected request',async()=>{
  const {result}=renderHook(()=>useNicknameService({onSaveNickname:async()=>{throw Error('offline');}}));
  await act(async()=>{await result.current.save();});expect(result.current.msg).toBe('저장하지 못했어요.');expect(result.current.saving).toBe(false);
 });
-import { existingEmail, validateResetEmail } from '../features/account/validation';
+import { existingEmail, validateResetEmail } from '../features/account/model/validation';
 it('classifies existing-email responses and reset input',()=>{
  expect(existingEmail('email_exists')).toBe(true);expect(existingEmail('user_already_exists')).toBe(true);expect(existingEmail('offline')).toBe(false);
  expect(validateResetEmail(' ')).toBe(false);expect(validateResetEmail(' e@x.y ')).toBe(true);

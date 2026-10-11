@@ -1,4 +1,4 @@
-import type { EndlessSummaryState } from '../endless/useEndlessSummary';
+import type { EndlessSummaryState } from '../endless/service/useEndlessSummary';
 
 export interface HomeServiceOptions {
   email: string | null;

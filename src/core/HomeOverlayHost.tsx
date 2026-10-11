@@ -6,8 +6,8 @@ import { AuthDialog } from '../views/account/AuthDialog';
 import { RankDialog } from '../views/ranking/RankDialog';
 import { OverlayOutlet } from '../ui/OverlayOutlet';
 import type { OverlayRequest } from '../ui/overlayTypes';
-import type { EndlessSummaryState } from '../features/endless/useEndlessSummary';
-import type { AuthDialogOptions, AuthFn } from '../features/account/authDialog.types';
+import type { EndlessSummaryState } from '../features/endless/service/useEndlessSummary';
+import type { AuthDialogOptions, AuthFn } from '../features/account/model/authDialog.types';
 
 export interface HomeOverlayHostProps {
   sound: boolean;

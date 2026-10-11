@@ -12,7 +12,7 @@ const actions = vi.hoisted(() => ({
   reportWrong: vi.fn(),
 }));
 
-vi.mock('../features/endless/useEndlessSession', () => ({
+vi.mock('../features/endless/service/useEndlessSession', () => ({
   useEndlessSession: () => ({
     ...actions,
     puzzle: stageCatalog()[0].stages[0].puzzle,
