@@ -175,9 +175,11 @@ function viewFailures(path: string, sourceOverride?: ts.SourceFile): string[] {
       dep.names.every((name) => /^[A-Z][A-Z0-9_]*$/.test(name));
     if (dep.resolved && !forwardsConstants) {
       const norm = dep.resolved.replace(/\.(tsx?|jsx?)$/, '');
+      const isUiUtility = /\/src\/ui\/(?:classNames|confettiModel)$/.test(norm);
       if (
-        /(?:^|\/)(?:[^/]*Logic|boardProjection|screenModels|rules|tap|probe|path|solver|shape|catalog|classNames|confettiModel|validation|nickname)$/.test(norm) ||
-        /\/features\/[^/]+\/model\//.test(norm)
+        !isUiUtility &&
+        (/(?:^|\/)(?:[^/]*Logic|boardProjection|screenModels|rules|tap|probe|path|solver|shape|catalog|classNames|confettiModel|validation|nickname)$/.test(norm) ||
+        /\/features\/[^/]+\/model\//.test(norm))
       ) {
         failures.push(`${label(path)}: View에서 순수 모델 직접 참조 (${dep.module})`);
       }
@@ -247,6 +249,23 @@ function viewFailures(path: string, sourceOverride?: ts.SourceFile): string[] {
           failures.push(`${label(path)}: View에서 산술 연산 직접 수행`);
         }
       }
+    }
+  }, sourceOverride);
+  return failures;
+}
+
+function pageOverlayFailures(path: string, sourceOverride?: ts.SourceFile): string[] {
+  const failures: string[] = [];
+  inspect(path, (node) => {
+    let tagName: string | null = null;
+    if (ts.isJsxOpeningElement(node) && ts.isIdentifier(node.tagName)) {
+      tagName = node.tagName.text;
+    } else if (ts.isJsxSelfClosingElement(node) && ts.isIdentifier(node.tagName)) {
+      tagName = node.tagName.text;
+    }
+
+    if (tagName && /^(ClearDialog|SettingsDialog|ProfileDialog|AuthDialog|RankDialog|GameOverDialog|EndlessClearDialog|GuestEndlessDialog|NicknameGateDialog)$/.test(tagName)) {
+      failures.push(`${label(path)}: Page 또는 Board에서 특정 기능 오버레이 직접 JSX 선택 (${tagName})`);
     }
   }, sourceOverride);
   return failures;
@@ -389,6 +408,9 @@ describe('책임 경계와 기능 패키지 아키텍처', () => {
     // 1. extensionless pure import -> 탐지
     const res1 = analyzeFixture(`import { buttonClass } from "@/shared/classNames";\nexport function V() { return <div />; }`);
     expect(res1).toContain('순수 모델 직접 참조 (@/shared/classNames)');
+    // 순수 UI 유틸리티 직접 import -> 허용 (탐지되지 않음)
+    expect(analyzeFixture('import { buttonClass } from "@/ui/classNames"; export function V() { return <div />; }')).toEqual([]);
+    expect(analyzeFixture('import { confettiPiecesModel } from "@/ui/confettiModel"; export function V() { return <div />; }')).toEqual([]);
     expect(analyzeFixture('import { rankModel as model } from "@/features/ranking/rankLogic"; export function V() { return <div />; }')).toHaveLength(1);
     expect(analyzeFixture('import { solve } from "@/features/sudoku/model/solver.ts"; export function V() { return <div />; }')).toHaveLength(1);
     expect(analyzeFixture('export { BOOT_TIMEOUT_MS } from "@/application/appLogic";')).toEqual([]);
@@ -411,7 +433,13 @@ describe('책임 경계와 기능 패키지 아키텍처', () => {
 
   it('Service는 HTTP와 로컬 저장 엔진을 직접 호출하지 않는다', () => {
     const failures: string[] = [];
-    for (const path of files.filter((file) => /[/\\]use[^/\\]*\.tsx?$/.test(file))) {
+    const targetFiles = files.filter((file) => {
+      const name = label(file);
+      if (!name.startsWith('src/features/') && !name.startsWith('src/application/')) return false;
+      if (/(?:Api|localAuth|endlessMirror|mirrorApi|sync)\.ts$/.test(name)) return false;
+      return true;
+    });
+    for (const path of targetFiles) {
       inspect(path, (node) => {
         if (ts.isCallExpression(node) && ts.isIdentifier(node.expression) && node.expression.text === 'fetch') {
           failures.push(`${label(path)}: HTTP 직접 호출`);
@@ -441,6 +469,57 @@ describe('책임 경계와 기능 패키지 아키텍처', () => {
     expect(failures).toEqual([]);
   });
 
+function inspectPureFailures(path: string, sourceOverride?: ts.SourceFile): string[] {
+  const failures: string[] = [];
+  for (const dep of getImportsAndExports(path, sourceOverride)) {
+    if (dep.isTypeOnly) continue;
+    if (
+      /^(react|react-dom|howler)$/.test(dep.module) ||
+      /\/(api|server)\/|\/(sound|save|sync|endlessMirror|mirrorApi|accountApi|stagesApi|adminApi|localAuth|saveApi)$/.test(
+        dep.module,
+      ) ||
+      /platform\//.test(dep.module)
+    ) {
+      failures.push(`${label(path)}: 부수 효과 모듈 ${dep.module} 참조`);
+    }
+  }
+  inspect(path, (node) => {
+    if (
+      ts.isIdentifier(node) &&
+      ['window', 'document', 'localStorage', 'sessionStorage', 'fetch', 'setTimeout', 'setInterval'].includes(
+        node.text,
+      )
+    ) {
+      failures.push(`${label(path)}: 환경 접근 ${node.text}`);
+    }
+    if (
+      ts.isPropertyAccessExpression(node) &&
+      ts.isIdentifier(node.expression) &&
+      node.expression.text === 'Date' &&
+      node.name.text === 'now'
+    ) {
+      failures.push(`${label(path)}: 환경 접근 Date.now`);
+    }
+    if (
+      ts.isNewExpression(node) &&
+      ts.isIdentifier(node.expression) &&
+      node.expression.text === 'Date' &&
+      (!node.arguments || node.arguments.length === 0)
+    ) {
+      failures.push(`${label(path)}: 환경 접근 new Date()`);
+    }
+    if (
+      ts.isPropertyAccessExpression(node) &&
+      ts.isIdentifier(node.expression) &&
+      node.expression.text === 'Math' &&
+      node.name.text === 'random'
+    ) {
+      failures.push(`${label(path)}: 환경 접근 Math.random`);
+    }
+  }, sourceOverride);
+  return failures;
+}
+
   it('순수 Logic은 환경과 입출력 구현에 의존하지 않는다', () => {
     const failures: string[] = [];
     const logic = files.filter((path) => {
@@ -451,33 +530,48 @@ describe('책임 경계와 기능 패키지 아키텍처', () => {
         /\/(selectionLogic|catalog|homeLogic|rankLogic|nickname|validation)\.ts$/.test(name) ||
         /\/(appLogic|gameTransition|forms|screenModels|boardProjection|stageCatalog|rules|tap|probe|path|solver|shape|logic|nickname)\.ts$/.test(
           name,
-        )
+        ) ||
+        /\/(classNames|confettiModel|timeFormatter|clearDialogPresentation|probeButtonPresentation)\.ts$/.test(name)
       );
     });
     for (const path of logic) {
-      for (const dep of getImportsAndExports(path)) {
-        if (dep.isTypeOnly) continue;
-        if (
-          /^(react|react-dom|howler)$/.test(dep.module) ||
-          /\/(api|server)\/|\/(sound|save|sync|endlessMirror|mirrorApi|accountApi|stagesApi|adminApi|localAuth|saveApi)$/.test(
-            dep.module,
-          ) ||
-          /platform\//.test(dep.module)
-        ) {
-          failures.push(`${label(path)}: 부수 효과 모듈 ${dep.module} 참조`);
-        }
-      }
-      inspect(path, (node) => {
-        if (
-          ts.isIdentifier(node) &&
-          ['window', 'document', 'localStorage', 'sessionStorage', 'fetch', 'setTimeout', 'setInterval'].includes(
-            node.text,
-          )
-        ) {
-          failures.push(`${label(path)}: 환경 접근 ${node.text}`);
-        }
-      });
+      failures.push(...inspectPureFailures(path));
     }
     expect(failures).toEqual([]);
   });
+
+  it('순수 UI utility와 도메인 Logic의 Date.now·new Date·Math.random 환경 접근을 엄격히 탐지한다', () => {
+    function analyzePureFixture(content: string) {
+      const source = ts.createSourceFile('fixture.ts', content, ts.ScriptTarget.Latest, true, ts.ScriptKind.TS);
+      return inspectPureFailures(join(process.cwd(), 'src/ui/classNames.ts'), source);
+    }
+
+    expect(analyzePureFixture('export function f() { return Date.now(); }')).toHaveLength(1);
+    expect(analyzePureFixture('export function f() { return new Date(); }')).toHaveLength(1);
+    expect(analyzePureFixture('export function f() { return Math.random(); }')).toHaveLength(1);
+  });
+
+  it('합성 TSX fixture로 Page와 Board의 특정 오버레이 직접 JSX 금지를 정밀 검증한다', () => {
+    function analyzeOverlayFixture(content: string) {
+      const source = ts.createSourceFile('fixture.tsx', content, ts.ScriptTarget.Latest, true, ts.ScriptKind.TSX);
+      return pageOverlayFailures(join(process.cwd(), 'src/views/home/HomeScreen.tsx'), source);
+    }
+
+    // 1. ClearDialog / SettingsDialog 직접 JSX -> 탐지
+    expect(analyzeOverlayFixture('export function Page() { return <div><ClearDialog /></div>; }')).toHaveLength(1);
+    expect(analyzeOverlayFixture('export function Page() { return <div><SettingsDialog /></div>; }')).toHaveLength(1);
+
+    // 2. OverlayOutlet 공통 슬롯 사용 및 Overlay 프레임 사용 -> 허용
+    expect(analyzeOverlayFixture('export function Page() { return <div><OverlayOutlet /></div>; }')).toEqual([]);
+    expect(analyzeOverlayFixture('export function Page() { return <div><Overlay label="테스트"><div /></Overlay></div>; }')).toEqual([]);
+  });
+
+  it('Page와 Board는 특정 기능 오버레이를 직접 JSX로 선택하지 않는다', () => {
+    const pageAndBoardFiles = files.filter((path) =>
+      /(?:HomeScreen|GameScreen|EndlessGameScreen|Board)\.tsx$/.test(label(path)),
+    );
+    const failures = pageAndBoardFiles.flatMap((path) => pageOverlayFailures(path));
+    expect(failures).toEqual([]);
+  });
+
 });
