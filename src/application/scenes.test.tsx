@@ -234,4 +234,3 @@ describe('EndlessScene & EndlessOverlayHost integration', () => {
     expect(screen.getByText('씨앗이 부족해요')).toBeDefined();
   });
 });
-
