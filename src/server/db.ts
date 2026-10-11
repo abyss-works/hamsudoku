@@ -2,6 +2,7 @@ import { PrismaPg } from '@prisma/adapter-pg';
 import { Pool } from 'pg';
 import { PrismaClient } from '../../prisma/generated/prisma/client';
 import { mergeClear, type ClearRecord } from '../shared/merge';
+import { rankedSeasonId, seasonWindow } from '../shared/season';
 
 export interface Attempt {
   id: string;
@@ -101,6 +102,7 @@ export interface DbPort {
   isSeasonFinalized(season: string): Promise<boolean>;
   runWithSeasonLock<T>(season: string, op: () => Promise<T>): Promise<T>;
   getUserSeasonRank(season: string, userId: string, window: { startAt: Date; endAt: Date }): Promise<{ rank: number | null; score: number }>;
+  listUnfinalizedSeasons(now: Date): Promise<string[]>;
 }
 
 
@@ -338,6 +340,25 @@ export function createMemoryDb(): DbPort {
         return { rank: null, score: 0 };
       }
       return { rank: idx + 1, score: aggregated[idx].score };
+    },
+    async listUnfinalizedSeasons(now: Date) {
+      const candidateSeasons = new Set<string>();
+      for (const e of seedLedger) {
+        candidateSeasons.add(e.season);
+      }
+      candidateSeasons.add(rankedSeasonId(now));
+
+      const unfinalized: string[] = [];
+      for (const s of candidateSeasons) {
+        const window = seasonWindow(s);
+        if (now.getTime() >= window.endAt.getTime()) {
+          const isFinalized = await this.isSeasonFinalized(s);
+          if (!isFinalized) {
+            unfinalized.push(s);
+          }
+        }
+      }
+      return unfinalized.sort();
     },
   };
 }
@@ -705,6 +726,26 @@ export function createPrismaDb(client: PrismaClient = prisma): DbPort {
         return { rank: null, score: 0 };
       }
       return { rank: Number(rows[0].rank), score: Number(rows[0].score) };
+    },
+    async listUnfinalizedSeasons(now: Date) {
+      const distinctSeasons = await client.seedLedger.findMany({
+        select: { season: true },
+        distinct: ['season'],
+      });
+      const candidateSeasons = new Set<string>(distinctSeasons.map((d) => d.season));
+      candidateSeasons.add(rankedSeasonId(now));
+
+      const unfinalized: string[] = [];
+      for (const s of candidateSeasons) {
+        const window = seasonWindow(s);
+        if (now.getTime() >= window.endAt.getTime()) {
+          const isFin = await this.isSeasonFinalized(s);
+          if (!isFin) {
+            unfinalized.push(s);
+          }
+        }
+      }
+      return unfinalized.sort();
     },
   };
 }

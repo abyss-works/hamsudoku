@@ -62,3 +62,21 @@ export async function getFinalizedSeasonRank(
 export async function isSeasonFinalized(db: DbPort, season: string): Promise<boolean> {
   return db.isSeasonFinalized(season);
 }
+
+export async function listUnfinalizedSeasons(db: DbPort, now: Date = new Date()): Promise<string[]> {
+  return db.listUnfinalizedSeasons(now);
+}
+
+export async function recoverUnfinalizedSeasons(
+  db: DbPort,
+  now: Date = new Date(),
+): Promise<FinalizedSeasonResult[]> {
+  const seasons = await db.listUnfinalizedSeasons(now);
+  const results: FinalizedSeasonResult[] = [];
+  for (const s of seasons) {
+    const res = await finalizeSeason(db, s, now);
+    results.push(res);
+  }
+  return results;
+}
+
