@@ -254,22 +254,19 @@ describe('requestSupply with DB integration', () => {
 
   it('Prisma 어댑터 fake transaction 경계에서도 advisory lock과 원자적 공급 결정이 동작한다', async () => {
     const fakePrismaDb = createMemoryDb();
-    let advisoryLockAcquired = false;
+    let lockCalls = 0;
 
     // Prisma $queryRaw 및 transaction 시뮬레이션
     const origAtomic = fakePrismaDb.atomicRequestSupply;
     if (origAtomic) {
       fakePrismaDb.atomicRequestSupply = async (nowIso, params) => {
-        advisoryLockAcquired = true;
-        try {
-          return await origAtomic.call(fakePrismaDb, nowIso, params);
-        } finally {
-          advisoryLockAcquired = false;
-        }
+        lockCalls += 1;
+        return origAtomic.call(fakePrismaDb, nowIso, params);
       };
     }
 
     const res = await requestSupply(fakePrismaDb, '2026-10-11T12:00:00.000Z');
     expect(res.action).toBe('enqueued');
+    expect(lockCalls).toBe(1);
   });
 });

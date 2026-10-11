@@ -628,7 +628,7 @@ export function createMemoryDb(): DbPort {
 
       return true;
     },
-    async failSupplyChunk(jobId, chunkIndex, reason) {
+    async failSupplyChunk(jobId, chunkIndex, _reason) {
       const job = supplyJobs.get(jobId);
       const chunk = supplyChunks.get(`${jobId}:${chunkIndex}`);
       if (chunk) {
@@ -1425,7 +1425,7 @@ export function createPrismaDb(client: PrismaClient = prisma): DbPort {
         return true;
       });
     },
-    async failSupplyChunk(jobId, chunkIndex, reason) {
+    async failSupplyChunk(jobId, chunkIndex, _reason) {
       await client.$transaction(async (tx) => {
         await tx.endlessSupplyChunk.update({
           where: { jobId_chunkIndex: { jobId, chunkIndex } },

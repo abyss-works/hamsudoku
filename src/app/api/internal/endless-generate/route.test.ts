@@ -1,7 +1,6 @@
 import { describe, expect, it } from 'vitest';
 import { handleEndlessGenerate } from './route';
 import type { QStashVerifier } from '../../../../server/qstash';
-import { createMemoryDb } from '../../../../server/db';
 
 const mockVerifierPass: QStashVerifier = {
   verify: async () => true,
