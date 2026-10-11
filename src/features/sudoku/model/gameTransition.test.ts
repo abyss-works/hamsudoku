@@ -3,6 +3,22 @@ import * as transitions from './gameTransition';
 import { PUZZLES } from './puzzles';
 
 describe('game transitions', () => {
+  it.each([false, true])('임시 정답 모드 %s에서 확정 정답의 반복 입력을 무시한다', (probeActive) => {
+    const puzzle = PUZZLES[0];
+    const [r, c] = puzzle.solution[0];
+    const confirmed = transitions.transitionGame(transitions.createGameState(puzzle.size), puzzle,
+      { type: 'tap', r, c, kind: 'double' });
+    let state = transitions.transitionGame(confirmed.state, puzzle, { type: 'probe', on: probeActive }).state;
+    for (const kind of ['single', 'double', 'single'] as const) {
+      const next = transitions.transitionGame(state, puzzle, { type: 'tap', r, c, kind });
+      expect(next.state.cells).toEqual(confirmed.state.cells);
+      expect(next.state.cells[r][c]).toBe('hamster');
+      expect(next.sounds).toEqual([]);
+      expect(next.completed).toBe(false);
+      state = next.state;
+    }
+  });
+
   it('입력 상태를 유지하며 덮인 X를 앵커 회수 때 복원한다', () => {
     const initial = transitions.createGameState(5);
     const marked = transitions.transitionGame(initial, PUZZLES[0], { type: 'tap', r: 2, c: 0, kind: 'single' });
