@@ -1,7 +1,7 @@
 // @vitest-environment node
 import { afterEach, describe, expect, it, vi } from 'vitest';
 import { POST } from './route';
-import { requestSupply } from '../../../../server/endlessSupply';
+import { publishQStashChunk } from '../../../../server/qstash';
 
 vi.mock('../../../../server/auth', () => ({
   getSessionUser: vi.fn(async () => ({ uid: 'u1', email: null })),
@@ -15,6 +15,14 @@ const mockDb = {
     solution: '0,0',
   })),
   issueAttempt: vi.fn(async () => ({ id: 'att-1' })),
+  atomicRequestSupply: vi.fn(async () => ({
+    shouldEnqueue: true,
+    action: 'enqueued',
+    jobId: 'job-mock-123',
+    seedStart: 10000,
+    seedEnd: 10010,
+  })),
+  markSupplyJobPublishFailed: vi.fn(async () => {}),
 };
 
 vi.mock('../../../../server/db', () => ({
@@ -29,12 +37,12 @@ vi.mock('../../../../server/crypto', () => ({
   })),
 }));
 
-vi.mock('../../../../server/endlessSupply', () => ({
-  requestSupply: vi.fn(async () => ({ action: 'enqueued', jobId: 'job-1' })),
+vi.mock('../../../../server/qstash', () => ({
+  publishQStashChunk: vi.fn(async () => ({ messageId: 'msg-mock-123' })),
 }));
 
 afterEach(() => {
-  vi.restoreAllMocks();
+  vi.clearAllMocks();
 });
 
 const req = () =>
@@ -45,18 +53,21 @@ const req = () =>
   });
 
 describe('POST /api/endless/next', () => {
-  it('판을 반환하면서 백그라운드 큐 등록을 요청한다', async () => {
+  it('판을 반환하면서 실제 QStash publisher 어댑터를 호출하여 비동기 생성을 큐잉한다', async () => {
     const res = await POST(req());
     expect(res.status).toBe(200);
-    expect(requestSupply).toHaveBeenCalledTimes(1);
+    expect(publishQStashChunk).toHaveBeenCalledTimes(1);
+    expect(publishQStashChunk).toHaveBeenCalledWith('job-mock-123', 0);
     const body = await res.json();
     expect(body.stage.id).toBe('s-1');
   });
 
-  it('큐 등록에 실패해도 기존 판 제공을 막지 않는다', async () => {
-    vi.mocked(requestSupply).mockRejectedValueOnce(new Error('QStash network down'));
+  it('큐 등록에 실패해도 DB 상태를 publish_failed로 기록하고 기존 판 제공을 정상 유지한다', async () => {
+    vi.mocked(publishQStashChunk).mockRejectedValueOnce(new Error('QStash network down'));
     const res = await POST(req());
     expect(res.status).toBe(200);
+    expect(publishQStashChunk).toHaveBeenCalledTimes(1);
+    expect(mockDb.markSupplyJobPublishFailed).toHaveBeenCalledWith('job-mock-123');
     const body = await res.json();
     expect(body.stage.id).toBe('s-1');
   });
@@ -69,3 +80,4 @@ describe('POST /api/endless/next', () => {
     expect(body.msg).toContain('준비 중');
   });
 });
+
