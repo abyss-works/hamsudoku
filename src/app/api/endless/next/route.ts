@@ -3,6 +3,7 @@ import { nextRequestSchema, nextResponseSchema } from '../../../../shared/endles
 import { getSessionUser } from '../../../../server/auth';
 import { encryptSolution } from '../../../../server/crypto';
 import { createPrismaDb } from '../../../../server/db';
+import { requestSupply } from '../../../../server/endlessSupply';
 
 export async function POST(req: Request) {
   const { uid } = await getSessionUser();
@@ -10,6 +11,11 @@ export async function POST(req: Request) {
   const body = nextRequestSchema.safeParse(await req.json().catch(() => null));
   if (!body.success) return NextResponse.json({ ok: false, msg: '요청이 올바르지 않아요.' }, { status: 400 });
   const db = createPrismaDb();
+  try {
+    await requestSupply(db, new Date().toISOString());
+  } catch (err) {
+    console.error('Failed to trigger supply:', err);
+  }
   const stage = await db.pickUnclearedStage(uid);
   if (!stage) return NextResponse.json({ ok: false, msg: '새 판을 준비 중이에요.' }, { status: 503 });
   const attempt = await db.issueAttempt(uid, stage.id);
