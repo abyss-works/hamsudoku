@@ -177,4 +177,37 @@ describe('useEndlessSession', () => {
       { timeout: 6000 },
     );
   });
+
+  it('네트워크 오류로 2회 연속 재시도 실패 시 optimistic mirror를 유지한다', async () => {
+    stubFetch(() => {
+      throw new TypeError('network error');
+    });
+    const { result } = renderHook(() => useEndlessSession());
+    await act(async () => {
+      await result.current.start();
+    });
+    await act(async () => {
+      await result.current.finish();
+    });
+    await waitFor(
+      () => {
+        expect(result.current.phase).toBe('cleared');
+        expect(result.current.submitting).toBe(false);
+        expect(result.current.error).toBe('기록을 저장하지 못했어요.');
+        expect(result.current.finishResult).toEqual({ ok: false, earned: 0 });
+        expect(result.current.mirror.wallet.balance).toBe(3);
+        expect(result.current.mirror.streak).toEqual({ current: 1, best: 1 });
+        expect(result.current.mirror.clearedIds).toEqual(['e-1']);
+      },
+      { timeout: 6000 },
+    );
+    const saved = JSON.parse(localStorage.getItem('hamsudoku:endless:v1') ?? '{}') as {
+      wallet?: { balance?: number };
+      streak?: { current?: number; best?: number };
+      clearedIds?: string[];
+    };
+    expect(saved.wallet?.balance).toBe(3);
+    expect(saved.streak).toEqual({ current: 1, best: 1 });
+    expect(saved.clearedIds).toEqual(['e-1']);
+  }, 10000);
 });

@@ -4,7 +4,7 @@ import { Button } from '../../ui/Button';
 import { Confetti } from '../../ui/Confetti';
 import { HamsterFace } from '../../ui/HamsterFace';
 import { Overlay } from '../../ui/Overlay';
-import { useClearDialogService } from '../../features/sudoku/useClearDialogService';
+import { clearDialogPresentation } from './clearDialogPresentation';
 
 export interface ClearDialogProps {
   total: number;
@@ -14,7 +14,7 @@ export interface ClearDialogProps {
 }
 
 export function ClearDialog({ total, onReset, onNextMap, onBrowse }: ClearDialogProps) {
-  const { title, partyIndices } = useClearDialogService(total);
+  const { title, partyIndices } = clearDialogPresentation(total);
 
   return (
     <Overlay label="클리어">

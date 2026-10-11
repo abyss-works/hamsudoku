@@ -18,6 +18,4 @@ export function useElapsed(active: boolean, resetKey: unknown = null): number {
   return sec;
 }
 
-export function formatElapsed(sec: number): string {
-  return `${Math.floor(sec / 60)}:${String(sec % 60).padStart(2, '0')}`;
-}
+export { formatElapsed } from '../../ui/timeFormatter';

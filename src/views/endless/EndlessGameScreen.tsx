@@ -1,26 +1,29 @@
+import type { ReactNode } from 'react';
 import { EndlessBoard } from './EndlessBoard';
-import { EndlessClearDialog } from './EndlessClearDialog';
-import { GameOverDialog } from './GameOverDialog';
 import { GameHelp } from '../sudoku/GameHelp';
-import { useEndlessGame } from '../../features/endless/useEndlessGame';
-import { Button } from '../../ui/Button';
+import type { useEndlessGame } from '../../features/endless/useEndlessGame';
 import { BootSplash } from '../../ui/BootSplash';
-import { Sprout } from 'lucide-react';
+import { GameHeader } from '../sudoku/GameHeader';
+import { SeedStatus } from '../sudoku/SeedStatus';
 
-export function EndlessGameScreen({ onBack }: { onBack: () => void }) {
-  const session = useEndlessGame();
+export interface EndlessGameScreenProps {
+  onBack: () => void;
+  session: ReturnType<typeof useEndlessGame>;
+  clearOverlay?: ReactNode;
+  gameOverOverlay?: ReactNode;
+}
 
+export function EndlessGameScreen({
+  onBack,
+  session,
+  clearOverlay,
+  gameOverOverlay,
+}: EndlessGameScreenProps) {
   if (!session.puzzle) {
     if (session.error) {
       return (
         <div className="game">
-          <div className="hud">
-            <Button variant="sticker" onClick={onBack}>
-              뒤로
-            </Button>
-            <span className="hud-code">무한모드</span>
-            <span />
-          </div>
+          <GameHeader title="무한모드" onBack={onBack} />
           <p role="alert">{session.error}</p>
         </div>
       );
@@ -30,40 +33,26 @@ export function EndlessGameScreen({ onBack }: { onBack: () => void }) {
 
   return (
     <div className="game">
-      <div className="hud">
-        <Button variant="sticker" onClick={onBack}>
-          뒤로
-        </Button>
-        <span className="hud-code">무한모드</span>
-        <span className="seed-box" role="status" aria-label={session.hud.ariaLabel}>
-          <Sprout size={20} aria-hidden="true" />
-          <span className="seed-count">{session.hud.balance}</span>
-          <span className="seed-lives" aria-hidden="true">
-            +{session.hud.seeds}
-          </span>
-        </span>
-      </div>
-      <GameHelp probe />
-      <EndlessBoard
-        key={session.stageId ?? 'loading'}
-        puzzle={session.puzzle}
-        onWrong={session.reportWrong}
-        onFinish={session.finishBoard}
-        clearOverlay={
-          <EndlessClearDialog
-            model={session.clearModel}
-            onNext={session.next}
-            onExit={onBack}
+      <GameHeader
+        title="무한모드"
+        onBack={onBack}
+        extra={
+          <SeedStatus
+            balance={session.hud.balance}
+            bonus={session.hud.seeds}
+            ariaLabel={session.hud.ariaLabel}
           />
         }
       />
-      {session.phase === 'gameover' && (
-        <GameOverDialog
-          error={session.error}
-          onRetry={session.next}
-          onExit={onBack}
-        />
-      )}
+      <GameHelp probe />
+      <EndlessBoard
+        key={session.roundId}
+        puzzle={session.puzzle}
+        onWrong={session.reportWrong}
+        onFinish={session.finishBoard}
+        clearOverlay={clearOverlay}
+      />
+      {gameOverOverlay}
     </div>
   );
 }

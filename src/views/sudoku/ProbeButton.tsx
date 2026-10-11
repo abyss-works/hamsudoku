@@ -1,6 +1,6 @@
 import { RotateCcw } from 'lucide-react';
 import { HamsterFace } from '../../ui/HamsterFace';
-import { useProbeButtonService } from '../../features/sudoku/useProbeButtonService';
+import { probeButtonPresentation } from './probeButtonPresentation';
 
 export interface ProbeButtonProps {
   active: boolean;
@@ -12,7 +12,7 @@ export interface ProbeButtonProps {
 // 임시 정답 아이템과 전체 지우기. 왼쪽 칸은 아이템이 부모 너비를 먹고,
 // 오른쪽 칸은 고정 크기 리셋 버튼 하나만 둔다.
 export function ProbeButton({ active, slots, onToggle, onResetMarks }: ProbeButtonProps) {
-  const model = useProbeButtonService(active, slots);
+  const model = probeButtonPresentation(active, slots);
 
   return (
     <div className="probe-controls" role="group" aria-label="임시 정답">

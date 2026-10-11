@@ -1,6 +1,7 @@
-import { useEffect, useRef, useState } from 'react';
+import { useEffect, useRef } from 'react';
 import { homeGate, homeModel } from './homeLogic';
 import type { HomeServiceOptions } from './home.types';
+import { useOverlayScope } from '../../ui/useOverlayScope';
 
 export function useHomeService({
   email,
@@ -17,15 +18,10 @@ export function useHomeService({
 }: HomeServiceOptions) {
   const latestSummary = useRef(summary);
   latestSummary.current = summary;
-  const [settingsOpen, setSettingsOpen] = useState(false);
-  const [profileOpen, setProfileOpen] = useState(false);
-  const [rankOpen, setRankOpen] = useState(false);
+  const overlay = useOverlayScope('home');
+
   const gate = homeGate(endlessEnabled, uid, email, nickname);
   const guest = gate === 'guest';
-  const [guestGateOpen, setGuestGateOpen] = useState(false);
-  // 로그인 상태인데 닉네임이 없으면 진입 전에 정하도록 안내한다.
-  const [nicknameGateOpen, setNicknameGateOpen] = useState(false);
-  const [authOpen, setAuthOpen] = useState(false);
 
   // 홈에 들어올 때마다 요약(씨앗 잔액·내 순위)을 최신으로 맞춘다.
   // 조용한 재요청을 쓴다 — loading 토글이 부팅 게이트를 재고정하면 화면 전환 직후
@@ -38,40 +34,52 @@ export function useHomeService({
 
   const openProfile = () => {
     onWarmSession();
-    setProfileOpen(true);
+    overlay.open({ type: 'profile', slot: 'profile' });
   };
-  const openSettings = () => setSettingsOpen(true);
-  const closeSettings = () => setSettingsOpen(false);
-  const closeProfile = () => setProfileOpen(false);
+  const openSettings = () => {
+    overlay.open({ type: 'settings', slot: 'settings' });
+  };
+  const closeSettings = () => {
+    overlay.close({ slot: 'settings' });
+  };
+  const closeProfile = () => {
+    overlay.close({ slot: 'profile' });
+  };
   const openRank = () => {
-    setRankOpen(true);
+    overlay.open({ type: 'rank', slot: 'rank' });
     void summary.refreshSoft();
     void summary.refreshMyRank();
   };
-  const closeRank = () => setRankOpen(false);
+  const closeRank = () => {
+    overlay.close({ slot: 'rank' });
+  };
   const enterEndless = () => {
     if (gate === 'guest') {
-      setGuestGateOpen(true);
+      overlay.open({ type: 'guestGate', slot: 'guestGate' });
     } else if (gate === 'nickname') {
-      setNicknameGateOpen(true);
+      overlay.open({ type: 'nicknameGate', slot: 'nicknameGate' });
     } else {
       onEndless();
     }
   };
-  const closeGuestGate = () => setGuestGateOpen(false);
+  const closeGuestGate = () => {
+    overlay.close({ slot: 'guestGate' });
+  };
   const guestLogin = () => {
-    setGuestGateOpen(false);
-    setAuthOpen(true);
+    overlay.close({ slot: 'guestGate' });
+    overlay.open({ type: 'auth', slot: 'auth' });
   };
   const enterAfterNickname = () => {
-    setNicknameGateOpen(false);
+    overlay.close({ slot: 'nicknameGate' });
     onEndless();
   };
   const profileLogin = () => {
-    setProfileOpen(false);
+    overlay.close({ slot: 'profile' });
     onLogin();
   };
-  const guestLink = () => setAuthOpen(true);
+  const guestLink = () => {
+    overlay.open({ type: 'auth', slot: 'auth' });
+  };
   const signinHeld = (email: string, password: string) => onSignin(email, password, true);
   const fetchAccountSeeds = async () => {
     const account = await latestSummary.current.refreshSoft();
@@ -81,9 +89,18 @@ export function useHomeService({
   const baseChosen = () => onBaseChosen?.();
   const cancelAuth = () => {
     onCancelSignin?.();
-    setAuthOpen(false);
+    overlay.close({ slot: 'auth' });
   };
-  const closeAuth = () => setAuthOpen(false);
+  const closeAuth = () => {
+    overlay.close({ slot: 'auth' });
+  };
+
+  const settingsOpen = overlay.isOpen('settings', 'settings');
+  const profileOpen = overlay.isOpen('profile', 'profile');
+  const rankOpen = overlay.isOpen('rank', 'rank');
+  const guestGateOpen = overlay.isOpen('guestGate', 'guestGate');
+  const nicknameGateOpen = overlay.isOpen('nicknameGate', 'nicknameGate');
+  const authOpen = overlay.isOpen('auth', 'auth');
 
   const model = homeModel({ endlessEnabled, summary, email });
 
