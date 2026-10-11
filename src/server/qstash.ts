@@ -1,107 +1,59 @@
-import crypto from 'node:crypto';
+import { Receiver } from '@upstash/qstash';
 
 export interface QStashVerifyOptions {
   currentSigningKey?: string;
   nextSigningKey?: string;
-  clockToleranceSec?: number;
+  clockTolerance?: number;
 }
 
-function base64UrlEncode(str: string): string {
-  return Buffer.from(str)
-    .toString('base64url');
+export interface QStashVerifier {
+  verify(req: Request, rawBody: string): Promise<boolean>;
 }
 
-function base64UrlDecode(str: string): string {
-  return Buffer.from(str, 'base64url').toString('utf8');
-}
+export class OfficialQStashVerifier implements QStashVerifier {
+  private receiver: Receiver | null = null;
 
-export function signQStashPayload(
-  url: string,
-  rawBody: string,
-  key: string,
-  nowSec?: number,
-): string {
-  const now = nowSec ?? Math.floor(Date.now() / 1000);
-  const header = { alg: 'HS256', typ: 'JWT' };
-  const bodyHash = crypto.createHash('sha256').update(rawBody).digest('hex');
-  const payload = {
-    iss: 'Upstash',
-    sub: url,
-    exp: now + 300,
-    nbf: now - 60,
-    body: bodyHash,
-  };
+  constructor(options: QStashVerifyOptions = {}) {
+    const currentSigningKey = options.currentSigningKey ?? process.env.QSTASH_CURRENT_SIGNING_KEY;
+    const nextSigningKey = options.nextSigningKey ?? process.env.QSTASH_NEXT_SIGNING_KEY ?? currentSigningKey;
 
-  const encodedHeader = base64UrlEncode(JSON.stringify(header));
-  const encodedPayload = base64UrlEncode(JSON.stringify(payload));
-  const dataToSign = `${encodedHeader}.${encodedPayload}`;
-  const signature = crypto.createHmac('sha256', key).update(dataToSign).digest('base64url');
+    if (currentSigningKey) {
+      this.receiver = new Receiver({
+        currentSigningKey,
+        nextSigningKey,
+      });
+    }
+  }
 
-  return `${dataToSign}.${signature}`;
+  async verify(req: Request, rawBody: string): Promise<boolean> {
+    if (!this.receiver) {
+      return false;
+    }
+
+    const signature = req.headers.get('upstash-signature');
+    if (!signature) {
+      return false;
+    }
+
+    try {
+      return await this.receiver.verify({
+        signature,
+        body: rawBody,
+        url: req.url,
+      });
+    } catch {
+      return false;
+    }
+  }
 }
 
 export async function verifyQStashSignature(
   req: Request,
   rawBody: string,
-  options: QStashVerifyOptions = {},
+  options?: QStashVerifyOptions,
 ): Promise<boolean> {
-  // 테스트 우회 헤더
-  if (req.headers.get('x-internal-test-bypass') === 'true') {
-    return true;
-  }
-
-  const signatureHeader = req.headers.get('upstash-signature');
-  if (!signatureHeader) {
-    return false;
-  }
-
-  const currentKey = options.currentSigningKey ?? process.env.QSTASH_CURRENT_SIGNING_KEY;
-  const nextKey = options.nextSigningKey ?? process.env.QSTASH_NEXT_SIGNING_KEY;
-  const keys = [currentKey, nextKey].filter(Boolean) as string[];
-
-  if (keys.length === 0) {
-    return false;
-  }
-
-  const parts = signatureHeader.split('.');
-  if (parts.length !== 3) {
-    return false;
-  }
-
-  const [encodedHeader, encodedPayload, receivedSig] = parts;
-  const dataToSign = `${encodedHeader}.${encodedPayload}`;
-
-  let payload: { exp?: number; nbf?: number; body?: string };
-  try {
-    payload = JSON.parse(base64UrlDecode(encodedPayload));
-  } catch {
-    return false;
-  }
-
-  const now = Math.floor(Date.now() / 1000);
-  const tolerance = options.clockToleranceSec ?? 30;
-
-  if (payload.exp && payload.exp < now - tolerance) {
-    return false;
-  }
-  if (payload.nbf && payload.nbf > now + tolerance) {
-    return false;
-  }
-
-  const expectedBodyHash = crypto.createHash('sha256').update(rawBody).digest('hex');
-  if (payload.body !== expectedBodyHash) {
-    return false;
-  }
-
-  // 등록된 키 중 하나라도 서명이 일치하는지 확인
-  for (const key of keys) {
-    const expectedSig = crypto.createHmac('sha256', key).update(dataToSign).digest('base64url');
-    if (crypto.timingSafeEqual(Buffer.from(receivedSig), Buffer.from(expectedSig))) {
-      return true;
-    }
-  }
-
-  return false;
+  const verifier = new OfficialQStashVerifier(options);
+  return verifier.verify(req, rawBody);
 }
 
 export async function publishQStashChunk(
@@ -110,12 +62,15 @@ export async function publishQStashChunk(
   options?: { destinationUrl?: string; token?: string },
 ): Promise<{ messageId: string }> {
   const token = options?.token ?? process.env.QSTASH_TOKEN;
+  if (!token) {
+    throw new Error('QStash publish failed: QSTASH_TOKEN is not configured');
+  }
+
   const destinationUrl =
     options?.destinationUrl ??
-    `${process.env.APP_URL ?? 'https://hamsudoku.abyssworks.dev'}/api/internal/endless-generate`;
-
-  if (!token) {
-    return { messageId: `msg-mock-${jobId}-${chunkIndex}` };
+    (process.env.APP_URL ? `${process.env.APP_URL}/api/internal/endless-generate` : undefined);
+  if (!destinationUrl) {
+    throw new Error('QStash publish failed: APP_URL is not configured');
   }
 
   const qstashUrl = `https://qstash.upstash.io/v2/publish/${destinationUrl}`;
@@ -130,7 +85,7 @@ export async function publishQStashChunk(
   });
 
   if (!res.ok) {
-    throw new Error(`QStash publish failed: ${res.status} ${await res.text()}`);
+    throw new Error(`QStash publish failed with status ${res.status}`);
   }
 
   const data = (await res.json()) as { messageId: string };
