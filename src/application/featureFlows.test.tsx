@@ -66,10 +66,11 @@ it('chooses gates before endless entry and selects fallback chapter',()=>{
  expect(rankModel(null,null,null,false).entries).toEqual([]);
 });
 import { useHomeService } from '../features/home/useHomeService';
+import { OverlayProvider } from '../ui/OverlayProvider';
 it('refreshes home quietly and opens guest gate before requesting entry',()=>{
  const refreshSoft=vi.fn(async()=>null);const refreshMyRank=vi.fn(async()=>{});const onEndless=vi.fn();
  const options={email:null,nickname:null,uid:'guest',summary:{me:null,rank:null,myRank:null,loading:false,error:null,refresh:async()=>{},refreshSoft,refreshMyRank},onSignin:async()=>({ok:true}),onEndless,endlessEnabled:true,onWarmSession:()=>{},onLogin:()=>{}};
- const {result}=renderHook(()=>useHomeService(options));
+ const {result}=renderHook(()=>useHomeService(options), { wrapper: OverlayProvider });
  expect(refreshSoft).toHaveBeenCalledOnce();
  act(()=>result.current.enterEndless());expect(result.current.guestGateOpen).toBe(true);expect(onEndless).not.toHaveBeenCalled();
  act(()=>result.current.openRank());expect(result.current.rankOpen).toBe(true);expect(refreshSoft).toHaveBeenCalledTimes(2);expect(refreshMyRank).toHaveBeenCalledOnce();
@@ -100,7 +101,7 @@ it('classifies existing-email responses and reset input',()=>{
 it('uses latest account summary from a retained home callback',async()=>{
  const base: Parameters<typeof useHomeService>[0]={email:null,nickname:null,uid:'guest',summary:{me:null,rank:null,myRank:null,loading:false,error:null,refresh:async()=>{},refreshSoft:async()=>null,refreshMyRank:async()=>{}},onSignin:async()=>({ok:true}),onEndless:()=>{},endlessEnabled:true,onWarmSession:()=>{},onLogin:()=>{}};
  const fresh=vi.fn(async()=>({wallet:{balance:42},clearedCount:0,streak:{current:0,best:0},season:'2026-W41'}));
- const {result,rerender}=renderHook(p=>useHomeService(p),{initialProps:base});
+ const {result,rerender}=renderHook(p=>useHomeService(p),{initialProps:base, wrapper: OverlayProvider});
  const previous=result.current.fetchAccountSeeds;
  rerender({...base,summary:{...base.summary,refreshSoft:fresh}});
  expect(await previous()).toBe(42);

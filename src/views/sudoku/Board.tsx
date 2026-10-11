@@ -1,7 +1,8 @@
 import type { ReactNode } from 'react';
 import { motion } from 'framer-motion';
 import { Cell } from './Cell';
-import { ClearDialog } from './ClearDialog';
+import { OverlayOutlet } from '../../ui/OverlayOutlet';
+import type { OverlayRequest } from '../../ui/overlayTypes';
 import type { Violations } from '../../features/sudoku/model/rules';
 import { useBoardInteraction } from '../../features/sudoku/useBoardInteraction';
 import type { CellState, Puzzle } from '../../features/sudoku/model/puzzles';
@@ -21,10 +22,8 @@ export interface BoardProps {
   onPress: (r: number, c: number) => void;
   onEnter: (r: number, c: number) => void;
   onRelease: () => boolean;
-  onReset: () => void;
-  onNextMap: () => void;
-  onBrowse: () => void;
   clearOverlay?: ReactNode;
+  renderOverlay?: (overlay: OverlayRequest) => ReactNode;
 }
 
 export function Board({
@@ -40,10 +39,8 @@ export function Board({
   onPress,
   onEnter,
   onRelease,
-  onReset,
-  onNextMap,
-  onBrowse,
   clearOverlay,
+  renderOverlay,
 }: BoardProps) {
   const { projected, boardRef, controls, handlePress, handleMove, handleUp, handleClickCapture, handleCancel } =
     useBoardInteraction(puzzle, cells, xMarks, violations, pulse, hitKey, shake, onPress, onEnter, onRelease);
@@ -70,8 +67,7 @@ export function Board({
           />
         )))}
       </div>
-      {cleared &&
-        (clearOverlay ?? <ClearDialog total={puzzle.size} onReset={onReset} onNextMap={onNextMap} onBrowse={onBrowse} />)}
+      {cleared && (clearOverlay ?? <OverlayOutlet slot="board" render={renderOverlay} />)}
     </motion.div>
   );
 }

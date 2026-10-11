@@ -1,8 +1,8 @@
 import { useAppService } from './useAppService';
 import { QueryProvider } from './queryClient';
-import { EndlessGameScreen } from '../views/endless/EndlessGameScreen';
-import { GameScreen } from '../views/stages/GameScreen';
-import { HomeScreen } from '../views/home/HomeScreen';
+import { EndlessScene } from './EndlessScene';
+import { StageScene } from './StageScene';
+import { HomeScene } from './HomeScene';
 import { LoginScreen } from '../views/account/LoginScreen';
 import { SelectScreen } from '../views/stages/SelectScreen';
 import { SetPasswordScreen } from '../views/account/SetPasswordScreen';
@@ -26,7 +26,7 @@ function AppView() {
       ) : (
         <>
           {screen === 'home' && (
-            <HomeScreen
+            <HomeScene
               email={account.email}
               nickname={account.nickname}
               uid={account.uid}
@@ -59,7 +59,7 @@ function AppView() {
             />
           )}
           {screen === 'game' && stage && (
-            <GameScreen
+            <StageScene
               key={stage.id}
               stage={stage}
               onBack={() => browse()}
@@ -67,7 +67,7 @@ function AppView() {
               onRecord={handleRecord}
             />
           )}
-          {screen === 'endless' && <EndlessGameScreen onBack={() => home()} />}
+          {screen === 'endless' && <EndlessScene onBack={() => home()} />}
           {screen === 'login' && (
             <LoginScreen
               signup={account.signup}

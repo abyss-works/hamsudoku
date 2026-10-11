@@ -4,6 +4,7 @@ import { HamsterFace } from '../../ui/HamsterFace';
 import { useLoginService } from '../../features/account/useLoginService';
 import type { LoginServiceOptions } from '../../features/account/login.types';
 import { LoginConfirmationView } from './login/LoginConfirmationView';
+import { AccountInput } from './AccountInput';
 
 export interface LoginScreenProps extends LoginServiceOptions {
   cloud: boolean;
@@ -27,26 +28,22 @@ export function LoginScreen({ signup, signin, reset, cloud, onBack, onDone }: Lo
           </span>
         </div>
         <form className="login-form" onSubmit={(e) => { e.preventDefault(); void submit(); }}>
-          <label className="login-field">
-            <span>이메일</span>
-            <input
-              type="email"
-              value={email}
-              onChange={(e) => setEmail(e.target.value)}
-              autoComplete="email"
-              disabled={busy}
-            />
-          </label>
-          <label className="login-field">
-            <span>비밀번호</span>
-            <input
-              type="password"
-              value={password}
-              onChange={(e) => setPassword(e.target.value)}
-              autoComplete="current-password"
-              disabled={busy}
-            />
-          </label>
+          <AccountInput
+            label="이메일"
+            type="email"
+            value={email}
+            onChange={setEmail}
+            autoComplete="email"
+            disabled={busy}
+          />
+          <AccountInput
+            label="비밀번호"
+            type="password"
+            value={password}
+            onChange={setPassword}
+            autoComplete="current-password"
+            disabled={busy}
+          />
           {error && (
             <p role="alert" className="login-error">
               {error}

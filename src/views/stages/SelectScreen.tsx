@@ -1,6 +1,8 @@
 import { useSelectService, type SelectServiceOptions } from '../../features/stages/useSelectService';
 import type { Stage } from '../../features/stages/catalog';
 import { Button } from '../../ui/Button';
+import { ChapterTabs } from './ChapterTabs';
+import { StageList } from './StageList';
 
 export interface SelectScreenProps extends SelectServiceOptions {
   error: string | null;
@@ -29,42 +31,8 @@ export function SelectScreen({ chapters, loading, error, clears, initialChapterI
       {empty && !error && <p>스테이지가 없어요</p>}
       {ready && !error && active && (
         <>
-          <div className="level-rail" role="group" aria-label="레벨 목록">
-            {chapterTabs.map((c) => (
-              <Button
-                key={c.id}
-                variant="sticker"
-                className={c.active ? 'btn-primary' : ''}
-                aria-pressed={c.active}
-                onClick={() => setSelectedId(c.id)}
-              >
-                {c.title}
-              </Button>
-            ))}
-          </div>
-          <section key={active.id} className="chapter">
-            <div className="stage-list">
-              {stages.map(({ stage, number, best, label, locked }) => {
-                return (
-                  <Button
-                    key={stage.id}
-                    variant="sticker"
-                    className="stage-btn"
-                    disabled={locked}
-                    onClick={() => onSelect(stage)}
-                    aria-label={label}
-                  >
-                    <span className="stage-num" aria-hidden="true">
-                      {number}
-                    </span>
-                    <span className="stage-best" aria-hidden="true">
-                      {best}
-                    </span>
-                  </Button>
-                );
-              })}
-            </div>
-          </section>
+          <ChapterTabs tabs={chapterTabs} onSelect={setSelectedId} />
+          <StageList chapterId={active.id} stages={stages} onSelect={onSelect} />
         </>
       )}
     </div>

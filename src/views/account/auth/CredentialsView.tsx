@@ -1,3 +1,5 @@
+import { AccountInput } from '../AccountInput';
+
 export interface CredentialsViewProps {
   email: string;
   setEmail: (val: string) => void;
@@ -15,28 +17,24 @@ export function CredentialsView({
 }: CredentialsViewProps) {
   return (
     <>
-      <label className="login-field">
-        <span>이메일</span>
-        <input
-          type="email"
-          aria-label="이메일"
-          value={email}
-          onChange={(e) => setEmail(e.target.value)}
-          autoComplete="email"
-          disabled={busy}
-        />
-      </label>
-      <label className="login-field">
-        <span>비밀번호</span>
-        <input
-          type="password"
-          aria-label="비밀번호"
-          value={password}
-          onChange={(e) => setPassword(e.target.value)}
-          autoComplete="current-password"
-          disabled={busy}
-        />
-      </label>
+      <AccountInput
+        label="이메일"
+        type="email"
+        ariaLabel="이메일"
+        value={email}
+        onChange={setEmail}
+        autoComplete="email"
+        disabled={busy}
+      />
+      <AccountInput
+        label="비밀번호"
+        type="password"
+        ariaLabel="비밀번호"
+        value={password}
+        onChange={setPassword}
+        autoComplete="current-password"
+        disabled={busy}
+      />
     </>
   );
 }

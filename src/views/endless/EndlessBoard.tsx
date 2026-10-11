@@ -29,9 +29,6 @@ export function EndlessBoard({ puzzle, onWrong, onFinish, clearOverlay }: Endles
         onPress={board.beginStroke}
         onEnter={board.strokeEnter}
         onRelease={board.endStroke}
-        onReset={board.reset}
-        onNextMap={() => {}}
-        onBrowse={() => {}}
         clearOverlay={clearOverlay}
       />
       <ProbeButton
