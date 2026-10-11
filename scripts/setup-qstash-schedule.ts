@@ -8,6 +8,7 @@
  *   pnpm tsx scripts/setup-qstash-schedule.ts --execute (실제 QStash에 등록)
  */
 import { Client } from '@upstash/qstash';
+import { qstashProtectionHeaders } from '../src/server/qstashHeaders';
 
 interface ScheduleDefinition {
   name: string;
@@ -77,6 +78,7 @@ export async function run(args: string[]) {
         body: JSON.stringify(def.body),
         headers: {
           'Content-Type': 'application/json',
+          ...qstashProtectionHeaders(),
         },
       });
       console.log(`✔ [성공] ${def.name} -> Schedule ID: ${res.scheduleId}`);

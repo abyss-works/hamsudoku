@@ -1,4 +1,5 @@
 import { Receiver } from '@upstash/qstash';
+import { qstashProtectionHeaders } from './qstashHeaders';
 import { timingSafeEqual } from 'node:crypto';
 
 export interface VerifyQStashOptions {
@@ -158,13 +159,15 @@ export async function publishQStashChunk(
     throw new Error('QStash publish failed: APP_URL is not configured');
   }
 
-  const qstashUrl = `https://qstash.upstash.io/v2/publish/${destinationUrl}`;
+  const baseUrl = (process.env.QSTASH_URL || 'https://qstash.upstash.io').replace(/\/+$/, '');
+  const qstashUrl = `${baseUrl}/v2/publish/${destinationUrl}`;
   const res = await fetch(qstashUrl, {
     method: 'POST',
     headers: {
       Authorization: `Bearer ${token}`,
       'Content-Type': 'application/json',
       'Upstash-Retries': '3',
+      ...Object.fromEntries(Object.entries(qstashProtectionHeaders()).map(([key, value]) => [`Upstash-Forward-${key}`, value])),
     },
     body: JSON.stringify({ jobId, chunkIndex }),
   });
