@@ -1,7 +1,7 @@
 ﻿// @vitest-environment jsdom
 import { act, cleanup, renderHook, waitFor } from '@testing-library/react';
 import { afterEach, expect, it, vi } from 'vitest';
-import { QueryProvider } from '../../application/queryClient';
+import { QueryProvider } from '../../core/queryClient';
 import { useEndlessSummary } from './useEndlessSummary';
 afterEach(() => { cleanup(); vi.unstubAllGlobals(); });
 it('같은 계정의 동시 조회는 요청을 공유한다', async () => {

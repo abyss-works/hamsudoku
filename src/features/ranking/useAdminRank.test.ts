@@ -1,7 +1,7 @@
 ﻿// @vitest-environment jsdom
 import { renderHook, waitFor } from '@testing-library/react';
 import { afterEach, describe, expect, it, vi } from 'vitest';
-import { QueryProvider } from '../../application/queryClient';
+import { QueryProvider } from '../../core/queryClient';
 import { useAdminRank } from './useAdminRank';
 
 afterEach(() => {
