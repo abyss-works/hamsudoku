@@ -37,7 +37,7 @@ describe('submitEndlessClear', () => {
     const db = createMemoryDb();
     await db.insertStage(stage('e-1'));
     const a = await db.issueAttempt('u1', 'e-1');
-    const nowIso = new Date(Date.parse(a.issuedAt) + 1_000).toISOString();
+    const nowIso = new Date(Date.parse(a.issuedAt) + 2_999).toISOString();
     const r = await submitEndlessClear(db, 'u1', input(a.id, 'e-1'), nowIso);
     expect(r.body).toMatchObject({ ok: false });
     const recent = await db.listRecentEndlessEvents('u1', 5);
@@ -51,6 +51,30 @@ describe('submitEndlessClear', () => {
     const nowIso = new Date(Date.parse(a.issuedAt) + 11_000).toISOString();
     const r = await submitEndlessClear(db, 'u1', { ...input(a.id, 'e-1'), solution: [[0, 0], [0, 1]] }, nowIso);
     expect(r.body).toMatchObject({ ok: false });
+  });
+
+  it.each([3_000, 5_000, 9_999])('%dms의 빠른 정상 풀이를 보상한다', async (elapsedMs) => {
+    const db = createMemoryDb();
+    await db.insertStage(stage('e-fast'));
+    const attempt = await db.issueAttempt('u1', 'e-fast');
+    const result = await submitEndlessClear(db, 'u1', input(attempt.id, 'e-fast'),
+      new Date(Date.parse(attempt.issuedAt) + elapsedMs).toISOString());
+    expect(result.body).toMatchObject({ ok: true, earned: 3, balance: 3 });
+    expect((await db.listRecentEndlessEvents('u1', 1))[0]).toMatchObject({ verified: true });
+  });
+
+  it.each([1_000, 2_000, 4_999])('%dms 간격의 정상 연속 풀이를 보상한다', async (gapMs) => {
+    const db = createMemoryDb();
+    await db.insertStage(stage('e-before'));
+    await db.insertStage(stage('e-after'));
+    const attempt = await db.issueAttempt('u1', 'e-after');
+    const now = Date.parse(attempt.issuedAt) + 6_000;
+    await db.commitEndlessClear('u1', 'e-before', {
+      earned: 3, season: '2026-W41', seedLeft: 3, elapsedMs: 2_000,
+      suspicious: false, atIso: new Date(now - gapMs).toISOString(),
+    });
+    const result = await submitEndlessClear(db, 'u1', input(attempt.id, 'e-after'), new Date(now).toISOString());
+    expect(result.body).toMatchObject({ ok: true, earned: 3, balance: 6 });
   });
 
   it('seedLeft 0은 무효다', async () => {
