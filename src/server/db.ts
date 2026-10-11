@@ -139,6 +139,26 @@ export interface DbPort {
     data: { status: string; stageCount?: number; completedAt?: string | null },
   ): Promise<void>;
   getHighestStageSeed(): Promise<number>;
+  claimSupplyChunk(
+    jobId: string,
+    chunkIndex: number,
+    nowIso: string,
+    leaseDurationMs: number,
+  ): Promise<{
+    claimed: boolean;
+    alreadyCompleted: boolean;
+    stageCount?: number;
+    seedStart?: number;
+    targetCount?: number;
+    reason?: string;
+  }>;
+  insertSupplyBatch(
+    jobId: string,
+    chunkIndex: number,
+    stages: EndlessStageRow[],
+    completedAtIso: string,
+  ): Promise<boolean>;
+  failSupplyChunk(jobId: string, chunkIndex: number, reason: string): Promise<void>;
 }
 
 let nextId = 0;
@@ -150,6 +170,7 @@ export function createMemoryDb(): DbPort {
   const records = new Map<string, ClearRecord & { updatedAt: string }>();
   const events: { userId: string; stageCode: string; elapsedSec: number; verified: boolean; clearedAt: string }[] = [];
   const stages = new Map<string, EndlessStageRow>();
+  const stageJobMap = new Map<string, string>();
   const endlessProgress = new Map<string, { cleared: boolean; attempts: number; lastPlayedAt: string }>();
   const wallets = new Map<string, number>();
   const streaks = new Map<string, StreakRow>();
@@ -463,6 +484,87 @@ export function createMemoryDb(): DbPort {
         if (s.seed > maxSeed) maxSeed = s.seed;
       }
       return maxSeed;
+    },
+    async claimSupplyChunk(jobId, chunkIndex, nowIso, leaseDurationMs) {
+      const job = supplyJobs.get(jobId);
+      const chunk = supplyChunks.get(`${jobId}:${chunkIndex}`);
+      if (!job || !chunk) {
+        return { claimed: false, alreadyCompleted: false, reason: 'JOB_OR_CHUNK_NOT_FOUND' };
+      }
+      if (chunk.status === 'completed') {
+        return { claimed: false, alreadyCompleted: true, stageCount: chunk.stageCount };
+      }
+      const now = Date.parse(nowIso);
+      const isLeaseActive = job.leaseExpiresAt && Date.parse(job.leaseExpiresAt) > now;
+      if (chunk.status === 'running' && isLeaseActive) {
+        return { claimed: false, alreadyCompleted: false, reason: 'CLAIM_BUSY' };
+      }
+      const newLease = new Date(now + leaseDurationMs).toISOString();
+      chunk.status = 'running';
+      job.status = 'running';
+      job.leaseExpiresAt = newLease;
+      job.updatedAt = new Date().toISOString();
+      return {
+        claimed: true,
+        alreadyCompleted: false,
+        stageCount: chunk.stageCount,
+        seedStart: job.seedStart,
+        targetCount: job.targetCount,
+      };
+    },
+    async insertSupplyBatch(jobId, chunkIndex, stageRows, completedAtIso) {
+      const job = supplyJobs.get(jobId);
+      const chunk = supplyChunks.get(`${jobId}:${chunkIndex}`);
+      if (!job || !chunk) return false;
+
+      // 콘텐츠 해시 및 기존 stage 중복 검사
+      const existingSignatures = new Map<string, string>();
+      for (const s of stages.values()) {
+        existingSignatures.set(`${s.regions}:${s.solution}`, s.id);
+      }
+
+      for (const st of stageRows) {
+        const sig = `${st.regions}:${st.solution}`;
+        const existingId = existingSignatures.get(sig);
+        const existingJobId = stageJobMap.get(st.id);
+
+        if (existingId && existingId !== st.id) {
+          // 다른 ID의 스테이지와 콘텐츠가 동일함 -> 중복!
+          return false;
+        }
+        if (existingJobId && existingJobId !== jobId) {
+          // 다른 작업에서 이미 생성된 ID/스테이지 -> 중복!
+          return false;
+        }
+      }
+
+      for (const st of stageRows) {
+        stages.set(st.id, { ...st });
+        stageJobMap.set(st.id, jobId);
+      }
+
+      chunk.status = 'completed';
+      chunk.stageCount = stageRows.length;
+      chunk.completedAt = completedAtIso;
+
+      job.status = 'completed';
+      job.lastSuccessAt = completedAtIso;
+      job.leaseExpiresAt = null;
+      job.updatedAt = new Date().toISOString();
+
+      return true;
+    },
+    async failSupplyChunk(jobId, chunkIndex, reason) {
+      const job = supplyJobs.get(jobId);
+      const chunk = supplyChunks.get(`${jobId}:${chunkIndex}`);
+      if (chunk) {
+        chunk.status = 'failed';
+      }
+      if (job) {
+        job.status = 'failed';
+        job.leaseExpiresAt = null;
+        job.updatedAt = new Date().toISOString();
+      }
     },
   };
 }
@@ -956,6 +1058,117 @@ export function createPrismaDb(client: PrismaClient = prisma): DbPort {
     async getHighestStageSeed() {
       const row = await client.endlessStage.findFirst({ orderBy: { seed: 'desc' } });
       return row?.seed ?? 10000;
+    },
+    async claimSupplyChunk(jobId, chunkIndex, nowIso, leaseDurationMs) {
+      return client.$transaction(async (tx) => {
+        const job = await tx.endlessSupplyJob.findUnique({ where: { id: jobId } });
+        const chunk = await tx.endlessSupplyChunk.findUnique({
+          where: { jobId_chunkIndex: { jobId, chunkIndex } },
+        });
+        if (!job || !chunk) {
+          return { claimed: false, alreadyCompleted: false, reason: 'JOB_OR_CHUNK_NOT_FOUND' };
+        }
+        if (chunk.status === 'completed') {
+          return { claimed: false, alreadyCompleted: true, stageCount: chunk.stageCount };
+        }
+        const now = new Date(nowIso).getTime();
+        const isLeaseActive = job.leaseExpiresAt && job.leaseExpiresAt.getTime() > now;
+        if (chunk.status === 'running' && isLeaseActive) {
+          return { claimed: false, alreadyCompleted: false, reason: 'CLAIM_BUSY' };
+        }
+        const newLease = new Date(now + leaseDurationMs);
+        await tx.endlessSupplyChunk.update({
+          where: { jobId_chunkIndex: { jobId, chunkIndex } },
+          data: { status: 'running' },
+        });
+        await tx.endlessSupplyJob.update({
+          where: { id: jobId },
+          data: { status: 'running', leaseExpiresAt: newLease },
+        });
+        return {
+          claimed: true,
+          alreadyCompleted: false,
+          stageCount: chunk.stageCount,
+          seedStart: job.seedStart,
+          targetCount: job.targetCount,
+        };
+      });
+    },
+    async insertSupplyBatch(jobId, chunkIndex, stageRows, completedAtIso) {
+      return client.$transaction(async (tx) => {
+        const completedDate = new Date(completedAtIso);
+        const job = await tx.endlessSupplyJob.findUnique({ where: { id: jobId } });
+        if (!job) return false;
+
+        // 콘텐츠 중복 검사: regions + solution 중복 확인
+        const duplicate = await tx.endlessStage.findFirst({
+          where: {
+            OR: stageRows.map((s) => ({
+              regions: s.regions,
+              solution: s.solution,
+              id: { not: s.id },
+            })),
+          },
+        });
+        if (duplicate) {
+          return false;
+        }
+
+        // 다른 작업에서 이미 생성된 동일 id 검사
+        const existingOlder = await tx.endlessStage.findFirst({
+          where: {
+            id: { in: stageRows.map((s) => s.id) },
+            createdAt: { lt: job.createdAt },
+          },
+        });
+        if (existingOlder) {
+          return false;
+        }
+
+        // 10개 행 적재
+        for (const s of stageRows) {
+          await tx.endlessStage.upsert({
+            where: { id: s.id },
+            create: {
+              id: s.id,
+              size: s.size,
+              regions: s.regions,
+              solution: s.solution,
+              tier: s.tier,
+              seed: s.seed,
+              plays: 0,
+              clears: 0,
+              avgClearMs: 0,
+              clearTotalMs: BigInt(0),
+            },
+            update: {},
+          });
+        }
+
+        await tx.endlessSupplyChunk.update({
+          where: { jobId_chunkIndex: { jobId, chunkIndex } },
+          data: { status: 'completed', stageCount: stageRows.length, completedAt: completedDate },
+        });
+
+        await tx.endlessSupplyJob.update({
+          where: { id: jobId },
+          data: { status: 'completed', lastSuccessAt: completedDate, leaseExpiresAt: null },
+        });
+
+        return true;
+      });
+    },
+    async failSupplyChunk(jobId, chunkIndex, reason) {
+      await client.$transaction(async (tx) => {
+        await tx.endlessSupplyChunk.update({
+          where: { jobId_chunkIndex: { jobId, chunkIndex } },
+          data: { status: 'failed' },
+        });
+        await tx.endlessSupplyJob.update({
+          where: { id: jobId },
+          data: { status: 'failed', leaseExpiresAt: null },
+        });
+      });
     },
   };
 }
