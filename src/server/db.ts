@@ -113,6 +113,9 @@ export interface DbPort {
     stageId: string,
     stats: { plays: number; clears: number; clearTotalMs: bigint; avgClearMs: number },
   ): Promise<void>;
+  atomicReaggregateStageStats?(
+    stageId: string,
+  ): Promise<{ ok: boolean; updated: boolean; error?: string }>;
   injectInconsistentProgress?(
     userId: string,
     stageId: string,
@@ -356,6 +359,42 @@ export function createMemoryDb(): DbPort {
         s.clearTotalMs = clampBigInt64(stats.clearTotalMs);
         s.avgClearMs = clampInt32(stats.avgClearMs);
       }
+    },
+    async atomicReaggregateStageStats(stageId: string) {
+      const s = stages.get(stageId);
+      if (!s) return { ok: false, updated: false, error: `Stage ${stageId} not found` };
+      const agg = await this.getStageAggregation(stageId);
+      if (
+        (agg.clearedUserCount > 0 && agg.verifiedClearCount === 0) ||
+        agg.clearedUserCount > agg.verifiedClearCount ||
+        agg.totalAttempts < agg.verifiedClearCount
+      ) {
+        return { ok: false, updated: false, error: `Inconsistent stage ${stageId}` };
+      }
+      const targetPlays = clampInt32(agg.totalAttempts);
+      const targetClears = clampInt32(agg.verifiedClearCount);
+      const targetTotalMs = clampBigInt64(agg.verifiedClearTotalMs);
+      const targetAvgMs = targetClears > 0 ? clampInt32(Math.round(Number(targetTotalMs / BigInt(targetClears)))) : 0;
+
+      const currentPlays = s.plays ?? 0;
+      const currentClears = s.clears ?? 0;
+      const currentTotalMs = s.clearTotalMs ?? BigInt(0);
+      const currentAvgMs = s.avgClearMs ?? 0;
+
+      const needsUpdate =
+        currentPlays !== targetPlays ||
+        currentClears !== targetClears ||
+        currentTotalMs !== targetTotalMs ||
+        currentAvgMs !== targetAvgMs;
+
+      if (needsUpdate) {
+        s.plays = targetPlays;
+        s.clears = targetClears;
+        s.clearTotalMs = targetTotalMs;
+        s.avgClearMs = targetAvgMs;
+        return { ok: true, updated: true };
+      }
+      return { ok: true, updated: false };
     },
     async injectInconsistentProgress(userId: string, stageId: string, input: { cleared: boolean; attempts: number }) {
       endlessProgress.set(progressKey(userId, stageId), {
@@ -975,6 +1014,56 @@ export function createPrismaDb(client: PrismaClient = prisma): DbPort {
           clearTotalMs: clampBigInt64(stats.clearTotalMs),
           avgClearMs: clampInt32(stats.avgClearMs),
         },
+      });
+    },
+    async atomicReaggregateStageStats(stageId: string) {
+      return client.$transaction(async (tx) => {
+        await tx.$queryRaw`SELECT id FROM "EndlessStage" WHERE id = ${stageId} FOR UPDATE`;
+        const s = await tx.endlessStage.findUnique({ where: { id: stageId } });
+        if (!s) return { ok: false, updated: false, error: `Stage ${stageId} not found` };
+
+        const [progressAgg, clearedUserCount, eventAgg] = await Promise.all([
+          tx.endlessProgress.aggregate({ where: { stageId }, _sum: { attempts: true } }),
+          tx.endlessProgress.count({ where: { stageId, cleared: true } }),
+          tx.endlessEvent.aggregate({ where: { stageId, verified: true }, _count: { _all: true }, _sum: { elapsedMs: true } }),
+        ]);
+
+        const totalAttempts = progressAgg._sum.attempts ?? 0;
+        const verifiedClearCount = eventAgg._count._all;
+        const verifiedClearTotalMs = BigInt(eventAgg._sum.elapsedMs ?? 0);
+
+        if (
+          (clearedUserCount > 0 && verifiedClearCount === 0) ||
+          clearedUserCount > verifiedClearCount ||
+          totalAttempts < verifiedClearCount
+        ) {
+          return { ok: false, updated: false, error: `Inconsistent stage ${stageId}` };
+        }
+
+        const targetPlays = clampInt32(totalAttempts);
+        const targetClears = clampInt32(verifiedClearCount);
+        const targetTotalMs = clampBigInt64(verifiedClearTotalMs);
+        const targetAvgMs = targetClears > 0 ? clampInt32(Math.round(Number(targetTotalMs / BigInt(targetClears)))) : 0;
+
+        const needsUpdate =
+          s.plays !== targetPlays ||
+          s.clears !== targetClears ||
+          s.clearTotalMs !== targetTotalMs ||
+          s.avgClearMs !== targetAvgMs;
+
+        if (needsUpdate) {
+          await tx.endlessStage.update({
+            where: { id: stageId },
+            data: {
+              plays: targetPlays,
+              clears: targetClears,
+              clearTotalMs: targetTotalMs,
+              avgClearMs: targetAvgMs,
+            },
+          });
+          return { ok: true, updated: true };
+        }
+        return { ok: true, updated: false };
       });
     },
     async commitEndlessClear(userId, stageId, input) {

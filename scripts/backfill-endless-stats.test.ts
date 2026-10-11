@@ -101,4 +101,74 @@ describe('backfillEndlessStats', () => {
     expect(report2.ok).toBe(true);
     expect(report2.updatedStages).toBe(0);
   });
+
+  it('일부 스테이지만 불일치해도 쓰기 전에 전체 검사를 완료하여 부분 안전하지 않은 보정(partial update)을 차단한다', async () => {
+    const db = createMemoryDb();
+    // stage 1: 정상적인 보정 대상 (stats 0 리셋)
+    await db.insertStage(stage('e-valid'));
+    await db.commitEndlessClear('u1', 'e-valid', {
+      earned: 3,
+      season: '2026-W41',
+      seedLeft: 3,
+      elapsedMs: 20000,
+      suspicious: false,
+      atIso: '2026-10-07T00:00:00.000Z',
+    });
+    await db.updateStageStats?.('e-valid', { plays: 0, clears: 0, clearTotalMs: BigInt(0), avgClearMs: 0 });
+
+    // stage 2: 불일치 대상 (clearedUserCount: 2 > verifiedClearCount: 1)
+    await db.insertStage(stage('e-partial-inconsistent'));
+    await db.commitEndlessClear('u1', 'e-partial-inconsistent', {
+      earned: 3,
+      season: '2026-W41',
+      seedLeft: 3,
+      elapsedMs: 20000,
+      suspicious: false,
+      atIso: '2026-10-07T00:00:00.000Z',
+    });
+    // u2에 대해 progress만 클리어 주입하여 이벤트 수량(1)보다 유저 수량(2)이 많게 만듦
+    await db.injectInconsistentProgress?.('u2', 'e-partial-inconsistent', { cleared: true, attempts: 1 });
+
+    const report = await backfillEndlessStats(db, { dryRun: false });
+    expect(report.ok).toBe(false);
+    expect(report.inconsistentStages).toBeGreaterThan(0);
+
+    // 전체 검사 실패로 인해 정상 stage인 e-valid조차 수정되지 않고 즉시 중단되어야 함
+    const validStage = await db.getStage('e-valid');
+    expect(validStage?.clears).toBe(0);
+    expect(validStage?.plays).toBe(0);
+  });
+
+  it('runBackfillCli는 CLI 플래그를 파싱하고 exitcode를 반환하며 dry-run 기본 동작을 유지한다', async () => {
+    const { runBackfillCli } = await import('./backfill-endless-stats');
+    const db = createMemoryDb();
+    await db.insertStage(stage('e-1'));
+    await db.commitEndlessClear('u1', 'e-1', {
+      earned: 3,
+      season: '2026-W41',
+      seedLeft: 3,
+      elapsedMs: 20000,
+      suspicious: false,
+      atIso: '2026-10-07T00:00:00.000Z',
+    });
+    await db.updateStageStats?.('e-1', { plays: 0, clears: 0, clearTotalMs: BigInt(0), avgClearMs: 0 });
+
+    // 인자 없음: dry-run 기본 동작, exitcode 0, DB 미수정
+    const codeDry = await runBackfillCli([], db);
+    expect(codeDry).toBe(0);
+    const sDry = await db.getStage('e-1');
+    expect(sDry?.clears).toBe(0);
+
+    // --apply 플래그: exitcode 0, DB 실제 수정
+    const codeApply = await runBackfillCli(['--apply'], db);
+    expect(codeApply).toBe(0);
+    const sApply = await db.getStage('e-1');
+    expect(sApply?.clears).toBe(1);
+
+    // 불일치 DB에 대해 실행 시 exitcode 1 반환
+    await db.injectInconsistentProgress?.('u2', 'e-1', { cleared: true, attempts: 1 });
+    const codeErr = await runBackfillCli(['--apply'], db);
+    expect(codeErr).toBe(1);
+  });
 });
+
