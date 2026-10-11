@@ -8,6 +8,7 @@ describe('rankLogic pure view models', () => {
       season: '2026-W41',
       snapshotAt: '2026-10-10T00:00:00Z',
       frozen: false,
+      status: 'active',
       top: [
         { userId: 'u1', nickname: '햄찌', score: 100 },
         { userId: 'u2', nickname: null, score: 50 },
@@ -31,6 +32,7 @@ describe('rankLogic pure view models', () => {
       season: '2026-W41',
       snapshotAt: '2026-10-10T00:00:00Z',
       frozen: true,
+      status: 'finalized',
       top: [],
       me: { rank: null, score: 0 },
     };
@@ -44,6 +46,7 @@ describe('rankLogic pure view models', () => {
       season: '2026-W41',
       snapshotAt: '2026-10-10T00:00:00Z',
       frozen: false,
+      status: 'active',
       top: [],
       me: { rank: null, score: 0 },
     };
@@ -55,6 +58,45 @@ describe('rankLogic pure view models', () => {
     expect(vmNull.empty).toBe(false);
     expect(vmNull.myRankSummary).toBeNull();
     expect(vmNull.rows).toEqual([]);
+  });
+
+  it('시즌이 다른 hot myRank 응답은 병합하지 않고 rank의 내 순위를 보존한다', () => {
+    const rank: RankResponse = {
+      season: '2026-W42',
+      snapshotAt: '2026-10-12T05:00:00Z',
+      frozen: false,
+      status: 'active',
+      top: [
+        { userId: 'u1', nickname: '햄찌', score: 10 },
+      ],
+      me: { rank: 1, score: 10 },
+    };
+    // 이전 시즌(2026-W41)의 응답이 늦게 도착한 상황
+    const staleMyRank = {
+      season: '2026-W41' as const,
+      rank: 5,
+      score: 999,
+      nickname: '햄찌',
+    };
+    const vm = rankModel(rank, staleMyRank, 'u1', true);
+    // 2026-W41의 999점으로 병합되지 않고 2026-W42의 10점이 유지되어야 함
+    expect(vm.myScore).toBe(10);
+    expect(vm.myRankNo).toBe(1);
+    expect(vm.myRankSummary).toBe('내 순위: 1위 · 10개');
+  });
+
+  it('status가 aggregating인 경우 isAggregating이 true가 된다', () => {
+    const rank: RankResponse = {
+      season: '2026-W41',
+      snapshotAt: '2026-10-12T00:00:00Z',
+      frozen: true,
+      status: 'aggregating',
+      top: [],
+      me: { rank: 2, score: 50 },
+    };
+    const vm = rankModel(rank, null, 'u1', true);
+    expect(vm.isAggregating).toBe(true);
+    expect(vm.status).toBe('aggregating');
   });
 
   it('관리자 랭킹 패널 뷰 모델을 구성한다', () => {

@@ -13,6 +13,7 @@ function rankResponse(over: Partial<RankResponse> = {}): RankResponse {
     snapshotAt: '2026-10-07T00:00:00.000Z',
     me: { rank: 3, score: 47 },
     frozen: false,
+    status: 'active',
     ...over,
   };
 }
@@ -73,4 +74,51 @@ describe('mergeRankEntries', () => {
     expect(entries[1].nickname).toBe('새이름');
     expect(meRank).toBe(2);
   });
+
+  it('동점: 점수가 같으면 userId 내림차순으로 정렬한다', () => {
+    const r = rankResponse({
+      top: [
+        { userId: 'user-b', nickname: 'B', score: 50 },
+        { userId: 'user-a', nickname: 'A', score: 50 },
+      ],
+      me: { rank: null, score: 0 },
+    });
+    // 내 userId: 'user-ab' (user-b > user-ab > user-a)
+    const { entries: resMid } = mergeRankEntries(r, 'user-ab', { score: 50, nickname: 'AB' });
+    expect(resMid.map((e) => e.userId)).toEqual(['user-b', 'user-ab', 'user-a']);
+
+    // 내 userId: 'user-z' (user-z > user-b)
+    const { entries: resHigh } = mergeRankEntries(r, 'user-z', { score: 50, nickname: 'Z' });
+    expect(resHigh.map((e) => e.userId)).toEqual(['user-z', 'user-b', 'user-a']);
+  });
+
+  it('상위 50명 밖 개인: 목록이 50명 이상이고 내 점수가 미달하면 목록 뒤에 51위로 끼우지 않는다', () => {
+    const top50 = Array.from({ length: 50 }, (_, i) => ({
+      userId: `top-${String(i + 1).padStart(2, '0')}`,
+      nickname: null,
+      score: 100 - i, // 100부터 51까지
+    }));
+    const r = rankResponse({ top: top50, me: { rank: 150, score: 10 } });
+    const { entries, meRank } = mergeRankEntries(r, 'me', { score: 10, nickname: '나' });
+
+    // 50명 초과로 51번째 항목을 만들지 않는다
+    expect(entries).toHaveLength(50);
+    expect(entries.find((e) => e.userId === 'me')).toBeUndefined();
+    // 전체 개인 순위를 목록 위치(51위 등)로 추측하지 않고 서버의 순위(150위)를 보존한다
+    expect(meRank).toBe(150);
+  });
+
+  it('목록 내 동일 userId 중복이 있으면 1건으로 합친다', () => {
+    const r = rankResponse({
+      top: [
+        { userId: 'dup', nickname: 'D1', score: 60 },
+        { userId: 'dup', nickname: 'D2', score: 55 },
+        { userId: 'other', nickname: null, score: 40 },
+      ],
+      me: { rank: 3, score: 10 },
+    });
+    const { entries } = mergeRankEntries(r, 'me');
+    expect(entries.filter((e) => e.userId === 'dup')).toHaveLength(1);
+  });
 });
+

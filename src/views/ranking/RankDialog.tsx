@@ -9,7 +9,7 @@ export interface RankDialogProps extends RankDialogOptions {
 }
 
 export function RankDialog({ rank, myRank, uid, signedIn, onClose }: RankDialogProps) {
-  const { season, frozen, rows, empty, myRankSummary } = rankDialogService({ rank, myRank, uid, signedIn });
+  const { season, frozen, isAggregating, rows, empty, myRankSummary } = rankDialogService({ rank, myRank, uid, signedIn });
 
   return (
     <Overlay label="랭킹">
@@ -21,7 +21,11 @@ export function RankDialog({ rank, myRank, uid, signedIn, onClose }: RankDialogP
           주간 랭킹
           {season && <span className="rank-season">{season}</span>}
         </p>
-        {frozen && <p className="rank-frozen">집계가 마감됐어요. 새 시즌은 4시에 시작해요.</p>}
+        {isAggregating ? (
+          <p className="rank-frozen">순위를 집계하고 있어요. 잠시 후 확정돼요.</p>
+        ) : (
+          frozen && <p className="rank-frozen">집계가 마감됐어요. 새 시즌은 4시에 시작해요.</p>
+        )}
         <RankList rows={rows} empty={empty} />
         {myRankSummary && <p className="rank-me">{myRankSummary}</p>}
         <div className="rank-actions">

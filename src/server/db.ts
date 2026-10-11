@@ -1,7 +1,9 @@
+import { AsyncLocalStorage } from 'node:async_hooks';
 import { PrismaPg } from '@prisma/adapter-pg';
 import { Pool } from 'pg';
 import { PrismaClient } from '../../prisma/generated/prisma/client';
 import { mergeClear, type ClearRecord } from '../shared/merge';
+import { rankedSeasonId, rankingFrozen, seasonWindow } from '../shared/season';
 
 export interface Attempt {
   id: string;
@@ -59,7 +61,6 @@ export function clampBigInt64(val: bigint): bigint {
   return val;
 }
 
-
 export interface EndlessSupplyJobRow {
   id: string;
   policyVersion: string;
@@ -81,6 +82,21 @@ export interface EndlessSupplyChunkRow {
   stageCount: number;
   completedAt: string | null;
   createdAt: string;
+}
+
+export interface SeasonFinalizationRow {
+  season: string;
+  startAt: string;
+  endAt: string;
+  finalizedAt: string;
+  status: string;
+}
+
+export interface SeasonRankResultRow {
+  season: string;
+  userId: string;
+  score: number;
+  rank: number;
 }
 
 export interface DbPort {
@@ -124,7 +140,14 @@ export interface DbPort {
   commitEndlessClear(
     userId: string,
     stageId: string,
-    input: { earned: number; season: string; seedLeft: number; elapsedMs: number; suspicious: boolean; atIso: string },
+    input: {
+      earned: number;
+      season: string;
+      seedLeft: number;
+      elapsedMs: number;
+      suspicious: boolean;
+      atIso: string;
+    },
   ): Promise<EndlessSummary>;
   commitEndlessFail(userId: string, stageId: string, atIso: string): Promise<{ streak: StreakRow }>;
   appendEndlessEvent(
@@ -190,11 +213,59 @@ export interface DbPort {
     seedEnd?: number;
   }>;
   markSupplyJobPublishFailed(jobId: string): Promise<void>;
+  aggregateSeasonLedger(season: string, window: { startAt: Date; endAt: Date }): Promise<{ userId: string; score: number }[]>;
+  saveSeasonFinalization(header: SeasonFinalizationRow, results: SeasonRankResultRow[]): Promise<void>;
+  getSeasonFinalization(season: string): Promise<{ header: SeasonFinalizationRow; results: SeasonRankResultRow[] } | null>;
+  getFinalizedSeasonTop(season: string, limit: number): Promise<{ header: SeasonFinalizationRow; results: SeasonRankResultRow[] } | null>;
+  getFinalizedUserRank(season: string, userId: string): Promise<{ rank: number | null; score: number } | null>;
+  isSeasonFinalized(season: string): Promise<boolean>;
+  runWithSeasonLock<T>(season: string, op: (txDb: DbPort) => Promise<T>): Promise<T>;
+  getUserSeasonRank(season: string, userId: string, window: { startAt: Date; endAt: Date }): Promise<{ rank: number | null; score: number }>;
+  listUnfinalizedSeasons(now: Date): Promise<string[]>;
+}
+
+
+
+class SeasonSerialization {
+  private queue = new Map<string, Promise<void>>();
+  private storage = new AsyncLocalStorage<Set<string>>();
+
+  async runExclusive<T>(season: string, op: () => Promise<T>): Promise<T> {
+    const activeSeasons = this.storage.getStore();
+    if (activeSeasons?.has(season)) {
+      return op();
+    }
+
+    const prev = this.queue.get(season) ?? Promise.resolve();
+    let release: () => void = () => {};
+    const current = new Promise<void>((r) => {
+      release = r;
+    });
+    this.queue.set(
+      season,
+      prev.then(
+        () => current,
+        () => current,
+      ),
+    );
+    await prev;
+    const nextSet = new Set(activeSeasons);
+    nextSet.add(season);
+    return this.storage.run(nextSet, async () => {
+      try {
+        return await op();
+      } finally {
+        release();
+      }
+    });
+  }
 }
 
 let nextId = 0;
 
 export function createMemoryDb(): DbPort {
+  const seasonSerializer = new SeasonSerialization();
+  const finalizations = new Map<string, { header: SeasonFinalizationRow; results: SeasonRankResultRow[] }>();
   const users = new Map<string, { email: string | null; hasProfile: boolean }>();
   const nicknames = new Map<string, string>();
   const attempts = new Map<string, Attempt>();
@@ -215,17 +286,18 @@ export function createMemoryDb(): DbPort {
     reason?: string;
     createdAt: string;
   }[] = [];
-  const seedLedger: { userId: string; amount: number; season: string }[] = [];
+  const seedLedger: { userId: string; amount: number; season: string; rankingEligible: boolean; createdAt: string }[] = [];
   const supplyJobs = new Map<string, EndlessSupplyJobRow>();
   const supplyChunks = new Map<string, EndlessSupplyChunkRow>();
 
   const progressKey = (userId: string, stageId: string) => `${userId}:${stageId}`;
+
   const streakOf = (userId: string): StreakRow => streaks.get(userId) ?? { current: 0, best: 0 };
   const balanceOf = (userId: string): number => wallets.get(userId) ?? 0;
   const clearedCountOf = (userId: string) =>
     [...endlessProgress.entries()].filter(([k, v]) => k.startsWith(`${userId}:`) && v.cleared).length;
 
-  return {
+  const memoryDb: DbPort & { getRawSeedLedger?: () => typeof seedLedger } = {
     async ensureUser(userId: string, email: string | null) {
       const prev = users.get(userId);
       users.set(userId, { email: email ?? prev?.email ?? null, hasProfile: true });
@@ -404,47 +476,60 @@ export function createMemoryDb(): DbPort {
       });
     },
     async commitEndlessClear(userId, stageId, input) {
-      const key = progressKey(userId, stageId);
-      const prev = endlessProgress.get(key) ?? { cleared: false, attempts: 0, lastPlayedAt: '' };
+      return seasonSerializer.runExclusive(input.season, async () => {
+        const key = progressKey(userId, stageId);
+        const prev = endlessProgress.get(key) ?? { cleared: false, attempts: 0, lastPlayedAt: '' };
+        endlessProgress.set(key, { cleared: true, attempts: prev.attempts + 1, lastPlayedAt: input.atIso });
+        wallets.set(userId, balanceOf(userId) + input.earned);
 
-      // 이미 클리어한 스테이지에 대한 중복 제출 처리 (보상 및 통계 멱등성 보장)
-      if (prev.cleared) {
-        return { balance: balanceOf(userId), clearedCount: clearedCountOf(userId), streak: streakOf(userId) };
-      }
+        const fin = finalizations.get(input.season);
+        const window = seasonWindow(input.season);
+        const atDate = new Date(input.atIso);
+        const atMs = atDate.getTime();
+        const inWindow = atMs >= window.startAt.getTime() && atMs < window.endAt.getTime();
+        const isFinalized = fin?.header.status === 'finalized';
+        const isFrozen = rankingFrozen(atDate);
+        const rankingEligible = !isFinalized && inWindow && !isFrozen;
 
-      endlessProgress.set(key, { cleared: true, attempts: prev.attempts + 1, lastPlayedAt: input.atIso });
-      wallets.set(userId, balanceOf(userId) + input.earned);
-      seedLedger.push({ userId, amount: input.earned, season: input.season });
-      const s = streakOf(userId);
-      const next =
-        input.seedLeft === 3
-          ? { current: s.current + 1, best: Math.max(s.best, s.current + 1) }
-          : { current: 0, best: s.best };
-      streaks.set(userId, next);
-      endlessEvents.push({
-        userId,
-        stageId,
-        seedLeft: input.seedLeft,
-        elapsedMs: input.elapsedMs,
-        verified: true,
-        suspicious: input.suspicious,
-        createdAt: input.atIso,
+        seedLedger.push({
+          userId,
+          amount: input.earned,
+          season: input.season,
+          rankingEligible,
+          createdAt: input.atIso,
+        });
+
+        const s = streakOf(userId);
+        const next =
+          input.seedLeft === 3
+            ? { current: s.current + 1, best: Math.max(s.best, s.current + 1) }
+            : { current: 0, best: s.best };
+        streaks.set(userId, next);
+        endlessEvents.push({
+          userId,
+          stageId,
+          seedLeft: input.seedLeft,
+          elapsedMs: input.elapsedMs,
+          verified: true,
+          suspicious: input.suspicious,
+          createdAt: input.atIso,
+        });
+
+        const st = stages.get(stageId);
+        if (st) {
+          const nextPlays = clampInt32((st.plays ?? 0) + 1);
+          const nextClears = clampInt32((st.clears ?? 0) + 1);
+          const nextTotalMs = clampBigInt64((st.clearTotalMs ?? BigInt(0)) + BigInt(input.elapsedMs));
+          const rawAvgMs = nextClears > 0 ? Number(nextTotalMs / BigInt(nextClears)) : 0;
+          const nextAvgMs = clampInt32(rawAvgMs);
+          st.plays = nextPlays;
+          st.clears = nextClears;
+          st.clearTotalMs = nextTotalMs;
+          st.avgClearMs = nextAvgMs;
+        }
+
+        return { balance: balanceOf(userId), clearedCount: clearedCountOf(userId), streak: next };
       });
-
-      const st = stages.get(stageId);
-      if (st) {
-        const nextPlays = clampInt32((st.plays ?? 0) + 1);
-        const nextClears = clampInt32((st.clears ?? 0) + 1);
-        const nextTotalMs = clampBigInt64((st.clearTotalMs ?? BigInt(0)) + BigInt(input.elapsedMs));
-        const rawAvgMs = nextClears > 0 ? Number(nextTotalMs / BigInt(nextClears)) : 0;
-        const nextAvgMs = clampInt32(rawAvgMs);
-        st.plays = nextPlays;
-        st.clears = nextClears;
-        st.clearTotalMs = nextTotalMs;
-        st.avgClearMs = nextAvgMs;
-      }
-
-      return { balance: balanceOf(userId), clearedCount: clearedCountOf(userId), streak: next };
     },
     async commitEndlessFail(userId, stageId, atIso) {
       const key = progressKey(userId, stageId);
@@ -482,9 +567,12 @@ export function createMemoryDb(): DbPort {
       return { balance: balanceOf(userId), clearedCount: clearedCountOf(userId), streak: streakOf(userId) };
     },
     async listSeasonEarnings(season) {
+      const window = seasonWindow(season);
       const sums = new Map<string, number>();
       for (const e of seedLedger) {
-        if (e.season !== season) continue;
+        if (e.season !== season || e.rankingEligible === false) continue;
+        const t = Date.parse(e.createdAt);
+        if (t < window.startAt.getTime() || t >= window.endAt.getTime()) continue;
         sums.set(e.userId, (sums.get(e.userId) ?? 0) + e.amount);
       }
       return [...sums.entries()].map(([userId, amount]) => ({ userId, amount }));
@@ -757,7 +845,76 @@ export function createMemoryDb(): DbPort {
         c.status = 'publish_failed';
       }
     },
+    async aggregateSeasonLedger(season, window) {
+      const sums = new Map<string, number>();
+      for (const e of seedLedger) {
+        if (e.season !== season || e.rankingEligible === false) continue;
+        const t = Date.parse(e.createdAt);
+        if (t >= window.startAt.getTime() && t < window.endAt.getTime()) {
+          sums.set(e.userId, (sums.get(e.userId) ?? 0) + e.amount);
+        }
+      }
+      const entries = [...sums.entries()].map(([userId, score]) => ({ userId, score }));
+      entries.sort((a, b) => b.score - a.score || (b.userId > a.userId ? 1 : b.userId < a.userId ? -1 : 0));
+      return entries;
+    },
+    async saveSeasonFinalization(header, results) {
+      finalizations.set(header.season, { header, results });
+    },
+    async getSeasonFinalization(season) {
+      return finalizations.get(season) ?? null;
+    },
+    async getFinalizedSeasonTop(season, limit) {
+      const f = finalizations.get(season);
+      if (!f || f.header.status !== 'finalized') return null;
+      return { header: f.header, results: f.results.slice(0, limit) };
+    },
+    async getFinalizedUserRank(season, userId) {
+      const f = finalizations.get(season);
+      if (!f || f.header.status !== 'finalized') return null;
+      const found = f.results.find((r) => r.userId === userId);
+      return found ? { rank: found.rank, score: found.score } : { rank: null, score: 0 };
+    },
+    async isSeasonFinalized(season) {
+      const f = finalizations.get(season);
+      return f?.header.status === 'finalized';
+    },
+    async runWithSeasonLock<T>(season: string, op: (txDb: DbPort) => Promise<T>): Promise<T> {
+      return seasonSerializer.runExclusive(season, () => op(memoryDb));
+    },
+    async getUserSeasonRank(season, userId, window) {
+      const aggregated = await this.aggregateSeasonLedger(season, window);
+      const idx = aggregated.findIndex((e) => e.userId === userId);
+      if (idx === -1 || aggregated[idx].score <= 0) {
+        return { rank: null, score: 0 };
+      }
+      return { rank: idx + 1, score: aggregated[idx].score };
+    },
+    async listUnfinalizedSeasons(now: Date) {
+      const candidateSeasons = new Set<string>();
+      for (const e of seedLedger) {
+        candidateSeasons.add(e.season);
+      }
+      candidateSeasons.add(rankedSeasonId(now));
+
+      const unfinalized: string[] = [];
+      for (const s of candidateSeasons) {
+        const window = seasonWindow(s);
+        if (now.getTime() >= window.endAt.getTime()) {
+          const isFinalized = await this.isSeasonFinalized(s);
+          if (!isFinalized) {
+            unfinalized.push(s);
+          }
+        }
+      }
+      return unfinalized.sort();
+    },
+    getRawSeedLedger() {
+      return [...seedLedger];
+    },
   };
+
+  return memoryDb;
 }
 
 const globalForPrisma = globalThis as unknown as {
@@ -1068,25 +1225,12 @@ export function createPrismaDb(client: PrismaClient = prisma): DbPort {
     },
     async commitEndlessClear(userId, stageId, input) {
       return client.$transaction(async (tx) => {
+        // 시즌 advisory lock으로 트랜잭션 내 직렬화 보장
+        await tx.$executeRaw`SELECT pg_advisory_xact_lock(hashtext('season:' || ${input.season}))`;
         // 행 레벨 락으로 동시 클리어 시 가산 손실 방지
-        await tx.$queryRaw`SELECT id FROM "EndlessStage" WHERE id = ${stageId} FOR UPDATE`;
-
-        const prevProgress = await tx.endlessProgress.findUnique({
-          where: { userId_stageId: { userId, stageId } },
-        });
-
-        // 이미 클리어된 스테이지에 대한 중복 제출 처리 (보상 및 통계 멱등성 보장)
-        if (prevProgress?.cleared) {
-          const wallet = await tx.seedWallet.findUnique({ where: { userId } });
-          const streak = await tx.endlessStreak.findUnique({ where: { userId } });
-          const clearedCount = await tx.endlessProgress.count({ where: { userId, cleared: true } });
-          return {
-            balance: wallet?.balance ?? 0,
-            clearedCount,
-            streak: { current: streak?.current ?? 0, best: streak?.best ?? 0 },
-          };
+        if (typeof (tx as any).$queryRaw === 'function') {
+          await tx.$queryRaw`SELECT id FROM "EndlessStage" WHERE id = ${stageId} FOR UPDATE`;
         }
-
         await tx.endlessProgress.upsert({
           where: { userId_stageId: { userId, stageId } },
           create: { userId, stageId, cleared: true, attempts: 1, lastPlayedAt: new Date(input.atIso) },
@@ -1097,9 +1241,28 @@ export function createPrismaDb(client: PrismaClient = prisma): DbPort {
           create: { userId, balance: input.earned },
           update: { balance: { increment: input.earned } },
         });
+
+        const fin = await tx.seasonFinalization.findUnique({ where: { season: input.season } });
+        const window = seasonWindow(input.season);
+        const atDate = new Date(input.atIso);
+        const atMs = atDate.getTime();
+        const inWindow = atMs >= window.startAt.getTime() && atMs < window.endAt.getTime();
+        const isFinalized = fin?.status === 'finalized';
+        const isFrozen = rankingFrozen(atDate);
+        const rankingEligible = !isFinalized && inWindow && !isFrozen;
+
         await tx.seedLedger.create({
-          data: { userId, kind: 'earn', amount: input.earned, stageId, season: input.season },
+          data: {
+            userId,
+            kind: 'earn',
+            amount: input.earned,
+            stageId,
+            season: input.season,
+            rankingEligible,
+            createdAt: atDate,
+          },
         });
+
         const prev = await tx.endlessStreak.findUnique({ where: { userId } });
         const current = input.seedLeft === 3 ? (prev?.current ?? 0) + 1 : 0;
         const best = Math.max(prev?.best ?? 0, current);
@@ -1112,7 +1275,7 @@ export function createPrismaDb(client: PrismaClient = prisma): DbPort {
           data: { userId, stageId, seedLeft: input.seedLeft, elapsedMs: input.elapsedMs, verified: true, suspicious: input.suspicious },
         });
 
-        const stageRow = await tx.endlessStage.findUnique({ where: { id: stageId } });
+        const stageRow = tx.endlessStage ? await tx.endlessStage.findUnique({ where: { id: stageId } }) : null;
         if (stageRow) {
           const nextPlays = clampInt32(stageRow.plays + 1);
           const nextClears = clampInt32(stageRow.clears + 1);
@@ -1192,12 +1355,185 @@ export function createPrismaDb(client: PrismaClient = prisma): DbPort {
       };
     },
     async listSeasonEarnings(season) {
-      const rows = await client.seedLedger.groupBy({
-        by: ['userId'],
-        where: { season, kind: 'earn' },
-        _sum: { amount: true },
+      const window = seasonWindow(season);
+      const rows = await client.$queryRaw<{ userId: string; amount: number }[]>`
+        SELECT "userId", SUM("amount")::int AS amount
+        FROM "SeedLedger"
+        WHERE "season" = ${season}
+          AND "kind" = 'earn'
+          AND "rankingEligible" = true
+          AND "createdAt" >= ${window.startAt}
+          AND "createdAt" < ${window.endAt}
+        GROUP BY "userId"
+      `;
+      return rows.map((r) => ({ userId: r.userId, amount: Number(r.amount) }));
+    },
+    async aggregateSeasonLedger(season, window) {
+      const rows = await client.$queryRaw<{ userId: string; score: number }[]>`
+        SELECT "userId", SUM("amount")::int AS score
+        FROM "SeedLedger"
+        WHERE "season" = ${season}
+          AND "kind" = 'earn'
+          AND "rankingEligible" = true
+          AND "createdAt" >= ${window.startAt}
+          AND "createdAt" < ${window.endAt}
+        GROUP BY "userId"
+        ORDER BY score DESC, "userId" COLLATE "C" DESC
+      `;
+      return rows.map((r) => ({ userId: r.userId, score: Number(r.score) }));
+    },
+    async saveSeasonFinalization(header, results) {
+      const runSave = async (tx: any) => {
+        await tx.seasonFinalization.upsert({
+          where: { season: header.season },
+          create: {
+            season: header.season,
+            startAt: new Date(header.startAt),
+            endAt: new Date(header.endAt),
+            finalizedAt: new Date(header.finalizedAt),
+            status: header.status,
+          },
+          update: {
+            finalizedAt: new Date(header.finalizedAt),
+            status: header.status,
+          },
+        });
+        if (results.length > 0) {
+          await tx.seasonRankResult.createMany({
+            data: results.map((r) => ({
+              season: r.season,
+              userId: r.userId,
+              score: r.score,
+              rank: r.rank,
+            })),
+            skipDuplicates: true,
+          });
+        }
+      };
+      if (typeof (client as any).$transaction === 'function') {
+        await (client as any).$transaction(runSave);
+      } else {
+        await runSave(client);
+      }
+    },
+    async getSeasonFinalization(season) {
+      const h = await client.seasonFinalization.findUnique({
+        where: { season },
+        include: {
+          results: {
+            orderBy: { rank: 'asc' },
+          },
+        },
       });
-      return rows.map((r) => ({ userId: r.userId, amount: r._sum.amount ?? 0 }));
+      if (!h || h.status !== 'finalized') return null;
+      return {
+        header: {
+          season: h.season,
+          startAt: h.startAt.toISOString(),
+          endAt: h.endAt.toISOString(),
+          finalizedAt: h.finalizedAt.toISOString(),
+          status: h.status,
+        },
+        results: h.results.map((r) => ({
+          season: r.season,
+          userId: r.userId,
+          score: r.score,
+          rank: r.rank,
+        })),
+      };
+    },
+    async getFinalizedSeasonTop(season, limit) {
+      const h = await client.seasonFinalization.findUnique({
+        where: { season },
+        include: {
+          results: {
+            orderBy: { rank: 'asc' },
+            take: limit,
+          },
+        },
+      });
+      if (!h || h.status !== 'finalized') return null;
+      return {
+        header: {
+          season: h.season,
+          startAt: h.startAt.toISOString(),
+          endAt: h.endAt.toISOString(),
+          finalizedAt: h.finalizedAt.toISOString(),
+          status: h.status,
+        },
+        results: h.results.map((r) => ({
+          season: r.season,
+          userId: r.userId,
+          score: r.score,
+          rank: r.rank,
+        })),
+      };
+    },
+    async getFinalizedUserRank(season, userId) {
+      const header = await client.seasonFinalization.findUnique({ where: { season } });
+      if (header?.status !== 'finalized') return null;
+      const r = await client.seasonRankResult.findUnique({
+        where: { season_userId: { season, userId } },
+      });
+      if (!r) return { rank: null, score: 0 };
+      return { rank: r.rank, score: r.score };
+    },
+    async isSeasonFinalized(season) {
+      const h = await client.seasonFinalization.findUnique({ where: { season } });
+      return h?.status === 'finalized';
+    },
+    async runWithSeasonLock<T>(season: string, op: (txDb: DbPort) => Promise<T>): Promise<T> {
+      return client.$transaction(async (tx) => {
+        await tx.$executeRaw`SELECT pg_advisory_xact_lock(hashtext('season:' || ${season}))`;
+        const txDb = createPrismaDb(tx as unknown as PrismaClient);
+        return op(txDb);
+      });
+    },
+    async getUserSeasonRank(season, userId, window) {
+      const rows = await client.$queryRaw<{ score: number | null; rank: number }[]>`
+        WITH user_scores AS (
+          SELECT "userId", SUM("amount")::int AS score
+          FROM "SeedLedger"
+          WHERE "season" = ${season}
+            AND "kind" = 'earn'
+            AND "rankingEligible" = true
+            AND "createdAt" >= ${window.startAt}
+            AND "createdAt" < ${window.endAt}
+          GROUP BY "userId"
+        )
+        SELECT
+          (SELECT score FROM user_scores WHERE "userId" = ${userId}) AS score,
+          (
+            SELECT COUNT(*)::int
+            FROM user_scores
+            WHERE score > (SELECT score FROM user_scores WHERE "userId" = ${userId})
+               OR (score = (SELECT score FROM user_scores WHERE "userId" = ${userId}) AND "userId" COLLATE "C" > ${userId})
+          ) + 1 AS rank
+      `;
+      if (rows.length === 0 || rows[0].score === null || rows[0].score <= 0) {
+        return { rank: null, score: 0 };
+      }
+      return { rank: Number(rows[0].rank), score: Number(rows[0].score) };
+    },
+    async listUnfinalizedSeasons(now: Date) {
+      const distinctSeasons = await client.seedLedger.findMany({
+        select: { season: true },
+        distinct: ['season'],
+      });
+      const candidateSeasons = new Set<string>(distinctSeasons.map((d) => d.season));
+      candidateSeasons.add(rankedSeasonId(now));
+
+      const unfinalized: string[] = [];
+      for (const s of candidateSeasons) {
+        const window = seasonWindow(s);
+        if (now.getTime() >= window.endAt.getTime()) {
+          const isFin = await this.isSeasonFinalized(s);
+          if (!isFin) {
+            unfinalized.push(s);
+          }
+        }
+      }
+      return unfinalized.sort();
     },
     async findActiveSupplyJob(nowIso) {
       const row = await client.endlessSupplyJob.findFirst({
@@ -1551,3 +1887,4 @@ export function createPrismaDb(client: PrismaClient = prisma): DbPort {
     },
   };
 }
+
