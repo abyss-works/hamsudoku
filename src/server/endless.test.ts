@@ -135,13 +135,11 @@ describe('submitEndlessClear', () => {
     const t1 = new Date(Date.parse(a1.issuedAt) + 12_000).toISOString();
     const r1 = await submitEndlessClear(db, 'u1', input(a1.id, 'e-1'), t1);
     expect(r1.status).toBe(200);
-    expect(r1.body?.ok).toBe(true);
-    expect(r1.body?.balance).toBe(3);
-    expect(r1.body?.earned).toBe(3);
+    expect(r1.body).toMatchObject({ ok: true, balance: 3, earned: 3 });
 
     // 2. 동일 attempt 재전송 -> useAttempt 경계에서 거부, 중복 보상/통계 없음
     const r1Duplicate = await submitEndlessClear(db, 'u1', input(a1.id, 'e-1'), t1);
-    expect(r1Duplicate.body?.ok).toBe(false);
+    expect(r1Duplicate.body).toMatchObject({ ok: false });
     expect((await db.getEndlessSummary('u1')).balance).toBe(3);
     const stageAfterDup = await db.getStage('e-1');
     expect(stageAfterDup?.clears).toBe(1);
@@ -152,14 +150,12 @@ describe('submitEndlessClear', () => {
     const t2 = new Date(Date.parse(a2.issuedAt) + 20_000).toISOString();
     const r2 = await submitEndlessClear(db, 'u1', input(a2.id, 'e-1'), t2);
     expect(r2.status).toBe(200);
-    expect(r2.body?.ok).toBe(true);
-    expect(r2.body?.earned).toBe(3);
-    expect(r2.body?.balance).toBe(6);
+    expect(r2.body).toMatchObject({ ok: true, earned: 3, balance: 6 });
 
     // 상태, 원장, 통계, 응답 일치 확인
     const summary = await db.getEndlessSummary('u1');
     expect(summary.balance).toBe(6);
-    expect(r2.body?.balance).toBe(summary.balance);
+    expect(r2.body).toMatchObject({ balance: summary.balance });
 
     const stageAfterSecond = await db.getStage('e-1');
     expect(stageAfterSecond?.clears).toBe(2);
