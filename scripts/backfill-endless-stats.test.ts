@@ -27,7 +27,7 @@ describe('backfillEndlessStats', () => {
         earned: 3, season: '2026-W41', seedLeft: 3, elapsedMs: 10000,
         suspicious: false, atIso: '2026-10-07T00:00:00.000Z',
       });
-      await db.updateStageStats(id, { plays: 0, clears: 0, clearTotalMs: 0n, avgClearMs: 0 });
+      await db.updateStageStats(id, { plays: 0, clears: 0, clearTotalMs: BigInt(0), avgClearMs: 0 });
     }
     const update = vi.spyOn(db, 'atomicReaggregateStageStats')
       .mockResolvedValue({ ok: false, updated: false, error: 'Inconsistent stage first' });

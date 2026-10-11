@@ -1,6 +1,6 @@
 import { describe, expect, it, vi } from 'vitest';
 import { PrismaPg } from '@prisma/adapter-pg';
-import type { PrismaClient } from '@prisma/client';
+import type { PrismaClient } from '../../prisma/generated/prisma/client';
 import { Pool } from 'pg';
 import { createMemoryDb, createPrismaDb } from './db';
 import {
