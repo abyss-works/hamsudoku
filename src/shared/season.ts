@@ -33,3 +33,12 @@ export function rankedSeasonId(now: Date): string {
   if (!rankingFrozen(now)) return seasonId(now);
   return seasonId(new Date(now.getTime() - FREEZE_WINDOW_MS));
 }
+
+// 집계 구간 — 월요일 04:00 KST부터 다음 월요일 00:00 KST 미만.
+export function seasonWindow(id: string): { startAt: Date; endAt: Date } {
+  const start = seasonStartUtc(id);
+  const startAt = new Date(start.getTime() + FREEZE_WINDOW_MS);
+  const endAt = new Date(start.getTime() + 7 * DAY_MS);
+  return { startAt, endAt };
+}
+

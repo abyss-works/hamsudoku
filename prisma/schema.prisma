@@ -84,15 +84,17 @@ model SeedWallet {
 }
 
 model SeedLedger {
-  id        String   @id @default(uuid())
-  userId    String
-  kind      String
-  amount    Int
-  stageId   String?
-  season    String
-  createdAt DateTime @default(now())
+  id              String   @id @default(uuid())
+  userId          String
+  kind            String
+  amount          Int
+  stageId         String?
+  season          String
+  rankingEligible Boolean  @default(true)
+  createdAt       DateTime @default(now())
 
   @@index([season, kind])
+  @@index([season, rankingEligible])
   @@index([userId, season])
 }
 
@@ -115,3 +117,27 @@ model EndlessStreak {
   current Int    @default(0)
   best    Int    @default(0)
 }
+
+model SeasonFinalization {
+  season      String             @id
+  startAt     DateTime
+  endAt       DateTime
+  finalizedAt DateTime           @default(now())
+  status      String             @default("finalized")
+  results     SeasonRankResult[]
+
+  @@index([status])
+}
+
+model SeasonRankResult {
+  season       String
+  userId       String
+  score        Int
+  rank         Int
+  finalization SeasonFinalization @relation(fields: [season], references: [season], onDelete: Cascade)
+
+  @@id([season, userId])
+  @@index([season, rank])
+  @@index([userId])
+}
+
