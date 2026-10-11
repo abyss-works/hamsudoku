@@ -46,7 +46,11 @@ export async function GET() {
   // 2. 마감 창이지만 아직 미확정 상태인 경우: 중복 방지된 QStash 작업 등록 및 집계 중 상태 반환
   if (frozen) {
     const publisher = createQStashPublisher();
-    publisher.enqueueFinalize(season).catch(() => {});
+    try {
+      await publisher.enqueueFinalize(season);
+    } catch {
+      console.warn('Ranking finalization enqueue failed');
+    }
 
     return NextResponse.json(
       rankResponseSchema.parse({
@@ -71,7 +75,10 @@ export async function GET() {
   let entries: { userId: string; score: number }[] = [];
   let snapshotAt = now.toISOString();
   try {
-    const snapshot = await store.top(season, 50);
+    const snapshot = await store.top(season, 50, async () => {
+      const rows = await db.listSeasonEarnings(season);
+      return rows.map((row) => ({ userId: row.userId, score: row.amount }));
+    });
     entries = snapshot.entries;
     snapshotAt = snapshot.at;
   } catch {

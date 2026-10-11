@@ -20,6 +20,46 @@ function makeStore(replies: unknown[], calls: Call[]) {
 }
 
 describe('createRankStore', () => {
+  it('만료된 표시 캐시는 Redis 점수 누락과 관계없이 원장 전체 합계로 갱신한다', async () => {
+    const commands: unknown[][] = [];
+    let cached: string | null = null;
+    const fetchImpl = (async (_url: unknown, init?: RequestInit) => {
+      const command = JSON.parse(String(init?.body));
+      commands.push(command);
+      if (command[0] === 'get') return Response.json({ result: cached });
+      if (command[0] === 'set') return Response.json({ result: 'OK' });
+      if (command[0] === 'eval' && command[2] === 3) {
+        cached = command[9];
+        return Response.json({ result: 1 });
+      }
+      return Response.json({ result: command[0] === 'zrevrange' ? [] : 1 });
+    }) as typeof fetch;
+    const store = createRankStore({ url: 'https://example.invalid', token: 'test', fetchImpl });
+    let ledgerReads = 0;
+    const loadScores = async () => {
+      ledgerReads += 1;
+      return [{ userId: 'u-a', score: 3 }, { userId: 'u-z', score: 3 }, { userId: 'u-b', score: 8 }];
+    };
+    const result = await store.top('2026-W41', 2, loadScores);
+    expect(result.entries).toEqual([{ userId: 'u-b', score: 8 }, { userId: 'u-z', score: 3 }]);
+    expect(commands.some((command) => command[0] === 'zrevrange')).toBe(false);
+    const replacement = commands.find((command) => command[0] === 'eval' && command[2] === 3);
+    expect(replacement?.slice(-6)).toEqual([8, 'u-b', 3, 'u-z', 3, 'u-a']);
+    expect(await store.top('2026-W41', 2, loadScores)).toEqual(result);
+    expect(ledgerReads).toBe(1);
+  });
+
+  it('원장 조회 중 잠금이 만료되면 이전 갱신자가 캐시를 게시하지 않는다', async () => {
+    const fetchImpl = (async (_url: unknown, init?: RequestInit) => {
+      const command = JSON.parse(String(init?.body));
+      if (command[0] === 'get') return Response.json({ result: null });
+      if (command[0] === 'set') return Response.json({ result: 'OK' });
+      return Response.json({ result: command[0] === 'zrevrange' ? [] : 0 });
+    }) as typeof fetch;
+    const store = createRankStore({ url: 'https://example.invalid', token: 'test', fetchImpl });
+    await expect(store.top('2026-W41', 50, async () => [{ userId: 'u1', score: 3 }]))
+      .rejects.toThrow('Ranking refresh lock expired');
+  });
   it('다른 갱신자의 잠금이 유지되면 원본 조회와 캐시 덮어쓰기를 하지 않는다', async () => {
     const commands: unknown[][] = [];
     const fetchImpl = (async (_url: unknown, init?: RequestInit) => {
