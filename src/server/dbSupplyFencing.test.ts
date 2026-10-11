@@ -1,7 +1,6 @@
 import { describe, expect, it } from 'vitest';
 import type { PrismaClient } from '../../prisma/generated/prisma/client';
 import { createMemoryDb, createPrismaDb, type EndlessStageRow } from './db';
-import { executeSupplyChunk } from './endlessGeneration';
 
 function dummyStage(id: string, seed: number): EndlessStageRow {
   return {
