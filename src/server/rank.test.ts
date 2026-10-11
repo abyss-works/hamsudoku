@@ -20,6 +20,19 @@ function makeStore(replies: unknown[], calls: Call[]) {
 }
 
 describe('createRankStore', () => {
+  it('다른 갱신자의 잠금이 유지되면 원본 조회와 캐시 덮어쓰기를 하지 않는다', async () => {
+    const commands: unknown[][] = [];
+    const fetchImpl = (async (_url: unknown, init?: RequestInit) => {
+      const command = JSON.parse(String(init?.body));
+      commands.push(command);
+      if (command[0] === 'zrevrange') return Response.json({ result: ['u1', 3] });
+      return Response.json({ result: null });
+    }) as typeof fetch;
+    const store = createRankStore({ url: 'https://example.invalid', token: 'test', fetchImpl });
+    await expect(store.top('2026-W41', 50)).rejects.toThrow('Ranking refresh is in progress');
+    expect(commands.some((command) => command[0] === 'zrevrange')).toBe(false);
+    expect(commands.some((command) => command[0] === 'set' && command[1] === 'rank:2026-W41:top')).toBe(false);
+  });
   it('increment는 ZINCRBY를 보낸다', async () => {
     const calls: Call[] = [];
     const store = makeStore([7], calls);

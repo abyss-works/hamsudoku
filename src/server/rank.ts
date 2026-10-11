@@ -115,6 +115,7 @@ export function createRankStore(opts: { url: string; token: string; fetchImpl?: 
             return retryValid;
           }
         }
+        throw new Error('Ranking refresh is in progress');
       }
 
       try {
