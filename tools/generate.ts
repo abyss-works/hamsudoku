@@ -236,7 +236,7 @@ export function validateEndlessCandidate(candidate: EndlessCandidate): boolean {
   const cols = new Set<number>();
   const islands = new Set<number>();
   for (const [r, c] of candidate.solution) {
-    if (r < 0 || r >= 7 || c < 0 || c >= 7) return false;
+    if (!Number.isInteger(r) || !Number.isInteger(c) || r < 0 || r >= 7 || c < 0 || c >= 7) return false;
     rows.add(r);
     cols.add(c);
     islands.add(candidate.islands[r][c]);
@@ -249,6 +249,8 @@ export function validateEndlessCandidate(candidate: EndlessCandidate): boolean {
   if (solutions.length !== 1) {
     return false;
   }
+  const coordinates = (spots: Pos[]) => spots.map(([r, c]) => `${r},${c}`).sort().join(';');
+  if (coordinates(candidate.solution) !== coordinates(solutions[0])) return false;
   // 5. 난이도 band 검증
   const m = measure(candidate.islands);
   const sh = { ...scoreDifficulty(candidate.islands), singles: countSingles(candidate.islands) };

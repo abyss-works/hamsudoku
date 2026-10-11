@@ -4,6 +4,20 @@ import { executeSupplyChunk, validateEndlessCandidate } from './endlessGeneratio
 import type { Pos } from '../features/sudoku/model/solver';
 
 describe('executeSupplyChunk atomic claim and generation validation', () => {
+  it('보드에 유일해가 있어도 제공된 해답이 다르면 적재 검증을 거부한다', () => {
+    const candidate = {
+      islands: [
+        [0,1,1,1,1,1,1], [1,1,1,1,1,1,1], [1,1,1,1,2,2,1],
+        [1,1,1,4,2,3,3], [4,4,4,4,2,5,5], [4,4,4,4,4,5,5], [6,6,4,4,4,5,5],
+      ],
+      solution: [[0,0],[1,2],[2,4],[3,6],[4,3],[5,5],[6,1]] as Pos[],
+      tier: 2,
+    };
+    expect(validateEndlessCandidate(candidate)).toBe(true);
+    expect(validateEndlessCandidate({ ...candidate, solution: [...candidate.solution].reverse() })).toBe(true);
+    const wrong = [0,2,4,5,3,6,1].map((c, r) => [r, c] as Pos);
+    expect(validateEndlessCandidate({ ...candidate, solution: wrong })).toBe(false);
+  });
   it('청크를 실행하여 10개 퍼즐을 생성·검증하고 원자적으로 DB에 적재한다', async () => {
     const db = createMemoryDb();
     const jobId = 'job-gen-1';
