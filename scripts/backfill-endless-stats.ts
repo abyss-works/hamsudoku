@@ -66,7 +66,7 @@ export async function backfillEndlessStats(
     const targetPlays = agg.totalAttempts;
     const targetClears = agg.verifiedClearCount;
     const targetClearTotalMs = agg.verifiedClearTotalMs;
-    const targetAvgClearMs = targetClears > 0 ? Math.round(Number(targetClearTotalMs) / targetClears) : 0;
+    const targetAvgClearMs = targetClears > 0 ? Number(targetClearTotalMs / BigInt(targetClears)) : 0;
 
     const currentPlays = stage.plays ?? 0;
     const currentClears = stage.clears ?? 0;
@@ -113,6 +113,7 @@ export async function backfillEndlessStats(
         const res = await db.atomicReaggregateStageStats(pending.stageId);
         if (!res.ok) {
           errors.push(res.error ?? `Failed to atomic update stage ${pending.stageId}`);
+          break;
         } else if (res.updated) {
           actuallyUpdated += 1;
         }

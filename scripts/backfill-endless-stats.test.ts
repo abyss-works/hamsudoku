@@ -1,10 +1,41 @@
-import { describe, expect, it } from 'vitest';
+import { describe, expect, it, vi } from 'vitest';
 import { createMemoryDb } from '../src/server/db';
 import { backfillEndlessStats } from './backfill-endless-stats';
 
 const stage = (id: string) => ({ id, size: 7, regions: '0'.repeat(49), solution: '0,0', tier: 2, seed: 1 });
 
 describe('backfillEndlessStats', () => {
+  it('정수 평균의 dry-run과 실제 적용 값이 같고 재실행에 불필요한 보정이 없다', async () => {
+    const db = createMemoryDb();
+    await db.insertStage(stage('average'));
+    for (const [userId, elapsedMs] of [['u1', 10000], ['u2', 10001]] as const) {
+      await db.commitEndlessClear(userId, 'average', {
+        earned: 3, season: '2026-W41', seedLeft: 3, elapsedMs,
+        suspicious: false, atIso: '2026-10-07T00:00:00.000Z',
+      });
+    }
+    expect((await db.getStage('average'))?.avgClearMs).toBe(10000);
+    expect((await backfillEndlessStats(db, { dryRun: true })).updatedStages).toBe(0);
+    expect((await backfillEndlessStats(db, { dryRun: false })).updatedStages).toBe(0);
+  });
+
+  it('실제 적용 중 불일치가 발견되면 후속 스테이지 쓰기를 수행하지 않는다', async () => {
+    const db = createMemoryDb();
+    for (const id of ['first', 'second']) {
+      await db.insertStage(stage(id));
+      await db.commitEndlessClear('u1', id, {
+        earned: 3, season: '2026-W41', seedLeft: 3, elapsedMs: 10000,
+        suspicious: false, atIso: '2026-10-07T00:00:00.000Z',
+      });
+      await db.updateStageStats(id, { plays: 0, clears: 0, clearTotalMs: 0n, avgClearMs: 0 });
+    }
+    const update = vi.spyOn(db, 'atomicReaggregateStageStats')
+      .mockResolvedValue({ ok: false, updated: false, error: 'Inconsistent stage first' });
+    const result = await backfillEndlessStats(db, { dryRun: false });
+    expect(result.ok).toBe(false);
+    expect(update).toHaveBeenCalledTimes(1);
+    expect((await db.getStage('second'))?.clears).toBe(0);
+  });
   it('dry-run은 DB를 변경하지 않고 복원 예정 값과 불일치를 보고한다', async () => {
     const db = createMemoryDb();
     await db.insertStage(stage('e-1'));
