@@ -1,7 +1,7 @@
 import { describe, expect, it } from 'vitest';
 import { confettiPiecesModel } from './confettiModel';
 
-describe('confettiPiecesModel (shared UI pure model)', () => {
+describe('confettiPiecesModel (UI pure model)', () => {
   it('기본값 count=24 및 count=0, 색상 순환, 위치 및 지속시간을 정확히 생성한다', () => {
     // 1. count=0
     expect(confettiPiecesModel(0)).toEqual([]);

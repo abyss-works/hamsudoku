@@ -1,9 +1,9 @@
 import type { CSSProperties } from 'react';
 import { motion } from 'framer-motion';
-import { useConfettiService } from './useConfettiService';
+import { confettiPiecesModel } from './confettiModel';
 
 export function Confetti({ count = 24 }: { count?: number }) {
-  const pieces = useConfettiService(count);
+  const pieces = confettiPiecesModel(count);
 
   return (
     <div className="confetti" aria-hidden="true">
