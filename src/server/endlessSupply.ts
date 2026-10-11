@@ -12,6 +12,7 @@ export interface SupplyDecision {
   shouldEnqueue: boolean;
   action: 'enqueued' | 'merged' | 'cooldown' | 'sufficient_stock';
   jobId?: string;
+  enqueueError?: string;
 }
 
 export function evaluateSupplyDecision(params: {
@@ -47,46 +48,31 @@ export async function requestSupply(
   nowIso: string,
   enqueuer?: { enqueueChunk: (jobId: string, chunkIndex: number) => Promise<void> },
 ): Promise<SupplyDecision> {
-  const stockCount = await db.countZeroClearStages();
-  const activeJob = await db.findActiveSupplyJob(nowIso);
-  const lastSuccessAt = await db.getLatestSupplySuccessAt();
-
-  const decision = evaluateSupplyDecision({
-    stockCount,
-    activeJob,
-    lastSuccessAt,
-    nowIso,
+  // 1. 단일 DB 트랜잭션 + advisory lock 아래 공급 결정 및 시드 예약 원자 처리
+  const decision = await db.atomicRequestSupply(nowIso, {
+    stockThreshold: STOCK_THRESHOLD,
+    cooldownMs: COOLDOWN_MS,
+    leaseDurationMs: LEASE_DURATION_MS,
+    batchCount: BATCH_COUNT,
   });
 
-  if (!decision.shouldEnqueue) {
+  if (!decision.shouldEnqueue || !decision.jobId) {
     return decision;
   }
 
-  const highestSeed = await db.getHighestStageSeed();
-  const seedStart = highestSeed + 1;
-  const seedEnd = seedStart + BATCH_COUNT;
-  const jobId = `job-${Date.now()}-${Math.random().toString(36).slice(2, 8)}`;
-  const leaseExpiresAt = new Date(Date.parse(nowIso) + LEASE_DURATION_MS).toISOString();
-
-  await db.createSupplyJob({
-    id: jobId,
-    policyVersion: POLICY_VERSION,
-    seedStart,
-    seedEnd,
-    targetCount: BATCH_COUNT,
-    leaseExpiresAt,
-  });
-
-  await db.createSupplyChunk({
-    id: `${jobId}:0`,
-    jobId,
-    chunkIndex: 0,
-    status: 'pending',
-  });
-
+  // 2. 외부 HTTP 발행은 DB lock 밖에서 수행
   if (enqueuer) {
-    await enqueuer.enqueueChunk(jobId, 0);
+    try {
+      await enqueuer.enqueueChunk(decision.jobId, 0);
+    } catch (err) {
+      // 큐 등록 실패 관측 및 DB 작업을 publish_failed로 기록하여 2분간 영구 차단 방지
+      await db.markSupplyJobPublishFailed(decision.jobId);
+      return {
+        ...decision,
+        enqueueError: (err as Error).message,
+      };
+    }
   }
 
-  return { shouldEnqueue: true, action: 'enqueued', jobId };
+  return decision;
 }

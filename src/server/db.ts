@@ -159,6 +159,18 @@ export interface DbPort {
     completedAtIso: string,
   ): Promise<boolean>;
   failSupplyChunk(jobId: string, chunkIndex: number, reason: string): Promise<void>;
+  getHighestReservedSeed(): Promise<number>;
+  atomicRequestSupply(
+    nowIso: string,
+    options?: { batchCount?: number; cooldownMs?: number; leaseDurationMs?: number; stockThreshold?: number },
+  ): Promise<{
+    shouldEnqueue: boolean;
+    action: 'enqueued' | 'merged' | 'cooldown' | 'sufficient_stock';
+    jobId?: string;
+    seedStart?: number;
+    seedEnd?: number;
+  }>;
+  markSupplyJobPublishFailed(jobId: string): Promise<void>;
 }
 
 let nextId = 0;
@@ -564,6 +576,123 @@ export function createMemoryDb(): DbPort {
         job.status = 'failed';
         job.leaseExpiresAt = null;
         job.updatedAt = new Date().toISOString();
+      }
+    },
+    async getHighestReservedSeed() {
+      let maxSeed = 10000;
+      for (const s of stages.values()) {
+        if (s.seed > maxSeed) maxSeed = s.seed;
+      }
+      for (const j of supplyJobs.values()) {
+        if (j.seedEnd > maxSeed) maxSeed = j.seedEnd;
+      }
+      return maxSeed;
+    },
+    async atomicRequestSupply(nowIso, options = {}) {
+      // 공급 scope lock (인메모리 순차 직렬화)
+      const stockThreshold = options.stockThreshold ?? 20;
+      const cooldownMs = options.cooldownMs ?? 60_000;
+      const leaseDurationMs = options.leaseDurationMs ?? 120_000;
+      const batchCount = options.batchCount ?? 10;
+
+      // 1. 재고 검사 (clears === 0)
+      const stockCount = [...stages.values()].filter((s) => (s.clears ?? 0) === 0).length;
+      if (stockCount >= stockThreshold) {
+        return { shouldEnqueue: false, action: 'sufficient_stock' };
+      }
+
+      // 2. 만료된 작업 정리 및 활성 작업 검사
+      const now = Date.parse(nowIso);
+      for (const j of supplyJobs.values()) {
+        if (
+          (j.status === 'pending' || j.status === 'running') &&
+          j.leaseExpiresAt &&
+          Date.parse(j.leaseExpiresAt) <= now
+        ) {
+          j.status = 'failed';
+          j.updatedAt = new Date().toISOString();
+        }
+      }
+
+      const activeJob = [...supplyJobs.values()].find((j) => {
+        if (j.status !== 'pending' && j.status !== 'running') return false;
+        if (j.leaseExpiresAt && Date.parse(j.leaseExpiresAt) <= now) return false;
+        return true;
+      });
+      if (activeJob) {
+        return { shouldEnqueue: false, action: 'merged', jobId: activeJob.id };
+      }
+
+      // 3. 쿨다운 검사
+      let latestSuccess: string | null = null;
+      for (const j of supplyJobs.values()) {
+        if (j.lastSuccessAt && (!latestSuccess || Date.parse(j.lastSuccessAt) > Date.parse(latestSuccess))) {
+          latestSuccess = j.lastSuccessAt;
+        }
+      }
+      if (latestSuccess) {
+        const elapsed = now - Date.parse(latestSuccess);
+        if (elapsed < cooldownMs) {
+          return { shouldEnqueue: false, action: 'cooldown' };
+        }
+      }
+
+      // 4. 시드 예약 (기존 stage + 예약 job)
+      let maxSeed = 10000;
+      for (const s of stages.values()) {
+        if (s.seed > maxSeed) maxSeed = s.seed;
+      }
+      for (const j of supplyJobs.values()) {
+        if (j.seedEnd > maxSeed) maxSeed = j.seedEnd;
+      }
+
+      const seedStart = maxSeed;
+      const seedEnd = seedStart + batchCount;
+      const jobId = `job-${Date.now()}-${Math.random().toString(36).slice(2, 8)}`;
+      const leaseExpiresAt = new Date(now + leaseDurationMs).toISOString();
+
+      const jobRow: EndlessSupplyJobRow = {
+        id: jobId,
+        policyVersion: 'v1',
+        seedStart,
+        seedEnd,
+        targetCount: batchCount,
+        status: 'pending',
+        leaseExpiresAt,
+        lastSuccessAt: null,
+        createdAt: new Date().toISOString(),
+        updatedAt: new Date().toISOString(),
+      };
+      supplyJobs.set(jobId, jobRow);
+
+      supplyChunks.set(`${jobId}:0`, {
+        id: `${jobId}:0`,
+        jobId,
+        chunkIndex: 0,
+        status: 'pending',
+        stageCount: 0,
+        completedAt: null,
+        createdAt: new Date().toISOString(),
+      });
+
+      return {
+        shouldEnqueue: true,
+        action: 'enqueued',
+        jobId,
+        seedStart,
+        seedEnd,
+      };
+    },
+    async markSupplyJobPublishFailed(jobId) {
+      const j = supplyJobs.get(jobId);
+      if (j) {
+        j.status = 'publish_failed';
+        j.leaseExpiresAt = null;
+        j.updatedAt = new Date().toISOString();
+      }
+      const c = supplyChunks.get(`${jobId}:0`);
+      if (c) {
+        c.status = 'publish_failed';
       }
     },
   };
@@ -1168,6 +1297,118 @@ export function createPrismaDb(client: PrismaClient = prisma): DbPort {
           where: { id: jobId },
           data: { status: 'failed', leaseExpiresAt: null },
         });
+      });
+    },
+    async getHighestReservedSeed() {
+      const [maxStage, maxJob] = await Promise.all([
+        client.endlessStage.findFirst({ orderBy: { seed: 'desc' } }),
+        client.endlessSupplyJob.findFirst({ orderBy: { seedEnd: 'desc' } }),
+      ]);
+      const stageSeed = maxStage?.seed ?? 10000;
+      const jobSeed = maxJob?.seedEnd ?? 10000;
+      return Math.max(stageSeed, jobSeed);
+    },
+    async atomicRequestSupply(nowIso, options = {}) {
+      return client.$transaction(async (tx) => {
+        // 공급 scope advisory lock 획득
+        await tx.$queryRaw`SELECT pg_advisory_xact_lock(hashtext('endless_supply_lock'))`;
+
+        const stockThreshold = options.stockThreshold ?? 20;
+        const cooldownMs = options.cooldownMs ?? 60_000;
+        const leaseDurationMs = options.leaseDurationMs ?? 120_000;
+        const batchCount = options.batchCount ?? 10;
+
+        // 1. 재고 확인
+        const stockCount = await tx.endlessStage.count({ where: { clears: 0 } });
+        if (stockCount >= stockThreshold) {
+          return { shouldEnqueue: false, action: 'sufficient_stock' };
+        }
+
+        // 2. 만료 lease 회복 및 활성 작업 확인
+        const nowDate = new Date(nowIso);
+        await tx.endlessSupplyJob.updateMany({
+          where: {
+            status: { in: ['pending', 'running'] },
+            leaseExpiresAt: { lte: nowDate },
+          },
+          data: { status: 'failed' },
+        });
+
+        const activeJob = await tx.endlessSupplyJob.findFirst({
+          where: {
+            status: { in: ['pending', 'running'] },
+            OR: [{ leaseExpiresAt: null }, { leaseExpiresAt: { gt: nowDate } }],
+          },
+          orderBy: { createdAt: 'desc' },
+        });
+        if (activeJob) {
+          return { shouldEnqueue: false, action: 'merged', jobId: activeJob.id };
+        }
+
+        // 3. 쿨다운 확인
+        const latestSuccessJob = await tx.endlessSupplyJob.findFirst({
+          where: { lastSuccessAt: { not: null } },
+          orderBy: { lastSuccessAt: 'desc' },
+        });
+        if (latestSuccessJob?.lastSuccessAt) {
+          const elapsed = nowDate.getTime() - latestSuccessJob.lastSuccessAt.getTime();
+          if (elapsed < cooldownMs) {
+            return { shouldEnqueue: false, action: 'cooldown' };
+          }
+        }
+
+        // 4. 시드 충돌 방지 예약 (기존 stage + 예약 job)
+        const [maxStage, maxJob] = await Promise.all([
+          tx.endlessStage.findFirst({ orderBy: { seed: 'desc' } }),
+          tx.endlessSupplyJob.findFirst({ orderBy: { seedEnd: 'desc' } }),
+        ]);
+        const stageSeed = maxStage?.seed ?? 10000;
+        const jobSeed = maxJob?.seedEnd ?? 10000;
+        const maxSeed = Math.max(stageSeed, jobSeed);
+
+        const seedStart = maxSeed;
+        const seedEnd = seedStart + batchCount;
+        const jobId = `job-${Date.now()}-${Math.random().toString(36).slice(2, 8)}`;
+        const leaseExpiresAt = new Date(nowDate.getTime() + leaseDurationMs);
+
+        await tx.endlessSupplyJob.create({
+          data: {
+            id: jobId,
+            policyVersion: 'v1',
+            seedStart,
+            seedEnd,
+            targetCount: batchCount,
+            status: 'pending',
+            leaseExpiresAt,
+          },
+        });
+
+        await tx.endlessSupplyChunk.create({
+          data: {
+            id: `${jobId}:0`,
+            jobId,
+            chunkIndex: 0,
+            status: 'pending',
+          },
+        });
+
+        return {
+          shouldEnqueue: true,
+          action: 'enqueued',
+          jobId,
+          seedStart,
+          seedEnd,
+        };
+      });
+    },
+    async markSupplyJobPublishFailed(jobId) {
+      await client.endlessSupplyJob.update({
+        where: { id: jobId },
+        data: { status: 'publish_failed', leaseExpiresAt: null },
+      });
+      await client.endlessSupplyChunk.updateMany({
+        where: { jobId },
+        data: { status: 'publish_failed' },
       });
     },
   };

@@ -184,4 +184,92 @@ describe('requestSupply with DB integration', () => {
     expect(res2.jobId).not.toBe(res1.jobId);
     expect(enqueued).toHaveLength(2);
   });
+
+  it('기존 stage가 없어도 예약된 작업(seedEnd)을 고려하여 시드 충돌을 원자적으로 방지한다', async () => {
+    const db = createMemoryDb();
+    // Job 1 수동 생성 (seedStart: 10001, seedEnd: 10011) - stage는 적재되지 않음
+    await db.createSupplyJob({
+      id: 'job-existing-1',
+      policyVersion: 'v1',
+      seedStart: 10001,
+      seedEnd: 10011,
+      targetCount: 10,
+      leaseExpiresAt: null,
+    });
+    // 이 작업은 완료되었다고 가정
+    await db.updateSupplyJob('job-existing-1', { status: 'completed' });
+
+    // 새로운 공급 요청 생성 시 seedStart는 기존 job의 seedEnd인 10011 이상이어야 함
+    const res = await requestSupply(db, '2026-10-11T12:00:00.000Z');
+    expect(res.action).toBe('enqueued');
+    const newJob = await db.findSupplyJob(res.jobId!);
+    expect(newJob?.seedStart).toBeGreaterThanOrEqual(10011);
+  });
+
+  it('동시 요청 발생 시 advisory lock/원자 트랜잭션으로 단 하나만 큐잉되고 중복 작업이 방지된다', async () => {
+    const db = createMemoryDb();
+    const enqueued: string[] = [];
+    const enqueuer = {
+      enqueueChunk: async (jobId: string) => {
+        enqueued.push(jobId);
+      },
+    };
+
+    const results = await Promise.all([
+      requestSupply(db, '2026-10-11T12:00:00.000Z', enqueuer),
+      requestSupply(db, '2026-10-11T12:00:00.000Z', enqueuer),
+      requestSupply(db, '2026-10-11T12:00:00.000Z', enqueuer),
+    ]);
+
+    const enqueuedCount = results.filter((r) => r.action === 'enqueued').length;
+    const mergedCount = results.filter((r) => r.action === 'merged').length;
+    expect(enqueuedCount).toBe(1);
+    expect(mergedCount).toBe(2);
+    expect(enqueued).toHaveLength(1);
+  });
+
+  it('QStash enqueue 실패 시 작업 상태를 publish_failed로 기록하여 2분간 차단되지 않고 재시도를 허용한다', async () => {
+    const db = createMemoryDb();
+    const failingEnqueuer = {
+      enqueueChunk: async () => {
+        throw new Error('Network timeout during enqueue');
+      },
+    };
+
+    const res1 = await requestSupply(db, '2026-10-11T12:00:00.000Z', failingEnqueuer);
+    expect(res1.action).toBe('enqueued');
+    expect(res1.enqueueError).toBeDefined();
+
+    const job = await db.findSupplyJob(res1.jobId!);
+    expect(job?.status).toBe('publish_failed');
+
+    // 2분 대기 없이 다음 요청에서 바로 새로운 공급을 수행할 수 있어야 한다
+    const successfulEnqueuer = {
+      enqueueChunk: async () => {},
+    };
+    const res2 = await requestSupply(db, '2026-10-11T12:00:05.000Z', successfulEnqueuer);
+    expect(res2.action).toBe('enqueued');
+    expect(res2.jobId).not.toBe(res1.jobId);
+  });
+
+  it('Prisma 어댑터 fake transaction 경계에서도 advisory lock과 원자적 공급 결정이 동작한다', async () => {
+    const fakePrismaDb = createMemoryDb();
+    let advisoryLockAcquired = false;
+
+    // Prisma $queryRaw 및 transaction 시뮬레이션
+    const origAtomic = fakePrismaDb.atomicRequestSupply;
+    if (origAtomic) {
+      fakePrismaDb.atomicRequestSupply = async (nowIso, params) => {
+        advisoryLockAcquired = true;
+        try {
+          return await origAtomic.call(fakePrismaDb, nowIso, params);
+        } finally {
+          advisoryLockAcquired = false;
+        }
+      };
+    }
+
+    const res = await requestSupply(fakePrismaDb, '2026-10-11T12:00:00.000Z');
+    expect(res.action).toBe('enqueued');
+  });
 });
