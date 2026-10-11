@@ -1664,6 +1664,12 @@ export function createPrismaDb(client: PrismaClient = prisma): DbPort {
     },
     async claimSupplyChunk(jobId, chunkIndex, nowIso, leaseDurationMs) {
       return client.$transaction(async (tx) => {
+        // 행 레벨 락으로 동시 claim 요청 직렬화
+        if (typeof (tx as any).$queryRaw === 'function') {
+          await tx.$queryRaw`SELECT id FROM "EndlessSupplyJob" WHERE id = ${jobId} FOR UPDATE`;
+          await tx.$queryRaw`SELECT id FROM "EndlessSupplyChunk" WHERE "jobId" = ${jobId} AND "chunkIndex" = ${chunkIndex} FOR UPDATE`;
+        }
+
         const job = await tx.endlessSupplyJob.findUnique({ where: { id: jobId } });
         const chunk = await tx.endlessSupplyChunk.findUnique({
           where: { jobId_chunkIndex: { jobId, chunkIndex } },
