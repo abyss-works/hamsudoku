@@ -1,4 +1,5 @@
 import { Client } from '@upstash/qstash';
+import { qstashProtectionHeaders } from './qstashHeaders';
 
 export interface QStashPublisher {
   enqueueFinalize(season: string): Promise<{ messageId: string }>;
@@ -34,6 +35,7 @@ export function createQStashPublisher(config?: QStashPublisherConfig): QStashPub
         url: destinationUrl,
         body: { season, recover: true },
         deduplicationId: `finalize-${season}`,
+        ...(process.env.QSTASH_PROTECTION_BYPASS ? { headers: qstashProtectionHeaders() } : {}),
       });
       return { messageId: res.messageId };
     },
