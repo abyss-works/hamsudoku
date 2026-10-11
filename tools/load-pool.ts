@@ -12,7 +12,9 @@ function loadEnvLocal() {
   }
 }
 
-export { serializeRegions, serializeSolution, stageId } from '../src/shared/endlessStageFormat';
+import { serializeRegions, serializeSolution, stageId } from '../src/shared/endlessStageFormat';
+
+export { serializeRegions, serializeSolution, stageId };
 
 function argValue(argv: string[], name: string): string | undefined {
   const i = argv.indexOf(name);

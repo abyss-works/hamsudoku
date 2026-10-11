@@ -45,7 +45,7 @@ export interface EndlessEventRow {
 }
 
 export const MAX_INT32 = 2_147_483_647;
-export const MAX_BIGINT64 = 9_223_372_036_854_775_807n;
+export const MAX_BIGINT64 = BigInt('9223372036854775807');
 
 export function clampInt32(val: number): number {
   if (val > MAX_INT32) return MAX_INT32;
@@ -55,7 +55,7 @@ export function clampInt32(val: number): number {
 
 export function clampBigInt64(val: bigint): bigint {
   if (val > MAX_BIGINT64) return MAX_BIGINT64;
-  if (val < 0n) return 0n;
+  if (val < BigInt(0)) return BigInt(0);
   return val;
 }
 

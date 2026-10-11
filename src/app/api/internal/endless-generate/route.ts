@@ -11,9 +11,7 @@ export const maxDuration = 60;
 export const endlessGeneratePayloadSchema = z.object({
   jobId: z.string().min(1, 'jobId is required'),
   // 작업당 단일 청크 0 정책: 0이 아닌 청크 번호는 즉시 400을 반환하여 잘못된 입력에 의한 무한 재시도를 방지한다.
-  chunkIndex: z.literal(0, {
-    errorMap: () => ({ message: 'chunkIndex must be 0 (single chunk per job)' }),
-  }),
+  chunkIndex: z.literal(0, { message: 'chunkIndex must be 0 (single chunk per job)' }),
 });
 
 export interface GenerateRouteDeps {
@@ -48,7 +46,7 @@ export async function handleEndlessGenerate(req: Request, deps?: GenerateRouteDe
   const db = deps?.db ?? createPrismaDb();
   const result = await executeSupplyChunk(db, {
     jobId: parsed.data.jobId,
-    chunkIndex: parsed.data.chunkIndex,
+    chunkIndex: parsed.data.chunkIndex as number,
   });
 
   if (!result.ok) {
