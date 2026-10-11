@@ -139,7 +139,7 @@ describe('endless DbPort', () => {
     expect(await db.countZeroClearStages()).toBe(0);
   });
 
-  it('동일 사용자의 중복 클리어 제출 시 보상 지급과 스테이지 클리어 통계가 중복 가산되지 않는다', async () => {
+  it('동일 사용자가 별도의 유효 시도로 클리어 시 각각 정상 기록되고 보상과 스테이지 통계가 누적된다', async () => {
     const db = createMemoryDb();
     await db.insertStage(stage('e-1'));
 
@@ -159,7 +159,7 @@ describe('endless DbPort', () => {
     expect(st1?.clears).toBe(1);
     expect(st1?.plays).toBe(1);
 
-    // 중복 클리어 제출 (네트워크 재전송 또는 중복 요청)
+    // 두 번째 유효 클리어 제출: 별도 유효 attempt에 따른 정상 기록
     const s2 = await db.commitEndlessClear('u1', 'e-1', {
       earned: 3,
       season: '2026-W41',
@@ -168,14 +168,13 @@ describe('endless DbPort', () => {
       suspicious: false,
       atIso: '2026-10-07T00:00:10.000Z',
     });
-    // 보상 및 클리어 수 중복 증가 방지
-    expect(s2.balance).toBe(3);
+    expect(s2.balance).toBe(6);
     expect(s2.clearedCount).toBe(1);
 
     const st2 = await db.getStage('e-1');
-    expect(st2?.clears).toBe(1);
-    expect(st2?.plays).toBe(1);
-    expect(st2?.clearTotalMs).toBe(BigInt(20000));
+    expect(st2?.clears).toBe(2);
+    expect(st2?.plays).toBe(2);
+    expect(st2?.clearTotalMs).toBe(BigInt(45000));
   });
 
   it('Int 및 BigInt 상한을 초과하는 대규모 경과 시간에 대해 오버플로 없이 상한값으로 안전하게 클램핑된다', async () => {
