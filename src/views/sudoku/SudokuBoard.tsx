@@ -8,11 +8,15 @@ import { useBoardInteraction } from '../../features/sudoku/service/useBoardInter
 import type { CellState, Puzzle } from '../../features/sudoku/model/puzzles';
 import type { TapKind } from '../../features/sudoku/model/tap';
 
+const EMPTY_MARKS: ReadonlySet<string> = new Set();
+
 export interface SudokuBoardProps {
   puzzle: Puzzle;
   cells: CellState[][];
   /** 조각 위에 올린 X 집합. 해당 칸은 X로 그린다. */
   xMarks?: ReadonlySet<string>;
+  /** 확정 정답마커 집합. 다른 마커 상태보다 먼저 렌더링한다. */
+  autoMarks?: ReadonlySet<string>;
   violations: Violations;
   cleared: boolean;
   pulse?: ReadonlyMap<string, number>;
@@ -30,6 +34,7 @@ export function SudokuBoard({
   puzzle,
   cells,
   xMarks = new Set(),
+  autoMarks = EMPTY_MARKS,
   violations,
   cleared,
   pulse = new Map(),
@@ -43,7 +48,7 @@ export function SudokuBoard({
   renderOverlay,
 }: SudokuBoardProps) {
   const { projected, boardRef, controls, handlePress, handleMove, handleUp, handleClickCapture, handleCancel } =
-    useBoardInteraction(puzzle, cells, xMarks, violations, pulse, hitKey, shake, onPress, onEnter, onRelease);
+    useBoardInteraction(puzzle, cells, xMarks, violations, pulse, hitKey, shake, onPress, onEnter, onRelease, autoMarks);
 
   return (
     <motion.div className={`board-wrap${shake > 0 ? ' shake' : ''}`} animate={controls}>

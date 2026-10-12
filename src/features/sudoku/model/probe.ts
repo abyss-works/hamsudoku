@@ -1,7 +1,8 @@
 import type { CellState } from './puzzles';
 
-/** 덮인 조각은 X로 본다. 렌더·확정·스트로크 시작이 공유하는 우선순위다. */
-export function resolveMark(state: CellState, covered: boolean): CellState {
+/** 확정 정답마커가 우선하고, 덮인 조각은 일반 X로 렌더링한다. */
+export function resolveMark(state: CellState, covered: boolean, confirmed = false): CellState {
+  if (confirmed) return 'auto';
   return state === 'frag' && covered ? 'mark' : state;
 }
 

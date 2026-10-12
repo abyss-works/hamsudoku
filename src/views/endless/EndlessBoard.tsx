@@ -20,6 +20,7 @@ export function EndlessBoard({ puzzle, onWrong, onFinish, clearOverlay }: Endles
         puzzle={puzzle}
         cells={board.cells}
         xMarks={board.xMarks}
+        autoMarks={board.autoMarks}
         violations={board.violations}
         cleared={board.cleared}
         pulse={board.pulse}

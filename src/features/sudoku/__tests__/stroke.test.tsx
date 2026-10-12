@@ -104,7 +104,8 @@ describe('stroke', () => {
       result.current.tapCell(4, 4, 'double'); // 오답 → 빨강 고정
     });
     expect(at(result.current.cells, 0, 0)).toBe('hamster');
-    expect(at(result.current.cells, 0, 2)).toBe('auto');
+    expect(result.current.autoMarks.has('0,2')).toBe(true);
+    expect(at(result.current.cells, 0, 2)).toBe('empty');
     expect(at(result.current.cells, 4, 4)).toBe('wrong');
     act(() => {
       result.current.beginStroke(2, 2);
@@ -116,7 +117,8 @@ describe('stroke', () => {
     });
     expect(at(result.current.cells, 2, 2)).toBe('mark');
     expect(at(result.current.cells, 1, 2)).toBe('mark');
-    expect(at(result.current.cells, 0, 2)).toBe('auto');
+    expect(at(result.current.cells, 0, 2)).toBe('empty');
+    expect(result.current.autoMarks.has('0,2')).toBe(true);
     expect(at(result.current.cells, 0, 0)).toBe('hamster');
     expect(at(result.current.cells, 4, 4)).toBe('wrong');
     expect(at(result.current.cells, 2, 4)).toBe('mark');
@@ -187,7 +189,8 @@ describe('stroke', () => {
     });
     expect(engaged).toBe(true);
     expect(at(result.current.cells, 0, 0)).toBe('hamster');
-    expect(at(result.current.cells, 1, 1)).toBe('auto');
+    expect(at(result.current.cells, 1, 1)).toBe('empty');
+    expect(result.current.autoMarks.has('1,1')).toBe(true);
     expect(at(result.current.cells, 2, 2)).toBe('mark');
   });
 });
@@ -397,11 +400,13 @@ describe('probe', () => {
       result.current.resetMarks();
     });
     expect(at(result.current.cells, 0, 0)).toBe('hamster');
-    expect(at(result.current.cells, 0, 1)).toBe('auto');
+    expect(at(result.current.cells, 0, 1)).toBe('empty');
+    expect(result.current.autoMarks.has('0,1')).toBe(true);
     expect(at(result.current.cells, 3, 3)).toBe('empty');
     expect(at(result.current.cells, 4, 1)).toBe('empty');
     expect(at(result.current.cells, 4, 2)).toBe('empty');
-    expect(at(result.current.cells, 4, 0)).toBe('auto');
+    expect(at(result.current.cells, 4, 0)).toBe('empty');
+    expect(result.current.autoMarks.has('4,0')).toBe(true);
     expect(result.current.probeSlots).toBe(3);
   });
   it('앵커를 톡하면 자기 조각만 회수되고 슬롯이 충전된다', () => {
@@ -472,7 +477,8 @@ describe('probe', () => {
       result.current.tapCell(0, 0, 'double');
     });
     expect(at(result.current.cells, 0, 0)).toBe('hamster');
-    expect(at(result.current.cells, 0, 1)).toBe('auto');
+    expect(at(result.current.cells, 0, 1)).toBe('empty');
+    expect(result.current.autoMarks.has('0,1')).toBe(true);
     expect(result.current.probeSlots).toBe(3);
   });
 
@@ -523,9 +529,10 @@ describe('정답 전파', () => {
       result.current.tapCell(0, 0, 'double'); // 정답
     });
     expect(at(result.current.cells, 0, 0)).toBe('hamster');
-    expect(at(result.current.cells, 0, 1)).toBe('auto');
-    expect(at(result.current.cells, 3, 0)).toBe('auto');
-    expect(at(result.current.cells, 1, 1)).toBe('auto');
+    expect(at(result.current.cells, 0, 1)).toBe('mark');
+    expect(at(result.current.cells, 3, 0)).toBe('mark');
+    expect(at(result.current.cells, 1, 1)).toBe('mark');
+    for (const key of ['0,1', '3,0', '1,1']) expect(result.current.autoMarks.has(key)).toBe(true);
     expect(at(result.current.cells, 2, 2)).toBe('mark');
   });
 

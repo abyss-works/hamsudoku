@@ -108,7 +108,8 @@ describe('global double', () => {
       result.current.tapCell(0, 0, 'double');
     });
     expect(at(result.current.cells, 0, 0)).toBe('hamster');
-    expect(at(result.current.cells, 0, 1)).toBe('auto');
+    expect(at(result.current.cells, 0, 1)).toBe('empty');
+    expect(result.current.autoMarks.has('0,1')).toBe(true);
     expect(result.current.probeSlots).toBe(3);
   });
 });

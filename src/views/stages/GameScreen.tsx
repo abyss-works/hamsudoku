@@ -28,6 +28,7 @@ export function GameScreen({
         puzzle={stage.puzzle}
         cells={game.cells}
         xMarks={game.xMarks}
+        autoMarks={game.autoMarks}
         violations={game.violations}
         cleared={game.cleared}
         pulse={game.pulse}
