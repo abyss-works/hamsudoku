@@ -1,4 +1,4 @@
-import type { Chapter, Stage } from '../features/stages/stagesApi';
+import type { Chapter, Stage } from '../features/stages/model/catalog';
 
 export type Screen = 'home' | 'select' | 'game' | 'login' | 'recovery' | 'endless';
 export const BOOT_TIMEOUT_MS = 5000;

@@ -2,7 +2,7 @@
 import { StrictMode } from 'react';
 import { act, cleanup, renderHook } from '@testing-library/react';
 import { afterEach, expect, it, vi } from 'vitest';
-import { useClears } from '../features/stages/useClears';
+import { useClears } from '../features/stages/service/useClears';
 afterEach(() => { cleanup(); localStorage.clear(); vi.restoreAllMocks(); });
 it('StrictMode 설정 액션은 저장을 한 번만 실행한다', () => {
   const { result } = renderHook(useClears, { wrapper: StrictMode });

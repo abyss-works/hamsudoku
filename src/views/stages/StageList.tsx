@@ -1,5 +1,5 @@
 import { Button } from '../../ui/Button';
-import type { Stage } from '../../features/stages/catalog';
+import type { Stage } from '../../features/stages/model/catalog';
 
 export interface StageItemView {
   stage: Stage;

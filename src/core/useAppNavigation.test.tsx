@@ -2,7 +2,7 @@
 import { act, cleanup, renderHook } from '@testing-library/react';
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 import { useAppNavigation } from './useAppNavigation';
-import type { Chapter } from '../features/stages/stagesApi';
+import type { Chapter } from '../features/stages/model/catalog';
 import type { Puzzle } from '../features/sudoku/model/puzzles';
 
 const dummyPuzzle: Puzzle = {

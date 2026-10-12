@@ -1,5 +1,5 @@
 import { readdirSync, readFileSync } from 'node:fs';
-import { dirname, join, relative } from 'node:path';
+import { basename, dirname, join, relative } from 'node:path';
 import { describe, expect, it } from 'vitest';
 import ts from 'typescript';
 
@@ -286,6 +286,36 @@ describe('책임 경계와 기능 패키지 아키텍처', () => {
     expect(featureTsx).toEqual([]);
   });
 
+  it('기능 구현은 api, model, service 책임 그룹 아래에 배치한다', () => {
+    const misplaced = files.map(label).filter((file) =>
+      file.startsWith('src/features/') && !/^src\/features\/[^/]+\/(api|model|service)\//.test(file),
+    );
+    expect(misplaced).toEqual([]);
+  });
+
+  it('View 컴포넌트 파일명은 표현 역할 접미사를 사용한다', () => {
+    const roleSuffix = /.+(Screen|Dialog|Overlay|Tabs|Tab|Board|List|Panel|Menu|Header|Input|Button|Status|Progress|Help|Cell)$/;
+    const invalid = files.map(label).filter((file) => {
+      if (!/^src\/views\/.*\.tsx$/.test(file)) return false;
+      return !roleSuffix.test(basename(file, '.tsx'));
+    });
+    expect(invalid).toEqual([]);
+  });
+
+  it('View 대표 컴포넌트 이름은 파일명과 일치한다', () => {
+    const mismatched = files.map(label).filter((file) => {
+      if (!/^src\/views\/.*\.tsx$/.test(file)) return false;
+      const componentNames = getSourceFile(join(process.cwd(), file)).statements
+        .filter((statement): statement is ts.FunctionDeclaration =>
+          ts.isFunctionDeclaration(statement) && Boolean(statement.name) &&
+          Boolean(statement.modifiers?.some((modifier) => modifier.kind === ts.SyntaxKind.ExportKeyword)),
+        )
+        .map((statement) => statement.name!.text);
+      return !componentNames.includes(basename(file, '.tsx'));
+    });
+    expect(mismatched).toEqual([]);
+  });
+
 function validateLayerDependency(fromLabel: string, toLabel: string, dep: ImportInfo): string[] {
   const failures: string[] = [];
   const fromLayer = getLayer(fromLabel);
@@ -418,11 +448,11 @@ function validateLayerDependency(fromLabel: string, toLabel: string, dep: Import
     // 순수 UI 유틸리티 직접 import -> 허용 (탐지되지 않음)
     expect(analyzeFixture('import { buttonClass } from "@/ui/classNames"; export function V() { return <div />; }')).toEqual([]);
     expect(analyzeFixture('import { confettiPiecesModel } from "@/ui/confettiModel"; export function V() { return <div />; }')).toEqual([]);
-    expect(analyzeFixture('import { rankModel as model } from "@/features/ranking/rankLogic"; export function V() { return <div />; }')).toHaveLength(1);
+    expect(analyzeFixture('import { rankModel as model } from "@/features/ranking/model/rankLogic"; export function V() { return <div />; }')).toHaveLength(1);
     expect(analyzeFixture('import { solve } from "@/features/sudoku/model/solver.ts"; export function V() { return <div />; }')).toHaveLength(1);
     expect(analyzeFixture('export { BOOT_TIMEOUT_MS } from "@/application/appLogic";')).toEqual([]);
     expect(analyzeFixture('export { BOOT_TIMEOUT_MS } from "@/core/appLogic";')).toEqual([]);
-    expect(analyzeFixture('export { rankModel as MODEL } from "@/features/ranking/rankLogic";')).toHaveLength(1);
+    expect(analyzeFixture('export { rankModel as MODEL } from "@/features/ranking/model/rankLogic";')).toHaveLength(1);
     expect(analyzeFixture('import { useState as ownState } from "react"; export function V() { const [v] = ownState(0); return <div>{v}</div>; }').length).toBeGreaterThan(0);
     expect(analyzeFixture('import * as React from "react"; export function V() { const [v] = React.useState(0); return <div>{v}</div>; }').length).toBeGreaterThan(0);
 

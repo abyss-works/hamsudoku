@@ -3,7 +3,7 @@ import { Button } from '../../ui/Button';
 import { HamsterFace } from '../../ui/HamsterFace';
 import { useLoginService } from '../../features/account/service/useLoginService';
 import type { LoginServiceOptions } from '../../features/account/model/login.types';
-import { LoginConfirmationView } from './login/LoginConfirmationView';
+import { LoginConfirmationPanel } from './login/LoginConfirmationPanel';
 import { AccountInput } from './AccountInput';
 
 export interface LoginScreenProps extends LoginServiceOptions {
@@ -51,7 +51,7 @@ export function LoginScreen({ signup, signin, reset, cloud, onBack, onDone }: Lo
           )}
           {okMessage && <p className="login-ok">{okMessage}</p>}
           {confirmLogin ? (
-            <LoginConfirmationView
+            <LoginConfirmationPanel
               busy={busy}
               login={login}
               cancelLogin={cancelLogin}

@@ -1,6 +1,6 @@
 import { describe, expect, it } from 'vitest';
 import { countSingles, inBand, LEVEL_CONFIGS } from './levels';
-import { LEVELS } from '../../stages/levels.generated';
+import { LEVELS } from '../../stages/model/levels.generated';
 import { measure, measureWithTrace } from './logic';
 import { PUZZLES } from './puzzles';
 import { scoreDifficulty } from './shape';

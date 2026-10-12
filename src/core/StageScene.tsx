@@ -1,5 +1,5 @@
-import type { Stage } from '../features/stages/catalog';
-import { useStageGame } from '../features/stages/useStageGame';
+import type { Stage } from '../features/stages/model/catalog';
+import { useStageGame } from '../features/stages/service/useStageGame';
 import { OverlayProvider } from '../ui/OverlayProvider';
 import { GameScreen } from '../views/stages/GameScreen';
 import { StageOverlayHost } from './StageOverlayHost';

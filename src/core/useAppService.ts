@@ -1,8 +1,8 @@
-import { useClears } from '../features/stages/useClears';
+import { useClears } from '../features/stages/service/useClears';
 import { useAccount } from '../features/account/service/useAccount';
 import { useEndlessSummary } from '../features/endless/service/useEndlessSummary';
-import { useStages } from '../features/stages/useStages';
-import { useStageRecordsSync } from '../features/stages/useStageRecordsSync';
+import { useStages } from '../features/stages/service/useStages';
+import { useStageRecordsSync } from '../features/stages/service/useStageRecordsSync';
 import { useAppBoot } from './useAppBoot';
 import { useAppNavigation } from './useAppNavigation';
 import { useAccountTransfer } from './useAccountTransfer';

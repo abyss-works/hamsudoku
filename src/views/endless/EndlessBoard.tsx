@@ -1,5 +1,5 @@
 import type { ReactNode } from 'react';
-import { Board } from '../sudoku/Board';
+import { SudokuBoard } from '../sudoku/SudokuBoard';
 import { ProbeButton } from '../sudoku/ProbeButton';
 import { useEndlessBoard } from '../../features/endless/service/useEndlessBoard';
 import type { Puzzle } from '../../features/sudoku/model/puzzles';
@@ -16,7 +16,7 @@ export function EndlessBoard({ puzzle, onWrong, onFinish, clearOverlay }: Endles
 
   return (
     <>
-      <Board
+      <SudokuBoard
         puzzle={puzzle}
         cells={board.cells}
         xMarks={board.xMarks}

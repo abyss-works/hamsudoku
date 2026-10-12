@@ -1,5 +1,5 @@
 import { useState } from 'react';
-import type { Chapter, Stage } from '../features/stages/stagesApi';
+import type { Chapter, Stage } from '../features/stages/model/catalog';
 import { chapterForStage, nextStage, recoveryState, stageSelection, type Screen } from './appLogic';
 import { locationSearch, removeRecoveryLocation } from './appBrowser';
 
