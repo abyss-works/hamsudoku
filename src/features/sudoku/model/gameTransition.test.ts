@@ -67,7 +67,7 @@ describe('game transitions', () => {
     expect(reset.autoMarks.size).toBe(0);
   });
 
-  it('정답 대각선 이웃인 앵커를 회수하면 자동 X가 드러난다', () => {
+  it('정답 전파가 인접 앵커와 소유 조각을 회수하고 자동 X를 남긴다', () => {
     const puzzle = PUZZLES[0];
     const solution = puzzle.solution.find(([r, c]) => r + 1 < puzzle.size && c + 1 < puzzle.size);
     expect(solution).toBeDefined();
@@ -76,39 +76,45 @@ describe('game transitions', () => {
     const anchorR = r + 1;
     const anchorC = c + 1;
     const anchorKey = `${anchorR},${anchorC}`;
+    const restoredMarkR = anchorR;
+    const restoredMarkC = c;
+    const restoredMarkKey = `${restoredMarkR},${restoredMarkC}`;
     let state = transitions.createGameState(puzzle.size);
     state = transitions.transitionGame(state, puzzle, { type: 'tap', r, c, kind: 'single' }).state;
+    state = transitions.transitionGame(state, puzzle,
+      { type: 'tap', r: restoredMarkR, c: restoredMarkC, kind: 'single' }).state;
     state = transitions.transitionGame(state, puzzle, { type: 'probe', on: true }).state;
     state = transitions.transitionGame(state, puzzle, { type: 'tap', r: anchorR, c: anchorC, kind: 'single' }).state;
+    const ownedFrags = [...state.links.entries()]
+      .filter(([, owner]) => owner === anchorKey)
+      .map(([fragment]) => fragment);
+    expect(ownedFrags).toContain(`${r},${c}`);
+    expect(ownedFrags).toContain(restoredMarkKey);
     expect(state.cells[r][c]).toBe('frag');
     expect(state.underlay.get(`${r},${c}`)).toBe('mark');
+    expect(state.cells[restoredMarkR][restoredMarkC]).toBe('frag');
+    expect(state.underlay.get(restoredMarkKey)).toBe('mark');
     state = transitions.transitionGame(state, puzzle, { type: 'probe', on: false }).state;
 
-    const answered = transitions.transitionGame(state, puzzle, { type: 'tap', r, c, kind: 'double' }).state;
+    const answer = transitions.transitionGame(state, puzzle, { type: 'tap', r, c, kind: 'double' });
+    const answered = answer.state;
     expect(answered.cells[r][c]).toBe('hamster');
-    expect(answered.cells[anchorR][anchorC]).toBe('anchor');
+    expect(answered.cells[anchorR][anchorC]).toBe('empty');
+    expect(answered.cells[restoredMarkR][restoredMarkC]).toBe('mark');
+    expect(answered.underlay.has(restoredMarkKey)).toBe(false);
+    expect([...answered.links.values()]).not.toContain(anchorKey);
+    for (const fragment of ownedFrags) {
+      const [fragmentR, fragmentC] = fragment.split(',').map(Number);
+      if (fragment !== `${r},${c}`) expect(answered.cells[fragmentR][fragmentC]).not.toBe('frag');
+    }
     expect(answered.autoMarks.has(anchorKey)).toBe(true);
+    expect(answered.autoMarks.has(restoredMarkKey)).toBe(true);
+    expect(answer.sounds).toEqual(['erase', 'correct']);
     const answeredView = transitions.projectGame(answered, puzzle);
     expect(projectBoard(answeredView.cells, puzzle, answeredView.xMarks, answeredView.violations,
       answeredView.pulse, answeredView.hitKey, answeredView.autoMarks)[anchorR][anchorC].state).toBe('auto');
-
-    const locked = transitions.transitionGame(answered, puzzle,
-      { type: 'tap', r: anchorR, c: anchorC, kind: 'double' });
-    expect(locked.state.cells[anchorR][anchorC]).toBe('anchor');
-    expect(locked.sounds).toEqual([]);
-
-    const recalled = transitions.transitionGame(locked.state, puzzle,
-      { type: 'tap', r: anchorR, c: anchorC, kind: 'single' }).state;
-    expect(recalled.cells[anchorR][anchorC]).toBe('empty');
-    expect(recalled.autoMarks.has(anchorKey)).toBe(true);
-    const recalledView = transitions.projectGame(recalled, puzzle);
-    expect(projectBoard(recalledView.cells, puzzle, recalledView.xMarks, recalledView.violations,
-      recalledView.pulse, recalledView.hitKey, recalledView.autoMarks)[anchorR][anchorC].state).toBe('auto');
-
-    const started = transitions.transitionGame(answered, puzzle, { type: 'begin', r: anchorR, c: anchorC });
-    const erased = transitions.transitionGame(started.state, puzzle, { type: 'enter', r, c: anchorC }).state;
-    expect(erased.cells[anchorR][anchorC]).toBe('empty');
-    expect(erased.autoMarks.has(anchorKey)).toBe(true);
+    expect(projectBoard(answeredView.cells, puzzle, answeredView.xMarks, answeredView.violations,
+      answeredView.pulse, answeredView.hitKey, answeredView.autoMarks)[restoredMarkR][restoredMarkC].state).toBe('auto');
   });
 
   it('스트로크에서 각 칸을 한 번만 변경하고 reset은 스트로크를 해제한다', () => {
