@@ -10,6 +10,8 @@ export interface HamSudoku {
   cells: CellState[][];
   /** 조각 위에 올린 X 집합. 렌더만 X가 이기고 상태는 조각 그대로다. */
   xMarks: ReadonlySet<string>;
+  /** 확정 정답마커 집합. 조각·일반 X 상태와 분리해 렌더 우선순위를 적용한다. */
+  autoMarks: ReadonlySet<string>;
   violations: Violations;
   cleared: boolean;
   hamsterCount: number;

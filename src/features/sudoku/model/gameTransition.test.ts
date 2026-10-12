@@ -1,6 +1,7 @@
 import { describe, expect, it } from 'vitest';
 import * as transitions from './gameTransition';
 import { PUZZLES } from './puzzles';
+import { projectBoard } from './boardProjection';
 
 describe('game transitions', () => {
   it.each([false, true])('임시 정답 모드 %s에서 확정 정답의 반복 입력을 무시한다', (probeActive) => {
@@ -30,6 +31,40 @@ describe('game transitions', () => {
     expect(placed.state.cells[2][0]).toBe('frag');
     expect(recalled.state.cells[2][0]).toBe('mark');
     expect(recalled.sounds).toEqual(['erase']);
+  });
+
+  it('확정 마커가 임시 조각을 덮고 앵커 회수 뒤에도 남는다', () => {
+    const puzzle = PUZZLES[0];
+    let state = transitions.createGameState(puzzle.size);
+    state = transitions.transitionGame(state, puzzle, { type: 'tap', r: 1, c: 1, kind: 'single' }).state;
+    state = transitions.transitionGame(state, puzzle, { type: 'probe', on: true }).state;
+    state = transitions.transitionGame(state, puzzle, { type: 'tap', r: 2, c: 2, kind: 'single' }).state;
+    state = transitions.transitionGame(state, puzzle, { type: 'probe', on: false }).state;
+
+    const answered = transitions.transitionGame(state, puzzle, { type: 'tap', r: 0, c: 0, kind: 'double' }).state;
+    expect(answered.cells[1][1]).toBe('frag');
+    expect(answered.underlay.get('1,1')).toBe('mark');
+    expect(answered.autoMarks.has('1,1')).toBe(true);
+    const answeredView = transitions.projectGame(answered, puzzle);
+    expect(projectBoard(answeredView.cells, puzzle, answeredView.xMarks, answeredView.violations,
+      answeredView.pulse, answeredView.hitKey, answeredView.autoMarks)[1][1].state).toBe('auto');
+
+    const locked = transitions.transitionGame(answered, puzzle, { type: 'tap', r: 1, c: 1, kind: 'single' }).state;
+    expect(locked.cells[1][1]).toBe('frag');
+    expect(locked.underlay.get('1,1')).toBe('mark');
+
+    const recallMode = transitions.transitionGame(locked, puzzle, { type: 'probe', on: true }).state;
+    const recalled = transitions.transitionGame(recallMode, puzzle, { type: 'tap', r: 2, c: 2, kind: 'single' }).state;
+    expect(recalled.cells[1][1]).toBe('mark');
+    expect(recalled.underlay.has('1,1')).toBe(false);
+    expect(recalled.autoMarks.has('1,1')).toBe(true);
+
+    const recalledView = transitions.projectGame(recalled, puzzle);
+    expect(projectBoard(recalledView.cells, puzzle, recalledView.xMarks, recalledView.violations,
+      recalledView.pulse, recalledView.hitKey, recalledView.autoMarks)[1][1].state).toBe('auto');
+
+    const reset = transitions.transitionGame(recalled, puzzle, { type: 'reset' }).state;
+    expect(reset.autoMarks.size).toBe(0);
   });
 
   it('스트로크에서 각 칸을 한 번만 변경하고 reset은 스트로크를 해제한다', () => {
