@@ -372,7 +372,7 @@ export function renderModule(levels: GeneratedLevel[], seed: number, infos: Pool
     `// 가중치: ${WEIGHTS.version}`,
     `// 밴드: ${JSON.stringify(LEVEL_CONFIGS)}`,
     ...infos.map((i) => `// 레벨 ${i.level}: 풀 ${i.pool}, 점수 ${i.scoreMin}~${i.scoreMax}`),
-    `import type { GeneratedLevel } from '../sudoku/model/levels';`,
+    `import type { GeneratedLevel } from '../../sudoku/model/levels';`,
     `export const LEVELS: GeneratedLevel[] = ${JSON.stringify(levels)};`,
     ``,
   ];

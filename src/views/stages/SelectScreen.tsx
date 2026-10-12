@@ -1,5 +1,5 @@
-import { useSelectService, type SelectServiceOptions } from '../../features/stages/useSelectService';
-import type { Stage } from '../../features/stages/catalog';
+import { useSelectService, type SelectServiceOptions } from '../../features/stages/service/useSelectService';
+import type { Stage } from '../../features/stages/model/catalog';
 import { Button } from '../../ui/Button';
 import { ChapterTabs } from './ChapterTabs';
 import { StageList } from './StageList';

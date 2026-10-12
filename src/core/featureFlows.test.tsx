@@ -54,9 +54,9 @@ it('completes password success after 700ms', async () => {
  await act(async()=>{await result.current.submit();});
  act(()=>vi.advanceTimersByTime(700));expect(onDone).toHaveBeenCalledOnce();
 });
-import { homeGate } from '../features/home/homeLogic';
-import { selectionModel } from '../features/stages/selectionLogic';
-import { rankModel } from '../features/ranking/rankLogic';
+import { homeGate } from '../features/home/model/homeLogic';
+import { selectionModel } from '../features/stages/model/selectionLogic';
+import { rankModel } from '../features/ranking/model/rankLogic';
 it('chooses gates before endless entry and selects fallback chapter',()=>{
  expect(homeGate(true,'guest',null,null)).toBe('guest');
  expect(homeGate(true,'account','e@x.y',null)).toBe('nickname');
@@ -65,7 +65,7 @@ it('chooses gates before endless entry and selects fallback chapter',()=>{
  expect(selectionModel(chapters,'missing',new Map()).active?.id).toBe('c');
  expect(rankModel(null,null,null,false).entries).toEqual([]);
 });
-import { useHomeService } from '../features/home/useHomeService';
+import { useHomeService } from '../features/home/service/useHomeService';
 import { OverlayProvider } from '../ui/OverlayProvider';
 it('refreshes home quietly and opens guest gate before requesting entry',()=>{
  const refreshSoft=vi.fn(async()=>null);const refreshMyRank=vi.fn(async()=>{});const onEndless=vi.fn();

@@ -71,7 +71,7 @@ export const RULES = [
   { fig: <LineFig />, text: '한 줄에 햄스터 1마리' },
 ];
 
-export function RulesPage() {
+export function RulesHelp() {
   return (
     <>
       {RULES.map((r) => (

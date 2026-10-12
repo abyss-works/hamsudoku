@@ -70,6 +70,11 @@ describe('generateLevel', () => {
     const r2 = generateLevel(1, 7);
     expect(renderModule(r1.levels, 7, [r1.info])).toBe(renderModule(r2.levels, 7, [r2.info]));
   });
+  it('스테이지 model 경로로 생성한 모듈은 sudoku model을 참조한다', () => {
+    expect(renderModule([], 7, [])).toContain(
+      `import type { GeneratedLevel } from '../../sudoku/model/levels';`,
+    );
+  });
   it('실패 레벨은 건너뛰고 기록한다', () => {
     const r = runLevels(7, [99]);
     expect(r.levels).toHaveLength(0);

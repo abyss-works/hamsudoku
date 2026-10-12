@@ -1,5 +1,4 @@
-import type { HomeServiceOptions } from '../features/home/home.types';
-import { useHomeService } from '../features/home/useHomeService';
+import { useHomeService, type HomeServiceOptions } from '../features/home/service/useHomeService';
 import { OverlayProvider } from '../ui/OverlayProvider';
 import { HomeScreen } from '../views/home/HomeScreen';
 import { HomeOverlayHost } from './HomeOverlayHost';

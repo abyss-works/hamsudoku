@@ -1,7 +1,7 @@
 // @vitest-environment jsdom
 import { cleanup, render } from '@testing-library/react';
 import { afterEach, describe, expect, it, vi } from 'vitest';
-import { stageCatalog } from '../features/stages/catalog';
+import { stageCatalog } from '../features/stages/model/catalog';
 import { EndlessScene } from './EndlessScene';
 import { StageScene } from './StageScene';
 import * as gameTransition from '../features/sudoku/model/gameTransition';

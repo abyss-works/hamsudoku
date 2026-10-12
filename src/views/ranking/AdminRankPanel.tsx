@@ -1,7 +1,7 @@
 'use client';
 
 import { CheckSquare, RefreshCw, Square, Trash2 } from 'lucide-react';
-import { useAdminRankPanelService } from '../../features/ranking/useAdminRankPanelService';
+import { useAdminRankPanelService } from '../../features/ranking/service/useAdminRankPanelService';
 import { Button } from '../../ui/Button';
 
 // 관리자 전용 랭킹 패널 — 게스트(nickname 없음) 엔트리를 골라 랭킹 스토어에서 제거한다.
