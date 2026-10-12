@@ -1,7 +1,7 @@
 // @vitest-environment jsdom
 import { afterEach, describe, expect, it, vi } from 'vitest';
 import { act, renderHook, waitFor } from '@testing-library/react';
-import { QueryProvider } from '../../../core/queryClient';
+import { QueryProvider } from '../../../core/composition/QueryProvider';
 import { useEndlessSummary } from './useEndlessSummary';
 
 afterEach(() => {

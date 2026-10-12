@@ -1,11 +1,11 @@
 // @vitest-environment jsdom
 import { cleanup, fireEvent, render, screen } from '@testing-library/react';
 import { afterEach, describe, expect, it, vi } from 'vitest';
-import { HomeScene } from './HomeScene';
-import { stageCatalog } from '../features/stages/model/catalog';
-import { StageScene } from './StageScene';
-import { EndlessScene } from './EndlessScene';
-import * as endlessSessionModule from '../features/endless/service/useEndlessSession';
+import { HomeScene } from '../HomeScene';
+import { stageCatalog } from '../../../features/stages/model/catalog';
+import { StageScene } from '../StageScene';
+import { EndlessScene } from '../EndlessScene';
+import * as endlessSessionModule from '../../../features/endless/service/useEndlessSession';
 
 afterEach(() => {
   cleanup();

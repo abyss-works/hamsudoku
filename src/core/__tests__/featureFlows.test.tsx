@@ -1,11 +1,11 @@
 // @vitest-environment jsdom
 import { act, renderHook } from '@testing-library/react';
 import { afterEach, expect, it, vi } from 'vitest';
-import { useLoginService } from '../features/account/service/useLoginService';
-import { useAuthDialogService } from '../features/account/service/useAuthDialogService';
-import { useSetPasswordService } from '../features/account/service/useSetPasswordService';
-import { useNicknameService } from '../features/account/service/useNicknameService';
-import { recommendedBase, validateCredentials, validatePassword } from '../features/account/model/validation';
+import { useLoginService } from '../../features/account/service/useLoginService';
+import { useAuthDialogService } from '../../features/account/service/useAuthDialogService';
+import { useSetPasswordService } from '../../features/account/service/useSetPasswordService';
+import { useNicknameService } from '../../features/account/service/useNicknameService';
+import { recommendedBase, validateCredentials, validatePassword } from '../../features/account/model/validation';
 afterEach(() => vi.useRealTimers());
 it('validates credentials and password confirmation without IO', () => {
  expect(validateCredentials(' ', '123456')).toBe('이메일과 6자 이상 비밀번호를 입력하세요.');
@@ -54,9 +54,9 @@ it('completes password success after 700ms', async () => {
  await act(async()=>{await result.current.submit();});
  act(()=>vi.advanceTimersByTime(700));expect(onDone).toHaveBeenCalledOnce();
 });
-import { homeGate } from '../features/home/model/homeLogic';
-import { selectionModel } from '../features/stages/model/selectionLogic';
-import { rankModel } from '../features/ranking/model/rankLogic';
+import { homeGate } from '../../features/home/model/homeLogic';
+import { selectionModel } from '../../features/stages/model/selectionLogic';
+import { rankModel } from '../../features/ranking/model/rankLogic';
 it('chooses gates before endless entry and selects fallback chapter',()=>{
  expect(homeGate(true,'guest',null,null)).toBe('guest');
  expect(homeGate(true,'account','e@x.y',null)).toBe('nickname');
@@ -65,8 +65,8 @@ it('chooses gates before endless entry and selects fallback chapter',()=>{
  expect(selectionModel(chapters,'missing',new Map()).active?.id).toBe('c');
  expect(rankModel(null,null,null,false).entries).toEqual([]);
 });
-import { useHomeService } from '../features/home/service/useHomeService';
-import { OverlayProvider } from '../ui/OverlayProvider';
+import { useHomeService } from '../../features/home/service/useHomeService';
+import { OverlayProvider } from '../../ui/OverlayProvider';
 it('refreshes home quietly and opens guest gate before requesting entry',()=>{
  const refreshSoft=vi.fn(async()=>null);const refreshMyRank=vi.fn(async()=>{});const onEndless=vi.fn();
  const options={email:null,nickname:null,uid:'guest',summary:{me:null,rank:null,myRank:null,loading:false,error:null,refresh:async()=>{},refreshSoft,refreshMyRank},onSignin:async()=>({ok:true}),onEndless,endlessEnabled:true,onWarmSession:()=>{},onLogin:()=>{}};
@@ -93,7 +93,7 @@ it('recovers nickname submission after rejected request',async()=>{
  const {result}=renderHook(()=>useNicknameService({onSaveNickname:async()=>{throw Error('offline');}}));
  await act(async()=>{await result.current.save();});expect(result.current.msg).toBe('저장하지 못했어요.');expect(result.current.saving).toBe(false);
 });
-import { existingEmail, validateResetEmail } from '../features/account/model/validation';
+import { existingEmail, validateResetEmail } from '../../features/account/model/validation';
 it('classifies existing-email responses and reset input',()=>{
  expect(existingEmail('email_exists')).toBe(true);expect(existingEmail('user_already_exists')).toBe(true);expect(existingEmail('offline')).toBe(false);
  expect(validateResetEmail(' ')).toBe(false);expect(validateResetEmail(' e@x.y ')).toBe(true);

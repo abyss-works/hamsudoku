@@ -1,6 +1,6 @@
-import { useHomeService, type HomeServiceOptions } from '../features/home/service/useHomeService';
-import { OverlayProvider } from '../ui/OverlayProvider';
-import { HomeScreen } from '../views/home/HomeScreen';
+import { useHomeService, type HomeServiceOptions } from '../../features/home/service/useHomeService';
+import { OverlayProvider } from '../../ui/OverlayProvider';
+import { HomeScreen } from '../../views/home/HomeScreen';
 import { HomeOverlayHost } from './HomeOverlayHost';
 
 export interface HomeSceneProps extends HomeServiceOptions {

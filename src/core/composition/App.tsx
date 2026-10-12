@@ -1,15 +1,15 @@
-import { useAppService } from './useAppService';
-import { QueryProvider } from './queryClient';
+import { useAppService } from '../orchestration/useAppService';
+import { QueryProvider } from './QueryProvider';
 import { EndlessScene } from './EndlessScene';
 import { StageScene } from './StageScene';
 import { HomeScene } from './HomeScene';
-import { LoginScreen } from '../views/account/LoginScreen';
-import { SelectScreen } from '../views/stages/SelectScreen';
-import { SetPasswordScreen } from '../views/account/SetPasswordScreen';
-import { BootSplash } from '../ui/BootSplash';
-import { LoadingProvider } from '../ui/LoadingProvider';
-export type { Screen } from './appLogic';
-export { BOOT_TIMEOUT_MS } from './appLogic';
+import { LoginScreen } from '../../views/account/LoginScreen';
+import { SelectScreen } from '../../views/stages/SelectScreen';
+import { SetPasswordScreen } from '../../views/account/SetPasswordScreen';
+import { BootSplash } from '../../ui/BootSplash';
+import { LoadingProvider } from '../../ui/LoadingProvider';
+export type { Screen } from '../orchestration/appLogic';
+export { BOOT_TIMEOUT_MS } from '../orchestration/appLogic';
 
 function AppView() {
   const {

@@ -1,10 +1,10 @@
 // @vitest-environment jsdom
 import { cleanup, fireEvent, render, screen, waitFor } from '@testing-library/react';
 import { afterEach, expect, it, vi } from 'vitest';
-import { EndlessScene } from './EndlessScene';
+import { EndlessScene } from '../EndlessScene';
 
 const api = vi.hoisted(() => ({ nextStage: vi.fn(), submitClear: vi.fn(), reportFail: vi.fn() }));
-vi.mock('../features/endless/api/endlessApi', () => ({
+vi.mock('../../../features/endless/api/endlessApi', () => ({
   ...api,
   EndlessApiError: class extends Error { status = 500; },
 }));

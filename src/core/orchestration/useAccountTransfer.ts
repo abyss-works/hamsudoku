@@ -1,6 +1,6 @@
-import type { useAccount } from '../features/account/service/useAccount';
-import type { useEndlessSummary } from '../features/endless/service/useEndlessSummary';
-import type { useStageRecordsSync } from '../features/stages/service/useStageRecordsSync';
+import type { useAccount } from '../../features/account/service/useAccount';
+import type { useEndlessSummary } from '../../features/endless/service/useEndlessSummary';
+import type { useStageRecordsSync } from '../../features/stages/service/useStageRecordsSync';
 
 export interface AccountTransferOptions {
   account: Pick<ReturnType<typeof useAccount>, 'signin' | 'signout'>;

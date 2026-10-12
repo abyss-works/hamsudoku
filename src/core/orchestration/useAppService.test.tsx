@@ -3,8 +3,8 @@ import { act, cleanup, renderHook, waitFor } from '@testing-library/react';
 import { StrictMode } from 'react';
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 import { useAppService } from './useAppService';
-import { PUZZLES } from '../features/sudoku/model/puzzles';
-import { SAVE_KEY } from '../platform/storage/save';
+import { PUZZLES } from '../../features/sudoku/model/puzzles';
+import { SAVE_KEY } from '../../platform/storage/save';
 
 const deps = vi.hoisted(() => ({
   account: { uid: 'a', email: 'a@example.com' as string | null, nickname: '이름', cloud: true, loading: false,
@@ -12,14 +12,14 @@ const deps = vi.hoisted(() => ({
   reconcile: vi.fn(), pull: vi.fn(), pushClear: vi.fn(), fetchAttemptKey: vi.fn(),
   summary: { me: {} as object | null, error: null as string | null, refreshSoft: vi.fn() },
 }));
-vi.mock('../features/account/service/useAccount', () => ({ useAccount: () => deps.account }));
-vi.mock('../features/stages/service/useStages', () => ({ useStages: () => ({ chapters: [{ id: 'lv1', title: '레벨 1', stages: [
+vi.mock('../../features/account/service/useAccount', () => ({ useAccount: () => deps.account }));
+vi.mock('../../features/stages/service/useStages', () => ({ useStages: () => ({ chapters: [{ id: 'lv1', title: '레벨 1', stages: [
   { id: 's1', code: '1-1', title: '첫 판', locked: false, puzzle: PUZZLES[0] },
   { id: 's2', code: '1-2', title: '둘째 판', locked: false, puzzle: PUZZLES[0] },
 ] }], loading: false, error: null }) }));
-vi.mock('../features/endless/service/useEndlessSummary', () => ({ useEndlessSummary: () => deps.summary }));
-vi.mock('../ui/useFontsReady', () => ({ useFontsReady: () => true }));
-vi.mock('../features/stages/api/sync', () => ({ reconcile: deps.reconcile, pull: deps.pull, pushClear: deps.pushClear, fetchAttemptKey: deps.fetchAttemptKey }));
+vi.mock('../../features/endless/service/useEndlessSummary', () => ({ useEndlessSummary: () => deps.summary }));
+vi.mock('../../ui/useFontsReady', () => ({ useFontsReady: () => true }));
+vi.mock('../../features/stages/api/sync', () => ({ reconcile: deps.reconcile, pull: deps.pull, pushClear: deps.pushClear, fetchAttemptKey: deps.fetchAttemptKey }));
 
 beforeEach(() => {
   vi.clearAllMocks();
