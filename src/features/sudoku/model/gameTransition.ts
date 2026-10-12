@@ -130,7 +130,7 @@ export function transitionGame(previous: GameState, puzzle: Puzzle, action: Game
     const prev = state.cells;
     const cur = prev[r][c];
     const key = keyOf(r, c);
-    if (state.autoMarks.has(key)) return;
+    if (state.autoMarks.has(key) && (cur !== 'anchor' || kind === 'double')) return;
     // 덮인 조각은 X로 본다. 상태는 조각 그대로 두고 렌더만 X가 이긴다.
     const covered = cur === 'frag' && state.underlay.has(key);
     if (state.probeActive && kind === 'single') {
@@ -175,10 +175,10 @@ export function transitionGame(previous: GameState, puzzle: Puzzle, action: Game
     }
     if (result === 'hamster') {
       const delays = new Map<string, number>();
-      // 정답마커는 빈 타일·회색X·조각 위에 별도 기록한다. 조각·앵커의 소유 상태는 보존한다.
+      // 정답마커는 빈 타일·회색X·조각·앵커 위에 별도 기록하고 조각 소유권·앵커 상태를 보존한다.
       for (const m of spreadMarks(after.length, r, c, puzzle.islands)) {
         const target = next[m.r][m.c];
-        if (target === 'empty' || target === 'mark' || target === 'frag') {
+        if (target === 'empty' || target === 'mark' || target === 'frag' || target === 'anchor') {
           state.autoMarks.add(keyOf(m.r, m.c));
           delays.set(keyOf(m.r, m.c), m.delayMs);
         }
@@ -226,8 +226,8 @@ export function transitionGame(previous: GameState, puzzle: Puzzle, action: Game
   // 칠하기 모드는 빈칸만 마크로, 지우기 모드는 X마커·앵커·덮인 조각을 바꾼다.
   // 덮인 조각은 X를 걷고 드러내고, 앵커는 조각까지 회수한다. 맨 조각은 손대지 않는다.
   const paintOne = (st: Stroke, r: number, c: number) => {
-    if (state.autoMarks.has(keyOf(r, c))) return;
     const cur = state.cells[r][c];
+    if (state.autoMarks.has(keyOf(r, c)) && cur !== 'anchor') return;
     if (st.toMark) {
       if (cur !== 'empty') return;
       const next = state.cells.map((line) => [...line]);
@@ -258,11 +258,11 @@ export function transitionGame(previous: GameState, puzzle: Puzzle, action: Game
       state.stroke = null;
       return;
     }
-    if (state.autoMarks.has(keyOf(r, c))) {
+    const cur = state.cells[r][c];
+    if (state.autoMarks.has(keyOf(r, c)) && cur !== 'anchor') {
       state.stroke = null;
       return;
     }
-    const cur = state.cells[r][c];
     // 덮인 조각은 X로 본다.
     const pressed = resolveMark(cur, state.underlay.has(keyOf(r, c)));
     const toMark = pressed !== 'mark' && pressed !== 'anchor';
