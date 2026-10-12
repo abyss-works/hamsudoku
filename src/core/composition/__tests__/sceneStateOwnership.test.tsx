@@ -1,10 +1,10 @@
 // @vitest-environment jsdom
 import { cleanup, render } from '@testing-library/react';
 import { afterEach, describe, expect, it, vi } from 'vitest';
-import { stageCatalog } from '../features/stages/model/catalog';
-import { EndlessScene } from './EndlessScene';
-import { StageScene } from './StageScene';
-import * as gameTransition from '../features/sudoku/model/gameTransition';
+import { stageCatalog } from '../../../features/stages/model/catalog';
+import { EndlessScene } from '../EndlessScene';
+import { StageScene } from '../StageScene';
+import * as gameTransition from '../../../features/sudoku/model/gameTransition';
 
 const actions = vi.hoisted(() => ({
   start: vi.fn().mockResolvedValue(undefined),
@@ -12,7 +12,7 @@ const actions = vi.hoisted(() => ({
   reportWrong: vi.fn(),
 }));
 
-vi.mock('../features/endless/service/useEndlessSession', () => ({
+vi.mock('../../../features/endless/service/useEndlessSession', () => ({
   useEndlessSession: () => ({
     ...actions,
     puzzle: stageCatalog()[0].stages[0].puzzle,

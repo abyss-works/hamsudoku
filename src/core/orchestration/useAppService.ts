@@ -1,12 +1,12 @@
-import { useClears } from '../features/stages/service/useClears';
-import { useAccount } from '../features/account/service/useAccount';
-import { useEndlessSummary } from '../features/endless/service/useEndlessSummary';
-import { useStages } from '../features/stages/service/useStages';
-import { useStageRecordsSync } from '../features/stages/service/useStageRecordsSync';
+import { useClears } from '../../features/stages/service/useClears';
+import { useAccount } from '../../features/account/service/useAccount';
+import { useEndlessSummary } from '../../features/endless/service/useEndlessSummary';
+import { useStages } from '../../features/stages/service/useStages';
+import { useStageRecordsSync } from '../../features/stages/service/useStageRecordsSync';
 import { useAppBoot } from './useAppBoot';
 import { useAppNavigation } from './useAppNavigation';
 import { useAccountTransfer } from './useAccountTransfer';
-import { useSoundPreferences, useSoundToggle } from '../platform/audio/useSoundPreferences';
+import { useSoundPreferences, useSoundToggle } from '../../platform/audio/useSoundPreferences';
 
 export function useAppService() {
   const clearsService = useClears();

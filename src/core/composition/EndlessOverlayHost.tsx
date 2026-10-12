@@ -1,8 +1,8 @@
 import type { ReactNode } from 'react';
-import { EndlessClearDialog } from '../views/endless/EndlessClearDialog';
-import { GameOverDialog } from '../views/endless/GameOverDialog';
-import type { EndlessClearModel } from '../features/endless/model/screenModels';
-import { OverlayOutlet } from '../ui/OverlayOutlet';
+import { EndlessClearDialog } from '../../views/endless/EndlessClearDialog';
+import { GameOverDialog } from '../../views/endless/GameOverDialog';
+import type { EndlessClearModel } from '../../features/endless/model/screenModels';
+import { OverlayOutlet } from '../../ui/OverlayOutlet';
 
 export interface EndlessClearOverlayHostProps {
   clearModel: EndlessClearModel | null;

@@ -1,6 +1,6 @@
-import { useEndlessGame } from '../features/endless/service/useEndlessGame';
-import { OverlayProvider } from '../ui/OverlayProvider';
-import { EndlessGameScreen } from '../views/endless/EndlessGameScreen';
+import { useEndlessGame } from '../../features/endless/service/useEndlessGame';
+import { OverlayProvider } from '../../ui/OverlayProvider';
+import { EndlessGameScreen } from '../../views/endless/EndlessGameScreen';
 import {
   EndlessClearOverlayHost,
   EndlessGameOverOverlayHost,

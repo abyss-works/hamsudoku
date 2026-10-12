@@ -1,6 +1,6 @@
 import type { ReactNode } from 'react';
-import { ClearDialog } from '../views/sudoku/ClearDialog';
-import { OverlayOutlet } from '../ui/OverlayOutlet';
+import { ClearDialog } from '../../views/sudoku/ClearDialog';
+import { OverlayOutlet } from '../../ui/OverlayOutlet';
 
 export interface StageOverlayHostProps {
   total: number;
