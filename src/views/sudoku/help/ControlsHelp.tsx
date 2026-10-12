@@ -7,7 +7,7 @@ export const CONTROLS = [
   { icon: <Move size={20} aria-hidden="true" />, lines: ['밀어서 쭉,', '표시하고 지우기'] },
 ];
 
-export function ControlsPage() {
+export function ControlsHelp() {
   return (
     <>
       {CONTROLS.map((c) => (

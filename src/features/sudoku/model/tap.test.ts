@@ -43,11 +43,11 @@ describe('nextState', () => {
 });
 
 describe('delayForPointerType', () => {
-  it('터치는 130ms, 나머지는 80ms다', () => {
-    expect(delayForPointerType('touch')).toBe(130);
-    expect(delayForPointerType('mouse')).toBe(80);
-    expect(delayForPointerType('pen')).toBe(80);
-    expect(delayForPointerType(null)).toBe(80);
+  it('터치와 나머지 포인터의 응답 대기를 각각 100ms로 제한한다', () => {
+    expect(delayForPointerType('touch')).toBe(100);
+    expect(delayForPointerType('mouse')).toBe(100);
+    expect(delayForPointerType('pen')).toBe(100);
+    expect(delayForPointerType(null)).toBe(100);
   });
 });
 

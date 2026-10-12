@@ -1,7 +1,7 @@
 import type { ReactNode } from 'react';
-import type { Stage } from '../../features/stages/catalog';
-import { Board } from '../sudoku/Board';
-import type { useStageGame } from '../../features/stages/useStageGame';
+import type { Stage } from '../../features/stages/model/catalog';
+import { SudokuBoard } from '../sudoku/SudokuBoard';
+import type { useStageGame } from '../../features/stages/service/useStageGame';
 import { GameHelp } from '../sudoku/GameHelp';
 import { GameHeader } from '../sudoku/GameHeader';
 import { HamsterProgress } from './HamsterProgress';
@@ -24,10 +24,11 @@ export function GameScreen({
       <GameHeader title={game.hud.hudText} onBack={onBack} />
       <HamsterProgress dots={game.hud.dots} ariaLabel={game.hud.hamsterDotsLabel} />
       <GameHelp />
-      <Board
+      <SudokuBoard
         puzzle={stage.puzzle}
         cells={game.cells}
         xMarks={game.xMarks}
+        autoMarks={game.autoMarks}
         violations={game.violations}
         cleared={game.cleared}
         pulse={game.pulse}

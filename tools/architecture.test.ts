@@ -1,5 +1,5 @@
 import { readdirSync, readFileSync } from 'node:fs';
-import { dirname, join, relative } from 'node:path';
+import { basename, dirname, join, relative } from 'node:path';
 import { describe, expect, it } from 'vitest';
 import ts from 'typescript';
 
@@ -286,6 +286,56 @@ describe('책임 경계와 기능 패키지 아키텍처', () => {
     expect(featureTsx).toEqual([]);
   });
 
+  it('기능 구현은 api, model, service 책임 그룹 아래에 배치한다', () => {
+    const misplaced = files.map(label).filter((file) =>
+      file.startsWith('src/features/') && !/^src\/features\/[^/]+\/(api|model|service)\//.test(file),
+    );
+    expect(misplaced).toEqual([]);
+  });
+
+  it('core 구현은 조립과 앱 흐름 조율 책임으로 나눈다', () => {
+    const misplaced = files.map(label).filter((file) =>
+      file.startsWith('src/core/') && !/^src\/core\/(composition|orchestration)\//.test(file),
+    );
+    expect(misplaced).toEqual([]);
+  });
+
+  it('core 흐름 조율은 React 조립 모듈을 역참조하지 않는다', () => {
+    const reverseDependencies = files.flatMap((file) => {
+      const from = label(file);
+      if (!from.startsWith('src/core/orchestration/')) return [];
+      return getImportsAndExports(file)
+        .filter((dep) => dep.resolved)
+        .map((dep) => ({ dep, to: relative(process.cwd(), dep.resolved!).replaceAll('\\', '/') }))
+        .filter(({ to }) => to.startsWith('src/core/composition/'))
+        .map(({ to }) => `${from} -> ${to}`);
+    });
+    expect(reverseDependencies).toEqual([]);
+  });
+
+  it('View 컴포넌트 파일명은 표현 역할 접미사를 사용한다', () => {
+    const roleSuffix = /.+(Screen|Dialog|Overlay|Tabs|Tab|Board|List|Panel|Menu|Header|Input|Button|Status|Progress|Help|Cell)$/;
+    const invalid = files.map(label).filter((file) => {
+      if (!/^src\/views\/.*\.tsx$/.test(file)) return false;
+      return !roleSuffix.test(basename(file, '.tsx'));
+    });
+    expect(invalid).toEqual([]);
+  });
+
+  it('View 대표 컴포넌트 이름은 파일명과 일치한다', () => {
+    const mismatched = files.map(label).filter((file) => {
+      if (!/^src\/views\/.*\.tsx$/.test(file)) return false;
+      const componentNames = getSourceFile(join(process.cwd(), file)).statements
+        .filter((statement): statement is ts.FunctionDeclaration =>
+          ts.isFunctionDeclaration(statement) && Boolean(statement.name) &&
+          Boolean(statement.modifiers?.some((modifier) => modifier.kind === ts.SyntaxKind.ExportKeyword)),
+        )
+        .map((statement) => statement.name!.text);
+      return !componentNames.includes(basename(file, '.tsx'));
+    });
+    expect(mismatched).toEqual([]);
+  });
+
 function validateLayerDependency(fromLabel: string, toLabel: string, dep: ImportInfo): string[] {
   const failures: string[] = [];
   const fromLayer = getLayer(fromLabel);
@@ -399,7 +449,7 @@ function validateLayerDependency(fromLabel: string, toLabel: string, dep: Import
       (path) =>
         (path.endsWith('.tsx') || label(path).startsWith('src/views/')) &&
         !label(path).startsWith('src/features/') &&
-        !/[/\\](queryClient|ErrorBoundary)\.tsx$/.test(path),
+        !/[/\\](queryClient|QueryProvider|ErrorBoundary)\.tsx$/.test(path),
     );
     failures.push(...views.flatMap((path) => viewFailures(path)));
     expect(failures).toEqual([]);
@@ -418,11 +468,11 @@ function validateLayerDependency(fromLabel: string, toLabel: string, dep: Import
     // 순수 UI 유틸리티 직접 import -> 허용 (탐지되지 않음)
     expect(analyzeFixture('import { buttonClass } from "@/ui/classNames"; export function V() { return <div />; }')).toEqual([]);
     expect(analyzeFixture('import { confettiPiecesModel } from "@/ui/confettiModel"; export function V() { return <div />; }')).toEqual([]);
-    expect(analyzeFixture('import { rankModel as model } from "@/features/ranking/rankLogic"; export function V() { return <div />; }')).toHaveLength(1);
+    expect(analyzeFixture('import { rankModel as model } from "@/features/ranking/model/rankLogic"; export function V() { return <div />; }')).toHaveLength(1);
     expect(analyzeFixture('import { solve } from "@/features/sudoku/model/solver.ts"; export function V() { return <div />; }')).toHaveLength(1);
     expect(analyzeFixture('export { BOOT_TIMEOUT_MS } from "@/application/appLogic";')).toEqual([]);
-    expect(analyzeFixture('export { BOOT_TIMEOUT_MS } from "@/core/appLogic";')).toEqual([]);
-    expect(analyzeFixture('export { rankModel as MODEL } from "@/features/ranking/rankLogic";')).toHaveLength(1);
+    expect(analyzeFixture('export { BOOT_TIMEOUT_MS } from "@/core/orchestration/appLogic";')).toEqual([]);
+    expect(analyzeFixture('export { rankModel as MODEL } from "@/features/ranking/model/rankLogic";')).toHaveLength(1);
     expect(analyzeFixture('import { useState as ownState } from "react"; export function V() { const [v] = ownState(0); return <div>{v}</div>; }').length).toBeGreaterThan(0);
     expect(analyzeFixture('import * as React from "react"; export function V() { const [v] = React.useState(0); return <div>{v}</div>; }').length).toBeGreaterThan(0);
 
@@ -612,33 +662,33 @@ function inspectPureFailures(path: string, sourceOverride?: ts.SourceFile): stri
   it('core 상위 경계 및 중첩 api/model/service 식별 fixture를 검증한다', () => {
     // 1. feature -> core 역참조 금지
     expect(
-      validateLayerDependency('src/features/account/service/useAccount.ts', 'src/core/appLogic.ts', {
-        module: '@/core/appLogic',
-        resolved: join(process.cwd(), 'src/core/appLogic.ts').replaceAll('\\', '/'),
+      validateLayerDependency('src/features/account/service/useAccount.ts', 'src/core/orchestration/appLogic.ts', {
+        module: '@/core/orchestration/appLogic',
+        resolved: join(process.cwd(), 'src/core/orchestration/appLogic.ts').replaceAll('\\', '/'),
         names: ['BOOT_TIMEOUT_MS'],
         isTypeOnly: false,
       }),
-    ).toContain('src/features/account/service/useAccount.ts -> src/core/appLogic.ts: feature는 core를 참조할 수 없다');
+    ).toContain('src/features/account/service/useAccount.ts -> src/core/orchestration/appLogic.ts: feature는 core를 참조할 수 없다');
 
     // 2. views -> core 역참조 금지
     expect(
-      validateLayerDependency('src/views/home/HomeScreen.tsx', 'src/core/appLogic.ts', {
-        module: '@/core/appLogic',
-        resolved: join(process.cwd(), 'src/core/appLogic.ts').replaceAll('\\', '/'),
+      validateLayerDependency('src/views/home/HomeScreen.tsx', 'src/core/orchestration/appLogic.ts', {
+        module: '@/core/orchestration/appLogic',
+        resolved: join(process.cwd(), 'src/core/orchestration/appLogic.ts').replaceAll('\\', '/'),
         names: ['BOOT_TIMEOUT_MS'],
         isTypeOnly: false,
       }),
-    ).toContain('src/views/home/HomeScreen.tsx -> src/core/appLogic.ts: views는 core를 참조할 수 없다');
+    ).toContain('src/views/home/HomeScreen.tsx -> src/core/orchestration/appLogic.ts: views는 core를 참조할 수 없다');
 
     // 3. platform/ui/shared -> core 역참조 금지
     expect(
-      validateLayerDependency('src/ui/Button.tsx', 'src/core/appLogic.ts', {
-        module: '@/core/appLogic',
-        resolved: join(process.cwd(), 'src/core/appLogic.ts').replaceAll('\\', '/'),
+      validateLayerDependency('src/ui/Button.tsx', 'src/core/orchestration/appLogic.ts', {
+        module: '@/core/orchestration/appLogic',
+        resolved: join(process.cwd(), 'src/core/orchestration/appLogic.ts').replaceAll('\\', '/'),
         names: ['BOOT_TIMEOUT_MS'],
         isTypeOnly: false,
       }),
-    ).toContain('src/ui/Button.tsx -> src/core/appLogic.ts: ui는 views/features/core를 참조할 수 없다');
+    ).toContain('src/ui/Button.tsx -> src/core/orchestration/appLogic.ts: ui는 views/features/core를 참조할 수 없다');
 
     // 4. views -> 중첩 API 직접 참조 금지
     expect(
@@ -651,16 +701,16 @@ function inspectPureFailures(path: string, sourceOverride?: ts.SourceFile): stri
     ).toContain('src/views/home/HomeScreen.tsx -> src/features/account/api/accountApi.ts: views는 직접 API/저장/환경 구현을 참조할 수 없다');
 
     // 5. core 및 service에서 fetch/localStorage 직접 호출 금지
-    expect(isServiceDirectAccessTarget('src/core/appLogic.ts')).toBe(true);
+    expect(isServiceDirectAccessTarget('src/core/orchestration/appLogic.ts')).toBe(true);
     expect(isServiceDirectAccessTarget('src/features/account/service/useAccount.ts')).toBe(true);
     expect(isServiceDirectAccessTarget('src/features/account/api/accountApi.ts')).toBe(false);
 
     expect(
       inspectServiceDirectAccess(
-        'src/core/appLogic.ts',
+        'src/core/orchestration/appLogic.ts',
         ts.createSourceFile('appLogic.ts', 'export function boot() { fetch("/api"); }', ts.ScriptTarget.Latest, true),
       ),
-    ).toContain('src/core/appLogic.ts: HTTP 직접 호출');
+    ).toContain('src/core/orchestration/appLogic.ts: HTTP 직접 호출');
 
     expect(
       inspectServiceDirectAccess(

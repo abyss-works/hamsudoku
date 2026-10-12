@@ -23,11 +23,12 @@ export function projectBoard(
   violations: Violations,
   pulse: ReadonlyMap<string, number>,
   hitKey: string | null,
+  autoMarks: ReadonlySet<string> = new Set(),
 ) {
   return cells.map((line, row) =>
     line.map((rawState, col) => {
       const key = `${row},${col}`;
-      const state = resolveMark(rawState, xMarks.has(key));
+      const state = resolveMark(rawState, xMarks.has(key), autoMarks.has(key));
       const islandId = puzzle.islands[row][col];
       const conflicted = cellConflicted(violations, puzzle.islands, row, col);
       const hit = hitKey === key;

@@ -7,9 +7,9 @@ import type { Violations } from '../model/rules';
 
 export function useBoardInteraction(puzzle: Puzzle, cells: CellState[][], xMarks: ReadonlySet<string>, violations: Violations,
   pulse: ReadonlyMap<string, number>, hitKey: string | null, shake: number, onPress: (r: number, c: number) => void,
-  onEnter: (r: number, c: number) => void, onRelease: () => boolean) {
+  onEnter: (r: number, c: number) => void, onRelease: () => boolean, autoMarks: ReadonlySet<string> = new Set()) {
   const size = puzzle.size;
-  const projected = projectBoard(cells, puzzle, xMarks, violations, pulse, hitKey);
+  const projected = projectBoard(cells, puzzle, xMarks, violations, pulse, hitKey, autoMarks);
   const suppressClick = useRef(false);
   const first = useRef(true);
   const controls = useAnimationControls();

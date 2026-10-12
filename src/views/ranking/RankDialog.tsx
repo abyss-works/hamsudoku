@@ -1,5 +1,5 @@
 import { Trophy } from 'lucide-react';
-import { rankDialogService, type RankDialogOptions } from '../../features/ranking/rankDialogService';
+import { rankDialogService, type RankDialogOptions } from '../../features/ranking/service/rankDialogService';
 import { Button } from '../../ui/Button';
 import { Overlay } from '../../ui/Overlay';
 import { RankList } from './RankList';

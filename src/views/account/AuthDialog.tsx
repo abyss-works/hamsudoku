@@ -3,9 +3,9 @@ import { Button } from '../../ui/Button';
 import { Overlay } from '../../ui/Overlay';
 import { useAuthDialogService } from '../../features/account/service/useAuthDialogService';
 import type { AuthDialogOptions, AuthFn } from '../../features/account/model/authDialog.types';
-import { CredentialsView } from './auth/CredentialsView';
-import { BaseSelectionView } from './auth/BaseSelectionView';
-import { LinkConfirmationView } from './auth/LinkConfirmationView';
+import { CredentialsPanel } from './auth/CredentialsPanel';
+import { BaseSelectionPanel } from './auth/BaseSelectionPanel';
+import { LinkConfirmationPanel } from './auth/LinkConfirmationPanel';
 
 export type { AuthFn };
 
@@ -65,7 +65,7 @@ export function AuthDialog({
             void submit();
           }}
         >
-          <CredentialsView
+          <CredentialsPanel
             email={email}
             setEmail={setEmail}
             password={password}
@@ -81,7 +81,7 @@ export function AuthDialog({
           {chooseBase ? (
             <div className="login-confirm">
               {pendingBase === null ? (
-                <BaseSelectionView
+                <BaseSelectionPanel
                   guestSnapshot={guestSnapshot}
                   deviceLabel={deviceLabel}
                   accountLabel={accountLabel}
@@ -92,7 +92,7 @@ export function AuthDialog({
                   pickBase={pickBase}
                 />
               ) : (
-                <LinkConfirmationView
+                <LinkConfirmationPanel
                   busy={busy}
                   confirmBase={confirmBase}
                   cancelBase={cancelBase}

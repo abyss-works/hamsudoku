@@ -1,0 +1,78 @@
+import type { ReactNode } from 'react';
+import { motion } from 'framer-motion';
+import { SudokuCell } from './SudokuCell';
+import { OverlayOutlet } from '../../ui/OverlayOutlet';
+import type { OverlayRequest } from '../../ui/overlayTypes';
+import type { Violations } from '../../features/sudoku/model/rules';
+import { useBoardInteraction } from '../../features/sudoku/service/useBoardInteraction';
+import type { CellState, Puzzle } from '../../features/sudoku/model/puzzles';
+import type { TapKind } from '../../features/sudoku/model/tap';
+
+const EMPTY_MARKS: ReadonlySet<string> = new Set();
+
+export interface SudokuBoardProps {
+  puzzle: Puzzle;
+  cells: CellState[][];
+  /** 조각 위에 올린 X 집합. 해당 칸은 X로 그린다. */
+  xMarks?: ReadonlySet<string>;
+  /** 확정 정답마커 집합. 다른 마커 상태보다 먼저 렌더링한다. */
+  autoMarks?: ReadonlySet<string>;
+  violations: Violations;
+  cleared: boolean;
+  pulse?: ReadonlyMap<string, number>;
+  hitKey?: string | null;
+  shake?: number;
+  onCell: (r: number, c: number, kind: TapKind) => void;
+  onPress: (r: number, c: number) => void;
+  onEnter: (r: number, c: number) => void;
+  onRelease: () => boolean;
+  clearOverlay?: ReactNode;
+  renderOverlay?: (overlay: OverlayRequest) => ReactNode;
+}
+
+export function SudokuBoard({
+  puzzle,
+  cells,
+  xMarks = new Set(),
+  autoMarks = EMPTY_MARKS,
+  violations,
+  cleared,
+  pulse = new Map(),
+  hitKey = null,
+  shake = 0,
+  onCell,
+  onPress,
+  onEnter,
+  onRelease,
+  clearOverlay,
+  renderOverlay,
+}: SudokuBoardProps) {
+  const { projected, boardRef, controls, handlePress, handleMove, handleUp, handleClickCapture, handleCancel } =
+    useBoardInteraction(puzzle, cells, xMarks, violations, pulse, hitKey, shake, onPress, onEnter, onRelease, autoMarks);
+
+  return (
+    <motion.div className={`board-wrap${shake > 0 ? ' shake' : ''}`} animate={controls}>
+      <div
+        ref={boardRef}
+        className="board"
+        role="grid"
+        aria-label={puzzle.name}
+        style={{ gridTemplateColumns: `repeat(${puzzle.size}, 1fr)` }}
+        onPointerMove={handleMove}
+        onPointerUp={handleUp}
+        onPointerCancel={handleCancel}
+        onClickCapture={handleClickCapture}
+      >
+        {projected.map((line) => line.map((cell) => (
+          <SudokuCell
+            key={`${cell.row}-${cell.col}`}
+            {...cell}
+            onTap={(kind) => onCell(cell.row, cell.col, kind)}
+            onPress={() => handlePress(cell.row, cell.col)}
+          />
+        )))}
+      </div>
+      {cleared && (clearOverlay ?? <OverlayOutlet slot="board" render={renderOverlay} />)}
+    </motion.div>
+  );
+}

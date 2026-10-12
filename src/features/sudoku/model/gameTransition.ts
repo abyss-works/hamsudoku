@@ -35,6 +35,7 @@ export interface GameState {
   cells: CellState[][];
   links: Map<string, string>;
   underlay: Map<string, 'mark'>;
+  autoMarks: Set<string>;
   stroke: Stroke | null;
   probeActive: boolean;
   pulse: ReadonlyMap<string, number>;
@@ -50,12 +51,12 @@ export type GameAction =
   | { type: 'end' | 'reset' | 'resetMarks' };
 
 export function createGameState(size: number): GameState {
-  return { cells: blankBoard(size), links: new Map(), underlay: new Map(), stroke: null,
+  return { cells: blankBoard(size), links: new Map(), underlay: new Map(), autoMarks: new Set(), stroke: null,
     probeActive: false, pulse: new Map(), hitKey: null, shake: 0 };
 }
 
 export function projectGame(state: GameState, puzzle: Puzzle) {
-  return { cells: state.cells, xMarks: new Set(state.underlay.keys()),
+  return { cells: state.cells, xMarks: new Set(state.underlay.keys()), autoMarks: new Set(state.autoMarks),
     violations: getViolations(state.cells, puzzle.islands), cleared: isCleared(state.cells, puzzle.islands),
     hamsterCount: countHamsters(state.cells), probeSlots: PROBE_SLOTS - anchorCount(state.cells),
     pulse: state.pulse, hitKey: state.hitKey, shake: state.shake, probeActive: state.probeActive };
@@ -64,6 +65,7 @@ export function projectGame(state: GameState, puzzle: Puzzle) {
 /** 입력의 Map·Set을 복제하여 전이 중 원본 상태를 변경하지 않는다. */
 export function transitionGame(previous: GameState, puzzle: Puzzle, action: GameAction) {
   const state: GameState = { ...previous, links: new Map(previous.links), underlay: new Map(previous.underlay),
+    autoMarks: new Set(previous.autoMarks),
     stroke: previous.stroke ? { ...previous.stroke, visited: new Set(previous.stroke.visited) } : null };
   const sounds: GameSound[] = [];
   const commit = (cells: CellState[][], pulse: Map<string, number>, hitKey: string | null) => {
@@ -128,6 +130,7 @@ export function transitionGame(previous: GameState, puzzle: Puzzle, action: Game
     const prev = state.cells;
     const cur = prev[r][c];
     const key = keyOf(r, c);
+    if (state.autoMarks.has(key)) return;
     // 덮인 조각은 X로 본다. 상태는 조각 그대로 두고 렌더만 X가 이긴다.
     const covered = cur === 'frag' && state.underlay.has(key);
     if (state.probeActive && kind === 'single') {
@@ -163,26 +166,40 @@ export function transitionGame(previous: GameState, puzzle: Puzzle, action: Game
     const base = resolveMark(after[r][c], state.underlay.has(key));
     const result = nextState(base, kind, isSolutionCell(puzzle, r, c));
     if (result === base) return;
-    const next = after.map((line) => [...line]);
-    next[r][c] = result;
-    // 덮개를 소비하면 소유권을 끊는다.
-    if (after[r][c] === 'frag') {
-      state.links.delete(key);
-      state.underlay.delete(key);
-    }
     if (result === 'hamster') {
+      // 확정 칸이 덮인 조각이면 소유권을 끊어 회수 시 햄스터 칸으로 복원되지 않게 한다.
+      if (after[r][c] === 'frag') {
+        state.links.delete(key);
+        state.underlay.delete(key);
+      }
+      // 앵커는 단일 회수 경로로 소유 조각까지 복원한 뒤 정답마커를 기록한다.
       const delays = new Map<string, number>();
-      // 빈 타일·회색X만 정답마커로 바꾼다. 남의 조각·앵커는 건드리지 않는다.
-      for (const m of spreadMarks(after.length, r, c, puzzle.islands)) {
+      const spread = spreadMarks(after.length, r, c, puzzle.islands);
+      for (const m of spread) {
+        if (state.cells[m.r][m.c] === 'anchor') {
+          recallAnchor(m.r, m.c);
+          for (const [fragment, delay] of state.pulse) delays.set(fragment, delay);
+        }
+      }
+      const next = state.cells.map((line) => [...line]);
+      next[r][c] = result;
+      for (const m of spread) {
         const target = next[m.r][m.c];
-        if (target === 'empty' || target === 'mark') {
-          next[m.r][m.c] = 'auto';
+        if (target === 'empty' || target === 'mark' || target === 'frag') {
+          state.autoMarks.add(keyOf(m.r, m.c));
           delays.set(keyOf(m.r, m.c), m.delayMs);
         }
       }
       commit(next, delays, keyOf(r, c));
       sounds.push('correct');
     } else {
+      const next = after.map((line) => [...line]);
+      next[r][c] = result;
+      // 덮개를 소비하면 소유권을 끊는다.
+      if (after[r][c] === 'frag') {
+        state.links.delete(key);
+        state.underlay.delete(key);
+      }
       commit(next, new Map(), null);
       if (result === 'wrong' && kind === 'double') {
         state.shake += 1;
@@ -200,6 +217,7 @@ export function transitionGame(previous: GameState, puzzle: Puzzle, action: Game
     state.cells = blank;
     state.links.clear();
     state.underlay.clear();
+    state.autoMarks.clear();
     state.stroke = null;
     state.pulse = new Map();
     state.hitKey = null;
@@ -223,6 +241,7 @@ export function transitionGame(previous: GameState, puzzle: Puzzle, action: Game
   // 덮인 조각은 X를 걷고 드러내고, 앵커는 조각까지 회수한다. 맨 조각은 손대지 않는다.
   const paintOne = (st: Stroke, r: number, c: number) => {
     const cur = state.cells[r][c];
+    if (state.autoMarks.has(keyOf(r, c))) return;
     if (st.toMark) {
       if (cur !== 'empty') return;
       const next = state.cells.map((line) => [...line]);
@@ -254,6 +273,10 @@ export function transitionGame(previous: GameState, puzzle: Puzzle, action: Game
       return;
     }
     const cur = state.cells[r][c];
+    if (state.autoMarks.has(keyOf(r, c))) {
+      state.stroke = null;
+      return;
+    }
     // 덮인 조각은 X로 본다.
     const pressed = resolveMark(cur, state.underlay.has(keyOf(r, c)));
     const toMark = pressed !== 'mark' && pressed !== 'anchor';

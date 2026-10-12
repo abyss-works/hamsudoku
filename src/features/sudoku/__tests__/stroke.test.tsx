@@ -104,7 +104,8 @@ describe('stroke', () => {
       result.current.tapCell(4, 4, 'double'); // 오답 → 빨강 고정
     });
     expect(at(result.current.cells, 0, 0)).toBe('hamster');
-    expect(at(result.current.cells, 0, 2)).toBe('auto');
+    expect(result.current.autoMarks.has('0,2')).toBe(true);
+    expect(at(result.current.cells, 0, 2)).toBe('empty');
     expect(at(result.current.cells, 4, 4)).toBe('wrong');
     act(() => {
       result.current.beginStroke(2, 2);
@@ -116,7 +117,8 @@ describe('stroke', () => {
     });
     expect(at(result.current.cells, 2, 2)).toBe('mark');
     expect(at(result.current.cells, 1, 2)).toBe('mark');
-    expect(at(result.current.cells, 0, 2)).toBe('auto');
+    expect(at(result.current.cells, 0, 2)).toBe('empty');
+    expect(result.current.autoMarks.has('0,2')).toBe(true);
     expect(at(result.current.cells, 0, 0)).toBe('hamster');
     expect(at(result.current.cells, 4, 4)).toBe('wrong');
     expect(at(result.current.cells, 2, 4)).toBe('mark');
@@ -187,7 +189,8 @@ describe('stroke', () => {
     });
     expect(engaged).toBe(true);
     expect(at(result.current.cells, 0, 0)).toBe('hamster');
-    expect(at(result.current.cells, 1, 1)).toBe('auto');
+    expect(at(result.current.cells, 1, 1)).toBe('empty');
+    expect(result.current.autoMarks.has('1,1')).toBe(true);
     expect(at(result.current.cells, 2, 2)).toBe('mark');
   });
 });
@@ -272,7 +275,7 @@ describe('probe', () => {
     expect(result.current.probeSlots).toBe(3);
   });
 
-  it('덮인 조각을 확정하면 X로 보고 시도한다', () => {
+  it('정답 전파가 덮인 조각의 주인 앵커와 소유 조각을 회수한다', () => {
     const { result } = renderHook(() => useHamSudoku(PUZZLES[0]));
     act(() => {
       result.current.setProbeActive(true);
@@ -285,8 +288,9 @@ describe('probe', () => {
       result.current.tapCell(0, 0, 'double');
     });
     expect(at(result.current.cells, 0, 0)).toBe('hamster');
-    expect(at(result.current.cells, 0, 3)).toBe('anchor');
-    expect(result.current.probeSlots).toBe(2);
+    expect(at(result.current.cells, 0, 3)).toBe('empty');
+    expect(result.current.autoMarks.has('0,3')).toBe(true);
+    expect(result.current.probeSlots).toBe(3);
   });
 
   it('덮인 조각에 앵커를 놓으면 차지한다', () => {
@@ -358,7 +362,7 @@ describe('probe', () => {
     expect(at(result.current.cells, 2, 3)).toBe('anchor');
   });
 
-  it('겹친 앵커를 확정해도 남의 조각이 남는다', () => {
+  it('정답 전파가 이웃 앵커를 회수하면 그 소유 조각도 회수한다', () => {
     const { result } = renderHook(() => useHamSudoku(PUZZLES[0]));
     act(() => {
       result.current.setProbeActive(true);
@@ -375,11 +379,11 @@ describe('probe', () => {
       result.current.tapCell(0, 0, 'double'); // A 확정
     });
     expect(at(result.current.cells, 0, 0)).toBe('hamster');
-    expect(at(result.current.cells, 0, 1)).toBe('frag');
-    expect(at(result.current.cells, 0, 2)).toBe('frag');
-    expect(at(result.current.cells, 0, 3)).toBe('frag');
-    expect(at(result.current.cells, 0, 4)).toBe('anchor');
-    expect(result.current.probeSlots).toBe(2);
+    for (const c of [1, 2, 3, 4]) {
+      expect(at(result.current.cells, 0, c)).toBe('empty');
+      expect(result.current.autoMarks.has(`0,${c}`)).toBe(true);
+    }
+    expect(result.current.probeSlots).toBe(3);
   });
 
   it('resetMarks는 정답마커 빼고 전부 지운다', () => {
@@ -397,11 +401,13 @@ describe('probe', () => {
       result.current.resetMarks();
     });
     expect(at(result.current.cells, 0, 0)).toBe('hamster');
-    expect(at(result.current.cells, 0, 1)).toBe('auto');
+    expect(at(result.current.cells, 0, 1)).toBe('empty');
+    expect(result.current.autoMarks.has('0,1')).toBe(true);
     expect(at(result.current.cells, 3, 3)).toBe('empty');
     expect(at(result.current.cells, 4, 1)).toBe('empty');
     expect(at(result.current.cells, 4, 2)).toBe('empty');
-    expect(at(result.current.cells, 4, 0)).toBe('auto');
+    expect(at(result.current.cells, 4, 0)).toBe('empty');
+    expect(result.current.autoMarks.has('4,0')).toBe(true);
     expect(result.current.probeSlots).toBe(3);
   });
   it('앵커를 톡하면 자기 조각만 회수되고 슬롯이 충전된다', () => {
@@ -472,7 +478,8 @@ describe('probe', () => {
       result.current.tapCell(0, 0, 'double');
     });
     expect(at(result.current.cells, 0, 0)).toBe('hamster');
-    expect(at(result.current.cells, 0, 1)).toBe('auto');
+    expect(at(result.current.cells, 0, 1)).toBe('empty');
+    expect(result.current.autoMarks.has('0,1')).toBe(true);
     expect(result.current.probeSlots).toBe(3);
   });
 
@@ -523,9 +530,10 @@ describe('정답 전파', () => {
       result.current.tapCell(0, 0, 'double'); // 정답
     });
     expect(at(result.current.cells, 0, 0)).toBe('hamster');
-    expect(at(result.current.cells, 0, 1)).toBe('auto');
-    expect(at(result.current.cells, 3, 0)).toBe('auto');
-    expect(at(result.current.cells, 1, 1)).toBe('auto');
+    expect(at(result.current.cells, 0, 1)).toBe('mark');
+    expect(at(result.current.cells, 3, 0)).toBe('mark');
+    expect(at(result.current.cells, 1, 1)).toBe('mark');
+    for (const key of ['0,1', '3,0', '1,1']) expect(result.current.autoMarks.has(key)).toBe(true);
     expect(at(result.current.cells, 2, 2)).toBe('mark');
   });
 
