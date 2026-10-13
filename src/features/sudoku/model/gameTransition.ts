@@ -1,6 +1,6 @@
 import { countHamsters, getViolations, isCleared, isSolutionCell } from './rules';
 import type { CellState, Puzzle } from './puzzles';
-import { ownedFrags, resolveMark } from './probe';
+import { ownedProbeCells, resolveMark } from './probe';
 import { nextState, spreadMarks, type TapKind } from './tap';
 
 function blankBoard(size: number): CellState[][] {
@@ -33,8 +33,11 @@ function anchorCount(cells: CellState[][]): number {
 
 export interface GameState {
   cells: CellState[][];
-  links: Map<string, string>;
+  /** 칸별 임시 표시를 유지하는 앵커 집합. */
+  probeOwners: Map<string, Set<string>>;
+  /** 앵커·조각 아래에 저장된 일반 X마커. */
   underlay: Map<string, 'mark'>;
+  /** 정답 전파로 잠긴 X마커. */
   autoMarks: Set<string>;
   stroke: Stroke | null;
   probeActive: boolean;
@@ -51,7 +54,7 @@ export type GameAction =
   | { type: 'end' | 'reset' | 'resetMarks' };
 
 export function createGameState(size: number): GameState {
-  return { cells: blankBoard(size), links: new Map(), underlay: new Map(), autoMarks: new Set(), stroke: null,
+  return { cells: blankBoard(size), probeOwners: new Map(), underlay: new Map(), autoMarks: new Set(), stroke: null,
     probeActive: false, pulse: new Map(), hitKey: null, shake: 0 };
 }
 
@@ -64,7 +67,9 @@ export function projectGame(state: GameState, puzzle: Puzzle) {
 
 /** 입력의 Map·Set을 복제하여 전이 중 원본 상태를 변경하지 않는다. */
 export function transitionGame(previous: GameState, puzzle: Puzzle, action: GameAction) {
-  const state: GameState = { ...previous, links: new Map(previous.links), underlay: new Map(previous.underlay),
+  const state: GameState = { ...previous,
+    probeOwners: new Map([...previous.probeOwners].map(([key, owners]) => [key, new Set(owners)])),
+    underlay: new Map(previous.underlay),
     autoMarks: new Set(previous.autoMarks),
     stroke: previous.stroke ? { ...previous.stroke, visited: new Set(previous.stroke.visited) } : null };
   const sounds: GameSound[] = [];
@@ -73,41 +78,58 @@ export function transitionGame(previous: GameState, puzzle: Puzzle, action: Game
     state.pulse = pulse;
     state.hitKey = hitKey;
   };
-  // 앵커를 놓고 십자·주변·같은 섬에 조각을 살포한다. 빈칸·회색X·덮인 조각만 바뀌고
-  // 잠금·햄스터·남의 조각은 통과한다.
+  const addProbeOwner = (key: string, owner: string) => {
+    const owners = state.probeOwners.get(key) ?? new Set<string>();
+    owners.add(owner);
+    state.probeOwners.set(key, owners);
+  };
+  const removeProbeOwner = (key: string, owner: string) => {
+    const owners = state.probeOwners.get(key);
+    if (!owners) return false;
+    owners.delete(owner);
+    if (owners.size > 0) return true;
+    state.probeOwners.delete(key);
+    return false;
+  };
+  // 앵커를 놓고 십자·주변·같은 섬에 조각을 살포한다. 기존 임시 표시에는 소유자를 추가한다.
+  // 잠금·햄스터·오답마커는 바꾸지 않는다.
   // 덮인 X마커는 간직했다가 회수 때 되돌린다.
   const placeAnchor = (r: number, c: number) => {
     const prev = state.cells;
     if (anchorCount(prev) >= PROBE_SLOTS) return;
     const next = prev.map((line) => [...line]);
-    if (prev[r][c] === 'mark') state.underlay.set(keyOf(r, c), 'mark');
-    if (prev[r][c] === 'frag') {
-      // 덮개를 벗기고 앵커가 차지한다.
-      state.links.delete(keyOf(r, c));
-      state.underlay.delete(keyOf(r, c));
-    }
+    const anchorKey = keyOf(r, c);
+    if (prev[r][c] === 'mark') state.underlay.set(anchorKey, 'mark');
     next[r][c] = 'anchor';
     const delays = new Map<string, number>();
     for (const m of spreadMarks(prev.length, r, c, puzzle.islands)) {
       const cur = next[m.r][m.c];
       if (cur === 'empty' || cur === 'mark') {
-        if (cur === 'mark') state.underlay.set(keyOf(m.r, m.c), 'mark');
+        const key = keyOf(m.r, m.c);
+        if (cur === 'mark') state.underlay.set(key, 'mark');
         next[m.r][m.c] = 'frag';
-        state.links.set(keyOf(m.r, m.c), keyOf(r, c));
-        delays.set(keyOf(m.r, m.c), m.delayMs);
+        addProbeOwner(key, anchorKey);
+        delays.set(key, m.delayMs);
+      } else if (cur === 'frag' || cur === 'anchor') {
+        addProbeOwner(keyOf(m.r, m.c), anchorKey);
       }
     }
     commit(next, delays, null);
     sounds.push('mark');
   };
 
-  // 앵커와 자기 조각을 거둔다. 덮인 X마커는 되돌리고 먼 조각부터 역순으로 사라진다.
+  // 앵커의 소유권을 회수한다. 마지막 소유자일 때만 덮인 X마커를 복원하고 조각을 지운다.
   const recallAnchor = (r: number, c: number) => {
     const prev = state.cells;
-    const owned = ownedFrags(state.links, prev, keyOf(r, c));
+    const anchorKey = keyOf(r, c);
+    const owned = ownedProbeCells(state.probeOwners, prev, anchorKey);
     const next = prev.map((line) => [...line]);
-    next[r][c] = state.underlay.get(keyOf(r, c)) ?? 'empty';
-    state.underlay.delete(keyOf(r, c));
+    if ((state.probeOwners.get(anchorKey)?.size ?? 0) > 0) {
+      next[r][c] = 'frag';
+    } else {
+      next[r][c] = state.underlay.get(anchorKey) ?? 'empty';
+      state.underlay.delete(anchorKey);
+    }
     const delays = new Map<string, number>();
     const ordered = owned
       .map((key) => {
@@ -117,10 +139,12 @@ export function transitionGame(previous: GameState, puzzle: Puzzle, action: Game
       .sort((a, b) => b.dist - a.dist);
     ordered.forEach(({ key }, i) => {
       const [fr, fc] = key.split(',').map(Number);
-      next[fr][fc] = state.underlay.get(key) ?? 'empty';
-      state.underlay.delete(key);
-      state.links.delete(key);
-      delays.set(key, i * 60);
+      const remains = removeProbeOwner(key, anchorKey);
+      if (!remains && prev[fr][fc] === 'frag') {
+        next[fr][fc] = state.underlay.get(key) ?? 'empty';
+        state.underlay.delete(key);
+        delays.set(key, i * 60);
+      }
     });
     commit(next, delays, null);
     sounds.push('erase');
@@ -169,7 +193,7 @@ export function transitionGame(previous: GameState, puzzle: Puzzle, action: Game
     if (result === 'hamster') {
       // 확정 칸이 덮인 조각이면 소유권을 끊어 회수 시 햄스터 칸으로 복원되지 않게 한다.
       if (after[r][c] === 'frag') {
-        state.links.delete(key);
+        state.probeOwners.delete(key);
         state.underlay.delete(key);
       }
       // 앵커는 단일 회수 경로로 소유 조각까지 복원한 뒤 정답마커를 기록한다.
@@ -197,7 +221,7 @@ export function transitionGame(previous: GameState, puzzle: Puzzle, action: Game
       next[r][c] = result;
       // 덮개를 소비하면 소유권을 끊는다.
       if (after[r][c] === 'frag') {
-        state.links.delete(key);
+        state.probeOwners.delete(key);
         state.underlay.delete(key);
       }
       commit(next, new Map(), null);
@@ -215,7 +239,7 @@ export function transitionGame(previous: GameState, puzzle: Puzzle, action: Game
   const reset = () => {
     const blank = blankBoard(puzzle.size);
     state.cells = blank;
-    state.links.clear();
+    state.probeOwners.clear();
     state.underlay.clear();
     state.autoMarks.clear();
     state.stroke = null;
@@ -230,7 +254,7 @@ export function transitionGame(previous: GameState, puzzle: Puzzle, action: Game
       line.map((cell) => (cell === 'mark' || cell === 'anchor' || cell === 'frag' ? 'empty' : cell)),
     );
     state.cells = next;
-    state.links.clear();
+    state.probeOwners.clear();
     state.underlay.clear();
     state.stroke = null;
     state.pulse = new Map();

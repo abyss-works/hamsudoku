@@ -293,7 +293,7 @@ describe('probe', () => {
     expect(result.current.probeSlots).toBe(3);
   });
 
-  it('덮인 조각에 앵커를 놓으면 차지한다', () => {
+  it('덮인 조각에 앵커를 놓아도 다른 앵커의 영향 범위를 보존한다', () => {
     const { result } = renderHook(() => useHamSudoku(PUZZLES[0]));
     act(() => {
       result.current.setProbeActive(true);
@@ -307,7 +307,7 @@ describe('probe', () => {
     act(() => {
       result.current.tapCell(0, 4, 'single'); // B 회수
     });
-    expect(at(result.current.cells, 0, 4)).toBe('empty');
+    expect(at(result.current.cells, 0, 4)).toBe('frag');
     expect(at(result.current.cells, 1, 3)).toBe('anchor');
     expect(result.current.probeSlots).toBe(2);
   });

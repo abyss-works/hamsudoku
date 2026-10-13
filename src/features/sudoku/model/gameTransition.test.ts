@@ -85,8 +85,8 @@ describe('game transitions', () => {
       { type: 'tap', r: restoredMarkR, c: restoredMarkC, kind: 'single' }).state;
     state = transitions.transitionGame(state, puzzle, { type: 'probe', on: true }).state;
     state = transitions.transitionGame(state, puzzle, { type: 'tap', r: anchorR, c: anchorC, kind: 'single' }).state;
-    const ownedFrags = [...state.links.entries()]
-      .filter(([, owner]) => owner === anchorKey)
+    const ownedFrags = [...state.probeOwners.entries()]
+      .filter(([, owners]) => owners.has(anchorKey))
       .map(([fragment]) => fragment);
     expect(ownedFrags).toContain(`${r},${c}`);
     expect(ownedFrags).toContain(restoredMarkKey);
@@ -102,7 +102,7 @@ describe('game transitions', () => {
     expect(answered.cells[anchorR][anchorC]).toBe('empty');
     expect(answered.cells[restoredMarkR][restoredMarkC]).toBe('mark');
     expect(answered.underlay.has(restoredMarkKey)).toBe(false);
-    expect([...answered.links.values()]).not.toContain(anchorKey);
+    expect([...answered.probeOwners.values()].some((owners) => owners.has(anchorKey))).toBe(false);
     for (const fragment of ownedFrags) {
       const [fragmentR, fragmentC] = fragment.split(',').map(Number);
       if (fragment !== `${r},${c}`) expect(answered.cells[fragmentR][fragmentC]).not.toBe('frag');
@@ -115,6 +115,46 @@ describe('game transitions', () => {
       answeredView.pulse, answeredView.hitKey, answeredView.autoMarks)[anchorR][anchorC].state).toBe('auto');
     expect(projectBoard(answeredView.cells, puzzle, answeredView.xMarks, answeredView.violations,
       answeredView.pulse, answeredView.hitKey, answeredView.autoMarks)[restoredMarkR][restoredMarkC].state).toBe('auto');
+  });
+
+  it('겹친 임시 정답을 회수해도 남은 임시 정답과 세 마커 상태를 보존한다', () => {
+    const puzzle = PUZZLES[0];
+    let state = transitions.createGameState(puzzle.size);
+    state = transitions.transitionGame(state, puzzle, { type: 'tap', r: 0, c: 2, kind: 'single' }).state;
+    state = transitions.transitionGame(state, puzzle, { type: 'tap', r: 1, c: 3, kind: 'single' }).state;
+    state = transitions.transitionGame(state, puzzle, { type: 'tap', r: 0, c: 0, kind: 'double' }).state;
+    state = transitions.transitionGame(state, puzzle, { type: 'probe', on: true }).state;
+    state = transitions.transitionGame(state, puzzle, { type: 'tap', r: 1, c: 2, kind: 'single' }).state;
+    state = transitions.transitionGame(state, puzzle, { type: 'tap', r: 1, c: 3, kind: 'single' }).state;
+
+    expect(state.cells[0][2]).toBe('frag');
+    expect(state.cells[1][3]).toBe('anchor');
+    expect(state.underlay.get('0,2')).toBe('mark');
+    expect(state.autoMarks.has('0,2')).toBe(true);
+    expect(state.probeOwners.get('0,2')).toEqual(new Set(['1,2', '1,3']));
+
+    const bothAnchors = state;
+    state = transitions.transitionGame(state, puzzle, { type: 'tap', r: 1, c: 2, kind: 'single' }).state;
+
+    expect(state.cells[0][2]).toBe('frag');
+    expect(state.cells[1][2]).toBe('frag');
+    expect(state.cells[1][3]).toBe('anchor');
+    expect(state.underlay.get('0,2')).toBe('mark');
+    expect(state.underlay.get('1,3')).toBe('mark');
+    expect(state.autoMarks.has('0,2')).toBe(true);
+    expect(state.probeOwners.get('0,2')).toEqual(new Set(['1,3']));
+    expect(bothAnchors.probeOwners.get('0,2')).toEqual(new Set(['1,2', '1,3']));
+    const view = transitions.projectGame(state, puzzle);
+    expect(projectBoard(view.cells, puzzle, view.xMarks, view.violations, view.pulse, view.hitKey, view.autoMarks)[0][2].state)
+      .toBe('auto');
+
+    state = transitions.transitionGame(state, puzzle, { type: 'tap', r: 1, c: 3, kind: 'single' }).state;
+
+    expect(state.cells[0][2]).toBe('mark');
+    expect(state.cells[1][3]).toBe('mark');
+    expect(state.underlay.has('0,2')).toBe(false);
+    expect(state.autoMarks.has('0,2')).toBe(true);
+    expect(state.probeOwners.has('0,2')).toBe(false);
   });
 
   it('스트로크에서 각 칸을 한 번만 변경하고 reset은 스트로크를 해제한다', () => {
