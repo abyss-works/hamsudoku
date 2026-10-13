@@ -2,7 +2,8 @@ import { NextResponse } from 'next/server';
 import { nextRequestSchema, nextResponseSchema } from '../../../../shared/endless';
 import { getSessionUser } from '../../../../server/auth';
 import { encryptSolution } from '../../../../server/crypto';
-import { createPrismaDb, type DbPort } from '../../../../server/db';
+import { createPrismaDb } from '../../../../server/db/prisma';
+import type { DbPort } from '../../../../server/db/port';
 import { requestSupply } from '../../../../server/endlessSupply';
 import { publishQStashChunk } from '../../../../server/qstash';
 

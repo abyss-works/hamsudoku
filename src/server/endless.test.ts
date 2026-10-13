@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest';
-import { createMemoryDb } from './db';
+import { createMemoryDb } from './db/memory';
 import { PERFECT_SUSPICIOUS_AT, submitEndlessClear, submitEndlessFail } from './endless';
 
 const stage = (id: string) => ({ id, size: 7, regions: '0'.repeat(49), solution: '0,0;1,1', tier: 2, seed: 1 });

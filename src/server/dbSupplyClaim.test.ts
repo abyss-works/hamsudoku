@@ -1,6 +1,7 @@
 import { describe, expect, it } from 'vitest';
 import type { PrismaClient } from '../../prisma/generated/prisma/client';
-import { createMemoryDb, createPrismaDb } from './db';
+import { createMemoryDb } from './db/memory';
+import { createPrismaDb } from './db/prisma';
 
 describe('Prisma claimSupplyChunk 동시성 및 Row Lock 검증 (결함 1)', () => {
   it('Prisma claimSupplyChunk는 트랜잭션 내에서 EndlessSupplyJob과 EndlessSupplyChunk에 대해 FOR UPDATE 행 잠금을 획득한다', async () => {

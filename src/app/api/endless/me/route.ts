@@ -2,7 +2,7 @@ import { NextResponse } from 'next/server';
 import { meResponseSchema } from '../../../../shared/endless';
 import { seasonId } from '../../../../shared/season';
 import { getSessionUser } from '../../../../server/auth';
-import { createPrismaDb } from '../../../../server/db';
+import { createPrismaDb } from '../../../../server/db/prisma';
 
 export async function GET() {
   const { uid } = await getSessionUser();

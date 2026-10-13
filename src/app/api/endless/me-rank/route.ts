@@ -2,7 +2,7 @@ import { NextResponse } from 'next/server';
 import { myRankResponseSchema } from '../../../../shared/endless';
 import { rankedSeasonId, seasonWindow } from '../../../../shared/season';
 import { getSessionUser } from '../../../../server/auth';
-import { createPrismaDb } from '../../../../server/db';
+import { createPrismaDb } from '../../../../server/db/prisma';
 import { getFinalizedUserRank } from '../../../../server/seasonFinalization';
 
 // 내 순위 별도 조회. Redis 스냅샷을 거치지 않고 DB 원장 및 확정 결과에서

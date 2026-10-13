@@ -2,7 +2,7 @@ import { NextResponse } from 'next/server';
 import { rankResponseSchema, type RankEntry } from '../../../../shared/endless';
 import { rankedSeasonId, rankingFrozen, seasonWindow } from '../../../../shared/season';
 import { getSessionUser } from '../../../../server/auth';
-import { createPrismaDb } from '../../../../server/db';
+import { createPrismaDb } from '../../../../server/db/prisma';
 import { rankStoreFromEnv } from '../../../../server/rank';
 import { createQStashPublisher } from '../../../../server/qstashPublisher';
 import { getFinalizedSeasonTop, getFinalizedUserRank } from '../../../../server/seasonFinalization';

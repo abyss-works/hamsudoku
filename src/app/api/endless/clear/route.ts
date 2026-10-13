@@ -3,7 +3,7 @@ import * as Sentry from '@sentry/nextjs';
 import { clearRequestSchema } from '../../../../shared/endless';
 import { rankedSeasonId, rankingFrozen } from '../../../../shared/season';
 import { getSessionUser } from '../../../../server/auth';
-import { createPrismaDb } from '../../../../server/db';
+import { createPrismaDb } from '../../../../server/db/prisma';
 import { submitEndlessClear } from '../../../../server/endless';
 import { rankStoreFromEnv } from '../../../../server/rank';
 

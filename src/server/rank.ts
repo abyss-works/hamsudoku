@@ -1,4 +1,4 @@
-import type { DbPort } from './db';
+import type { DbPort } from './db/port';
 
 export interface RankEntry {
   userId: string;

@@ -1,6 +1,7 @@
 import { describe, expect, it } from 'vitest';
 import type { PrismaClient } from '../../prisma/generated/prisma/client';
-import { createMemoryDb, createPrismaDb } from './db';
+import { createMemoryDb } from './db/memory';
+import { createPrismaDb } from './db/prisma';
 
 describe('Prisma 개인 확정 순위 조회', () => {
   it('미확정 시즌은 null을 반환해 개인 원장 조회로 이어진다', async () => {

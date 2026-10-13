@@ -2,7 +2,7 @@ import { NextResponse } from 'next/server';
 import { z } from 'zod';
 import { isAdmin } from '../../../../server/admin';
 import { getSessionUser } from '../../../../server/auth';
-import { createPrismaDb } from '../../../../server/db';
+import { createPrismaDb } from '../../../../server/db/prisma';
 import { rankStoreFromEnv } from '../../../../server/rank';
 import { seasonId } from '../../../../shared/season';
 

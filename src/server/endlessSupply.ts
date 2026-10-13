@@ -1,4 +1,4 @@
-import type { DbPort, EndlessSupplyJobRow } from './db';
+import type { DbPort, EndlessSupplyJobRow } from './db/port';
 
 export const STOCK_THRESHOLD = 20;
 export const BATCH_COUNT = 10;
@@ -6,7 +6,7 @@ export const COOLDOWN_MS = 60_000;
 export const LEASE_DURATION_MS = 120_000;
 export const POLICY_VERSION = 'v1';
 
-export type { EndlessSupplyJobRow, EndlessSupplyChunkRow } from './db';
+export type { EndlessSupplyJobRow, EndlessSupplyChunkRow } from './db/port';
 
 export interface SupplyDecision {
   shouldEnqueue: boolean;

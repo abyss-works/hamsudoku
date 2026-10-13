@@ -4,7 +4,7 @@ import {
   type EndlessCandidate,
 } from '../shared/sudoku/endlessPoolGenerator';
 import { serializeRegions, serializeSolution, stageId } from '../shared/endlessStageFormat';
-import type { DbPort, EndlessStageRow } from './db';
+import type { DbPort, EndlessStageRow } from './db/port';
 
 export const LEASE_DURATION_MS = 120_000;
 

@@ -1,4 +1,4 @@
-import type { DbPort } from './db';
+import type { DbPort } from './db/port';
 
 // 입장 키 유효시간 2시간. 퍼즐 한 판은 분 단위라 넉넉하고, 방치 키는 만료로 썩는다.
 const ATTEMPT_TTL_MS = 2 * 60 * 60 * 1000;

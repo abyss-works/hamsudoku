@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest';
-import { createMemoryDb } from './db';
+import { createMemoryDb } from './db/memory';
 import { validateEndlessCandidate } from '../shared/sudoku/endlessPoolGenerator';
 import { executeSupplyChunk } from './endlessGeneration';
 import type { Pos } from '../shared/sudoku/solver';
