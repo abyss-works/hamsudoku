@@ -1,7 +1,8 @@
 import { describe, expect, it } from 'vitest';
 import { createMemoryDb } from './db';
-import { executeSupplyChunk, validateEndlessCandidate } from './endlessGeneration';
-import type { Pos } from '../features/sudoku/model/solver';
+import { validateEndlessCandidate } from '../shared/sudoku/endlessPoolGenerator';
+import { executeSupplyChunk } from './endlessGeneration';
+import type { Pos } from '../shared/sudoku/solver';
 
 describe('executeSupplyChunk atomic claim and generation validation', () => {
   it('보드에 유일해가 있어도 제공된 해답이 다르면 적재 검증을 거부한다', () => {
