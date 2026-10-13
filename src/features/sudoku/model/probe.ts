@@ -6,17 +6,17 @@ export function resolveMark(state: CellState, covered: boolean, confirmed = fals
   return state === 'frag' && covered ? 'mark' : state;
 }
 
-/** 주인이 맞고 아직 조각인 소유 조각만 모은다. 회수 대상이다. */
-export function ownedFrags(
-  links: ReadonlyMap<string, string>,
+/** 해당 앵커가 소유한 조각과 다른 앵커 아래의 임시 표시를 모은다. */
+export function ownedProbeCells(
+  ownersByCell: ReadonlyMap<string, ReadonlySet<string>>,
   cells: CellState[][],
   owner: string,
 ): string[] {
   const owned: string[] = [];
-  for (const [frag, anchor] of links) {
-    if (anchor !== owner) continue;
-    const [r, c] = frag.split(',').map(Number);
-    if (cells[r]?.[c] === 'frag') owned.push(frag);
+  for (const [key, owners] of ownersByCell) {
+    if (!owners.has(owner)) continue;
+    const [r, c] = key.split(',').map(Number);
+    if (cells[r]?.[c] === 'frag' || cells[r]?.[c] === 'anchor') owned.push(key);
   }
   return owned;
 }
