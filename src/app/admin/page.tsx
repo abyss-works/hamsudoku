@@ -1,5 +1,5 @@
-import { AdminRankPanel } from '../../views/ranking/AdminRankPanel';
-import { QueryProvider } from '../../core/composition/QueryProvider';
+import { AdminRankPanel } from '../../presentation/views/ranking/AdminRankPanel';
+import { QueryProvider } from '../../core/QueryProvider';
 
 export const metadata = { title: '관리자 · 랭킹' };
 

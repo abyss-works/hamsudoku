@@ -1,11 +1,11 @@
-import { GuestEndlessDialog } from '../../views/account/GuestEndlessDialog';
-import { NicknameGateDialog } from '../../views/account/NicknameGateDialog';
-import { SettingsDialog } from '../../views/home/SettingsDialog';
-import { ProfileDialog } from '../../views/account/ProfileDialog';
-import { AuthDialog } from '../../views/account/AuthDialog';
-import { RankDialog } from '../../views/ranking/RankDialog';
-import { OverlayOutlet } from '../../ui/OverlayOutlet';
-import type { OverlayRequest } from '../../ui/overlayTypes';
+import { GuestEndlessDialog } from '../../presentation/views/account/GuestEndlessDialog';
+import { NicknameGateDialog } from '../../presentation/views/account/NicknameGateDialog';
+import { SettingsDialog } from '../../presentation/views/home/SettingsDialog';
+import { ProfileDialog } from '../../presentation/views/account/ProfileDialog';
+import { AuthDialog } from '../../presentation/views/account/AuthDialog';
+import { RankDialog } from '../../presentation/views/ranking/RankDialog';
+import { OverlayOutlet } from './OverlayOutlet';
+import type { OverlayRequest } from '../orchestration/overlayTypes';
 import type { EndlessSummaryState } from '../../features/endless/service/useEndlessSummary';
 import type { AuthDialogOptions, AuthFn } from '../../features/account/model/authDialog.types';
 

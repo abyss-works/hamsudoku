@@ -18,7 +18,7 @@ vi.mock('../../features/stages/service/useStages', () => ({ useStages: () => ({ 
   { id: 's2', code: '1-2', title: '둘째 판', locked: false, puzzle: PUZZLES[0] },
 ] }], loading: false, error: null }) }));
 vi.mock('../../features/endless/service/useEndlessSummary', () => ({ useEndlessSummary: () => deps.summary }));
-vi.mock('../../ui/useFontsReady', () => ({ useFontsReady: () => true }));
+vi.mock('./useFontsReady', () => ({ useFontsReady: () => true }));
 vi.mock('../../features/stages/api/sync', () => ({ reconcile: deps.reconcile, pull: deps.pull, pushClear: deps.pushClear, fetchAttemptKey: deps.fetchAttemptKey }));
 
 beforeEach(() => {

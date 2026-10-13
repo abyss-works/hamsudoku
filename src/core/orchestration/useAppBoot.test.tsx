@@ -10,7 +10,7 @@ vi.mock('./appBrowser', () => ({
 }));
 
 let mockFontsReady = true;
-vi.mock('../../ui/useFontsReady', () => ({
+vi.mock('./useFontsReady', () => ({
   useFontsReady: () => mockFontsReady,
 }));
 

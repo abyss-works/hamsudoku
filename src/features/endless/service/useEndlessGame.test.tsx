@@ -2,8 +2,11 @@
 import { renderHook, act } from '@testing-library/react';
 import type { ReactNode } from 'react';
 import { describe, expect, it, vi } from 'vitest';
-import { OverlayProvider, useOverlay } from '../../../ui/OverlayProvider';
-import { LoadingProvider } from '../../../ui/LoadingProvider';
+import { OverlayProvider, useOverlay } from '../../../core/composition/OverlayProvider';
+import { LoadingProvider } from '../../../core/composition/LoadingProvider';
+import { useDelayedLoading } from '../../../core/orchestration/useDelayedLoading';
+import { useOverlayScope } from '../../../core/orchestration/useOverlayScope';
+import { useLoading } from '../../../core/composition/LoadingProvider';
 import { useEndlessGame } from './useEndlessGame';
 import * as endlessSessionModule from './useEndlessSession';
 
@@ -15,6 +18,17 @@ function wrapper({ children }: { children: ReactNode }) {
       </OverlayProvider>
     </LoadingProvider>
   );
+}
+
+function useEndlessGameWithOverlay() {
+  const session = endlessSessionModule.useEndlessSession();
+  const overlay = useOverlayScope(`endless-${session.roundId}`);
+  const { track } = useLoading();
+  const showEntryLoading = useDelayedLoading(!session.puzzle);
+  return {
+    game: useEndlessGame(session, { overlay, track, showEntryLoading }),
+    overlay: useOverlay(),
+  };
 }
 
 describe('useEndlessGame overlay integration', () => {
@@ -41,8 +55,7 @@ describe('useEndlessGame overlay integration', () => {
 
     const { result } = renderHook(
       () => ({
-        game: useEndlessGame(),
-        overlay: useOverlay(),
+        ...useEndlessGameWithOverlay(),
       }),
       { wrapper },
     );
@@ -80,8 +93,7 @@ describe('useEndlessGame overlay integration', () => {
 
     const { result, rerender } = renderHook(
       () => ({
-        game: useEndlessGame(),
-        overlay: useOverlay(),
+        ...useEndlessGameWithOverlay(),
       }),
       { wrapper },
     );
@@ -123,8 +135,7 @@ describe('useEndlessGame overlay integration', () => {
 
     const { result, rerender } = renderHook(
       () => ({
-        game: useEndlessGame(),
-        overlay: useOverlay(),
+        ...useEndlessGameWithOverlay(),
       }),
       { wrapper },
     );
@@ -164,8 +175,7 @@ describe('useEndlessGame overlay integration', () => {
 
     const { result, rerender } = renderHook(
       () => ({
-        game: useEndlessGame(),
-        overlay: useOverlay(),
+        ...useEndlessGameWithOverlay(),
       }),
       { wrapper },
     );
@@ -208,8 +218,7 @@ describe('useEndlessGame overlay integration', () => {
 
     const { result, rerender } = renderHook(
       () => ({
-        game: useEndlessGame(),
-        overlay: useOverlay(),
+        ...useEndlessGameWithOverlay(),
       }),
       { wrapper },
     );

@@ -2,8 +2,10 @@
 import type { ReactNode } from 'react';
 import { act, cleanup, renderHook } from '@testing-library/react';
 import { afterEach, describe, expect, it, vi } from 'vitest';
-import { OverlayProvider, useOverlay } from '../../../ui/OverlayProvider';
+import { OverlayProvider, useOverlay } from '../../../core/composition/OverlayProvider';
+import { useOverlayScope } from '../../../core/orchestration/useOverlayScope';
 import { useEndlessGame } from '../service/useEndlessGame';
+import { useEndlessSession } from '../service/useEndlessSession';
 
 const sessionActions = vi.hoisted(() => ({
   start: vi.fn().mockResolvedValue(undefined),
@@ -32,7 +34,13 @@ describe('무한모드 표시 요청의 전이 수명', () => {
   it('같은 게임오버 상태에서 요청을 닫아도 표시 상태 갱신만으로 다시 열리지 않는다', () => {
     const wrapper = ({ children }: { children: ReactNode }) => <OverlayProvider>{children}</OverlayProvider>;
     const { result } = renderHook(() => {
-      const game = useEndlessGame();
+      const session = useEndlessSession();
+      const overlayScope = useOverlayScope(`endless-${session.roundId}`);
+      const game = useEndlessGame(session, {
+        overlay: overlayScope,
+        track: (promise) => promise,
+        showEntryLoading: false,
+      });
       const overlay = useOverlay();
       return { game, overlay };
     }, { wrapper });

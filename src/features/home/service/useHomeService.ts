@@ -1,7 +1,7 @@
 import { useEffect, useRef } from 'react';
+import type { OverlayActions } from '../../../shared/overlay';
 import { homeGate, homeModel } from '../model/homeLogic';
 import type { EndlessSummaryState } from '../../endless/service/useEndlessSummary';
-import { useOverlayScope } from '../../../ui/useOverlayScope';
 
 export interface HomeServiceOptions {
   email: string | null;
@@ -33,10 +33,9 @@ export function useHomeService({
   endlessEnabled,
   onWarmSession,
   onLogin,
-}: HomeServiceOptions) {
+}: HomeServiceOptions, overlay: OverlayActions) {
   const latestSummary = useRef(summary);
   latestSummary.current = summary;
-  const overlay = useOverlayScope('home');
 
   const gate = homeGate(endlessEnabled, uid, email, nickname);
   const guest = gate === 'guest';

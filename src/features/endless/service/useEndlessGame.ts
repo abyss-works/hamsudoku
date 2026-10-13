@@ -1,16 +1,16 @@
 import { useEffect, useRef } from 'react';
-import { useEndlessSession } from './useEndlessSession';
-import { useDelayedLoading } from '../../../ui/useDelayedLoading';
-import { useLoading } from '../../../ui/LoadingProvider';
+import type { OverlayActions } from '../../../shared/overlay';
+import type { EndlessSession } from './useEndlessSession';
 import { endlessClearModel, endlessHudModel } from '../model/screenModels';
-import { useOverlayScope } from '../../../ui/useOverlayScope';
 
-export function useEndlessGame() {
-  const session = useEndlessSession();
-  const { track } = useLoading();
+export interface EndlessGameOptions {
+  overlay: OverlayActions;
+  track<T>(promise: Promise<T>): Promise<T>;
+  showEntryLoading: boolean;
+}
+
+export function useEndlessGame(session: EndlessSession, { overlay, track, showEntryLoading }: EndlessGameOptions) {
   const started = useRef(false);
-  const showEntryLoading = useDelayedLoading(!session.puzzle);
-  const overlay = useOverlayScope(`endless-${session.roundId}`);
   const openedGameOverRef = useRef(false);
 
   useEffect(() => {
