@@ -1,6 +1,7 @@
 import { NextResponse } from 'next/server';
 import { z } from 'zod';
-import { createPrismaDb, type DbPort } from '../../../../server/db';
+import { createPrismaDb } from '../../../../server/db/prisma';
+import type { DbPort } from '../../../../server/db/port';
 import { executeSupplyChunk } from '../../../../server/endlessGeneration';
 import { OfficialQStashVerifier, type QStashVerifier } from '../../../../server/qstash';
 

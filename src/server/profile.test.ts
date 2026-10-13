@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest';
-import { createMemoryDb } from './db';
+import { createMemoryDb } from './db/memory';
 import { fetchNickname, lookupNicknames, saveNickname } from './profile';
 
 describe('saveNickname', () => {

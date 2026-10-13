@@ -1,5 +1,6 @@
 import { describe, expect, it } from 'vitest';
-import { createMemoryDb, type DbPort } from './db';
+import { createMemoryDb } from './db/memory';
+import type { DbPort } from './db/port';
 import { finalizeSeason, getFinalizedSeasonRank } from './seasonFinalization';
 
 describe('시즌 집계와 영속화 (Step 1)', () => {

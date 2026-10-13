@@ -291,6 +291,34 @@ describe('책임 경계와 기능 패키지 아키텍처', () => {
     expect(featureTsx).toEqual([]);
   });
 
+  it('서버 런타임은 저장소 루트의 개발 도구를 참조하지 않는다', () => {
+    const toolDependencies = files.flatMap((file) => {
+      const from = label(file);
+      if (!from.startsWith('src/server/')) return [];
+      return getImportsAndExports(file)
+        .filter((dep) => dep.resolved)
+        .map((dep) => ({
+          from,
+          to: relative(process.cwd(), dep.resolved!).replaceAll('\\', '/'),
+        }))
+        .filter(({ to }) => to.startsWith('tools/'))
+        .map(({ from, to }) => `${from} -> ${to}`);
+    });
+    expect(toolDependencies).toEqual([]);
+  });
+
+  it('Sudoku 생성 알고리즘은 순수 shared 도메인 모듈에 위치한다', () => {
+    const sourcePaths = new Set(files.map(label));
+    expect(sourcePaths.has('src/shared/sudoku/solver.ts')).toBe(true);
+    expect(sourcePaths.has('src/shared/sudoku/logic.ts')).toBe(true);
+    expect(sourcePaths.has('src/shared/sudoku/shape.ts')).toBe(true);
+    expect(sourcePaths.has('src/shared/sudoku/difficulty.ts')).toBe(true);
+    expect(sourcePaths.has('src/shared/sudoku/candidateGenerator.ts')).toBe(true);
+    expect(sourcePaths.has('src/shared/sudoku/endlessPoolGenerator.ts')).toBe(true);
+    expect(sourcePaths.has('src/server/puzzleCandidateGenerator.ts')).toBe(false);
+    expect(sourcePaths.has('src/server/endlessPoolGenerator.ts')).toBe(false);
+  });
+
   it('기능 구현은 api, model, service 책임 그룹 아래에 배치한다', () => {
     const misplaced = files.map(label).filter((file) =>
       file.startsWith('src/features/') && !/^src\/features\/[^/]+\/(api|model|service)\//.test(file),
@@ -477,7 +505,7 @@ function validateLayerDependency(fromLabel: string, toLabel: string, dep: Import
     expect(analyzeFixture('import { buttonClass } from "@/presentation/ui/classNames"; export function V() { return <div />; }')).toEqual([]);
     expect(analyzeFixture('import { confettiPiecesModel } from "@/presentation/ui/confettiModel"; export function V() { return <div />; }')).toEqual([]);
     expect(analyzeFixture('import { rankModel as model } from "@/features/ranking/model/rankLogic"; export function V() { return <div />; }')).toHaveLength(1);
-    expect(analyzeFixture('import { solve } from "@/features/sudoku/model/solver.ts"; export function V() { return <div />; }')).toHaveLength(1);
+    expect(analyzeFixture('import { applyRules } from "@/features/sudoku/model/rules.ts"; export function V() { return <div />; }')).toHaveLength(1);
     expect(analyzeFixture('export { BOOT_TIMEOUT_MS } from "@/application/appLogic";')).toEqual([]);
     expect(analyzeFixture('export { BOOT_TIMEOUT_MS } from "@/core/orchestration/appLogic";')).toEqual([]);
     expect(analyzeFixture('export { rankModel as MODEL } from "@/features/ranking/model/rankLogic";')).toHaveLength(1);

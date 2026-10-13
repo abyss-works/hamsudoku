@@ -1,6 +1,6 @@
 import { NextResponse } from 'next/server';
 import { getSessionUser } from '../../../server/auth';
-import { createPrismaDb } from '../../../server/db';
+import { createPrismaDb } from '../../../server/db/prisma';
 import { fetchRecords } from '../../../server/records';
 
 export async function GET() {

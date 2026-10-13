@@ -1,4 +1,5 @@
-import { createPrismaDb, type DbPort } from '../src/server/db';
+import { createPrismaDb } from '../src/server/db/prisma';
+import type { DbPort } from '../src/server/db/port';
 
 export interface BackfillOptions {
   dryRun?: boolean;

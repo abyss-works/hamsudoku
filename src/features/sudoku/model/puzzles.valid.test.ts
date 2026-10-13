@@ -1,10 +1,11 @@
 import { describe, expect, it } from 'vitest';
-import { countSingles, inBand, LEVEL_CONFIGS } from './levels';
+import { LEVEL_CONFIGS } from './levels';
+import { countSingles, inBand } from '../../../shared/sudoku/difficulty';
 import { LEVELS } from '../../stages/model/levels.generated';
-import { measure, measureWithTrace } from './logic';
+import { measure, measureWithTrace } from '../../../shared/sudoku/logic';
 import { PUZZLES } from './puzzles';
-import { scoreDifficulty } from './shape';
-import { checkIslands, countSolutions } from './solver';
+import { scoreDifficulty } from '../../../shared/sudoku/shape';
+import { checkIslands, countSolutions } from '../../../shared/sudoku/solver';
 
 const key = (p: readonly [number, number]) => `${p[0]},${p[1]}`;
 

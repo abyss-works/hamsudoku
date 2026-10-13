@@ -1,5 +1,5 @@
 import { seasonWindow } from '../shared/season';
-import type { DbPort, SeasonFinalizationRow, SeasonRankResultRow } from './db';
+import type { DbPort, SeasonFinalizationRow, SeasonRankResultRow } from './db/port';
 
 export interface FinalizedSeasonResult {
   header: SeasonFinalizationRow;

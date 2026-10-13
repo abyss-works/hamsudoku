@@ -1,7 +1,7 @@
 import { NextResponse } from 'next/server';
 import { z } from 'zod';
 import { seasonIdSchema } from '../../../../shared/endless';
-import { createPrismaDb } from '../../../../server/db';
+import { createPrismaDb } from '../../../../server/db/prisma';
 import { verifyInternalRequest } from '../../../../server/qstash';
 import { finalizeSeason, recoverUnfinalizedSeasons } from '../../../../server/seasonFinalization';
 

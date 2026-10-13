@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest';
-import { createMemoryDb } from './db';
+import { createMemoryDb } from './db/memory';
 import { createRankStore, rankStoreFromEnv, rebuildFromLedger } from './rank';
 
 type Call = { url: string; init: RequestInit };

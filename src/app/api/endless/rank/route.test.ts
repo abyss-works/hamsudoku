@@ -17,7 +17,7 @@ vi.mock('../../../../server/qstashPublisher', () => ({
   }),
 }));
 
-vi.mock('../../../../server/db', () => ({
+vi.mock('../../../../server/db/prisma', () => ({
   createPrismaDb: vi.fn(() => ({
     getSeasonFinalization: vi.fn(async () => null),
     getFinalizedSeasonTop: vi.fn(async (season: string) => {

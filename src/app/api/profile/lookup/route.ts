@@ -1,7 +1,7 @@
 import { NextResponse } from 'next/server';
 import { z } from 'zod';
 import { getSessionUser } from '../../../../server/auth';
-import { createPrismaDb } from '../../../../server/db';
+import { createPrismaDb } from '../../../../server/db/prisma';
 import { lookupNicknames } from '../../../../server/profile';
 
 const Body = z.object({ userIds: z.array(z.string()).max(100) });

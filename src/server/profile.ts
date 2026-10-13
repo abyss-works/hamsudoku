@@ -1,5 +1,5 @@
 import { validateNickname } from '../features/account/model/nickname';
-import type { DbPort } from './db';
+import type { DbPort } from './db/port';
 
 // 랭킹 표시용 이름 조회는 최대 100 uid로 묶는다.
 const LOOKUP_LIMIT = 100;
