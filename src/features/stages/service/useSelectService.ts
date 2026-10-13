@@ -2,7 +2,6 @@ import { useState } from 'react';
 import type { Chapter, Stage } from '../model/catalog';
 export type { Chapter, Stage };
 import type { ClearEntry } from '../../../platform/storage/save';
-import { useDelayedLoading } from '../../../ui/useDelayedLoading';
 import { selectionModel } from '../model/selectionLogic';
 
 export interface SelectServiceOptions {
@@ -15,8 +14,7 @@ export interface SelectServiceOptions {
 export function useSelectService({ chapters, loading, clears, initialChapterId }: SelectServiceOptions) {
   const [selectedId, setSelectedId] = useState<string | null>(initialChapterId ?? null);
   const { active, chapterTabs, stages } = selectionModel(chapters, selectedId, clears);
-  const showLoading = useDelayedLoading(loading);
   const empty = !loading && chapters.length === 0;
   const ready = !loading && chapters.length > 0;
-  return { active, chapterTabs, stages, showLoading, empty, ready, setSelectedId };
+  return { active, chapterTabs, stages, empty, ready, setSelectedId };
 }

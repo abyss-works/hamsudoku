@@ -34,7 +34,7 @@ export type ShapeInfo = DifficultyScore & { singles: number };
 
 const NONE: Range = { min: 0, max: 0 };
 
-// 수치는 생성기 --report (크기별 300개, 시드 7) 분포의 분위에서 정한 초기값이다. 바뀌면 logic.ts 의 WEIGHTS.version 과 함께 기록한다.
+// 수치는 생성기 --report (크기별 300개, 시드 7) 분포의 분위에서 정한 초기값이다. 바뀌면 WEIGHTS.version 과 함께 기록한다.
 export const LEVEL_CONFIGS: Record<number, LevelConfig> = {
   1: { size: 5, count: 10, maxTier: 0, t1: NONE, t2: NONE, t3: NONE, maxChain: 0, singles: { min: 1, max: 2 }, score: NONE },
   2: { size: 6, count: 10, maxTier: 1, t1: { min: 1, max: 3 }, t2: NONE, t3: NONE, maxChain: 0, singles: { min: 0, max: 1 }, score: { min: 3, max: 9 } },

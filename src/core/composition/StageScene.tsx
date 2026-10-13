@@ -1,7 +1,8 @@
 import type { Stage } from '../../features/stages/model/catalog';
 import { useStageGame } from '../../features/stages/service/useStageGame';
-import { OverlayProvider } from '../../ui/OverlayProvider';
-import { GameScreen } from '../../views/stages/GameScreen';
+import { OverlayProvider } from './OverlayProvider';
+import { useOverlayScope } from '../orchestration/useOverlayScope';
+import { GameScreen } from '../../presentation/views/stages/GameScreen';
 import { StageOverlayHost } from './StageOverlayHost';
 
 export interface StageSceneProps {
@@ -12,7 +13,8 @@ export interface StageSceneProps {
 }
 
 function StageSceneContent({ stage, onBack, onNextMap, onRecord }: StageSceneProps) {
-  const game = useStageGame(stage, onRecord);
+  const overlay = useOverlayScope(`stage-${stage.code}`);
+  const game = useStageGame(stage, onRecord, overlay);
 
   return (
     <GameScreen

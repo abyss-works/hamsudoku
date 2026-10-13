@@ -1,6 +1,7 @@
 import { useHomeService, type HomeServiceOptions } from '../../features/home/service/useHomeService';
-import { OverlayProvider } from '../../ui/OverlayProvider';
-import { HomeScreen } from '../../views/home/HomeScreen';
+import { OverlayProvider } from './OverlayProvider';
+import { useOverlayScope } from '../orchestration/useOverlayScope';
+import { HomeScreen } from '../../presentation/views/home/HomeScreen';
 import { HomeOverlayHost } from './HomeOverlayHost';
 
 export interface HomeSceneProps extends HomeServiceOptions {
@@ -33,6 +34,7 @@ function HomeSceneContent({
   onLogin,
   onLogout,
 }: HomeSceneProps) {
+  const overlay = useOverlayScope('home');
   const service = useHomeService({
     email,
     nickname,
@@ -45,7 +47,7 @@ function HomeSceneContent({
     endlessEnabled,
     onWarmSession,
     onLogin,
-  });
+  }, overlay);
 
   return (
     <HomeScreen

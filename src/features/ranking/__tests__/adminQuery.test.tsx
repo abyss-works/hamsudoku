@@ -1,7 +1,7 @@
 ﻿// @vitest-environment jsdom
 import { cleanup, renderHook, waitFor } from '@testing-library/react';
 import { afterEach, expect, it, vi } from 'vitest';
-import { QueryProvider } from '../../../core/composition/QueryProvider';
+import { QueryProvider } from '../../../core/QueryProvider';
 import { useAdminRank } from '../service/useAdminRank';
 afterEach(() => { cleanup(); vi.unstubAllGlobals(); });
 it('관리자 조회도 동일 계정 요청을 공유한다', async () => {

@@ -2,7 +2,8 @@
 import { renderHook, act } from '@testing-library/react';
 import type { ReactNode } from 'react';
 import { describe, expect, it, vi } from 'vitest';
-import { OverlayProvider, useOverlay } from '../../../ui/OverlayProvider';
+import { OverlayProvider, useOverlay } from '../../../core/composition/OverlayProvider';
+import { useOverlayScope } from '../../../core/orchestration/useOverlayScope';
 import { useStageGame } from './useStageGame';
 import type { Stage } from '../model/catalog';
 
@@ -23,16 +24,16 @@ function wrapper({ children }: { children: ReactNode }) {
   return <OverlayProvider initialScopeId="stage-test">{children}</OverlayProvider>;
 }
 
+function useStageGameWithOverlay(onRecord: (stageCode: string, elapsedSec: number) => void) {
+  const overlayScope = useOverlayScope(`stage-${testStage.code}`);
+  const overlay = useOverlay();
+  return { game: useStageGame(testStage, onRecord, overlayScope), overlay };
+}
+
 describe('useStageGame overlay integration', () => {
   it('초기에는 clear overlay가 열려있지 않다가, 클리어 시 stage-clear 슬롯으로 clear 요청이 등록된다', () => {
     const onRecord = vi.fn();
-    const { result } = renderHook(
-      () => ({
-        game: useStageGame(testStage, onRecord),
-        overlay: useOverlay(),
-      }),
-      { wrapper },
-    );
+    const { result } = renderHook(() => useStageGameWithOverlay(onRecord), { wrapper });
 
     expect(result.current.overlay.isOpen('clear', 'stage-clear')).toBe(false);
 
@@ -48,13 +49,7 @@ describe('useStageGame overlay integration', () => {
   });
 
   it('수동으로 clear를 닫은 뒤 rerender되어도 clear overlay가 다시 열리지 않는다', () => {
-    const { result, rerender } = renderHook(
-      () => ({
-        game: useStageGame(testStage, vi.fn()),
-        overlay: useOverlay(),
-      }),
-      { wrapper },
-    );
+    const { result, rerender } = renderHook(() => useStageGameWithOverlay(vi.fn()), { wrapper });
 
     act(() => {
       result.current.game.tapCell(0, 0, 'double');
@@ -77,13 +72,7 @@ describe('useStageGame overlay integration', () => {
   });
 
   it('retry 호출 시 이전 clear overlay가 닫히고 새 판 수명으로 다시 클리어할 수 있다', () => {
-    const { result } = renderHook(
-      () => ({
-        game: useStageGame(testStage, vi.fn()),
-        overlay: useOverlay(),
-      }),
-      { wrapper },
-    );
+    const { result } = renderHook(() => useStageGameWithOverlay(vi.fn()), { wrapper });
 
     act(() => {
       result.current.game.tapCell(0, 0, 'double');
