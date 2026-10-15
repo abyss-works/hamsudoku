@@ -15,3 +15,8 @@ export function confettiPiecesModel(count = 24): ConfettiPiece[] {
     duration: 1.6 + ((i * 7) % 10) / 10,
   }));
 }
+
+// 반복 횟수 결정. 모션 감소 설정에서는 반복 애니메이션을 끄고 한 번만 떨어진다.
+export function confettiRepeat(reduceMotion: boolean): number {
+  return reduceMotion ? 0 : Infinity;
+}

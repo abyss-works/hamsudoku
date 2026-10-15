@@ -3,6 +3,7 @@ import { EndlessClearDialog } from '../../presentation/views/endless/EndlessClea
 import { GameOverDialog } from '../../presentation/views/endless/GameOverDialog';
 import type { EndlessClearModel } from '../../features/endless/model/screenModels';
 import { OverlayOutlet } from './OverlayOutlet';
+import { useReducedMotion } from '../../platform/motion/useReducedMotion';
 
 export interface EndlessClearOverlayHostProps {
   clearModel: EndlessClearModel | null;
@@ -15,6 +16,7 @@ export function EndlessClearOverlayHost({
   onNext,
   onExit,
 }: EndlessClearOverlayHostProps): ReactNode {
+  const reduceMotion = useReducedMotion();
   return (
     <OverlayOutlet
       slot="endless-clear"
@@ -25,6 +27,7 @@ export function EndlessClearOverlayHost({
               model={clearModel}
               onNext={onNext}
               onExit={onExit}
+              reduceMotion={reduceMotion}
             />
           );
         }

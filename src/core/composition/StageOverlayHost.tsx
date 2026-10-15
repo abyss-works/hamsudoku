@@ -1,6 +1,7 @@
 import type { ReactNode } from 'react';
 import { ClearDialog } from '../../presentation/views/sudoku/ClearDialog';
 import { OverlayOutlet } from './OverlayOutlet';
+import { useReducedMotion } from '../../platform/motion/useReducedMotion';
 
 export interface StageOverlayHostProps {
   total: number;
@@ -15,6 +16,7 @@ export function StageOverlayHost({
   onNextMap,
   onBrowse,
 }: StageOverlayHostProps): ReactNode {
+  const reduceMotion = useReducedMotion();
   return (
     <OverlayOutlet
       slot="stage-clear"
@@ -26,6 +28,7 @@ export function StageOverlayHost({
               onReset={onReset}
               onNextMap={onNextMap}
               onBrowse={onBrowse}
+              reduceMotion={reduceMotion}
             />
           );
         }

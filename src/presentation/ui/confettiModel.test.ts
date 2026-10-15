@@ -30,3 +30,14 @@ describe('confettiPiecesModel (UI pure model)', () => {
     expect(defaultPieces[6].color).toBe('#e5484d');
   });
 });
+
+describe('confettiRepeat', () => {
+  it('모션 감소가 켜지면 반복하지 않고 한 번만 떨어진다', async () => {
+    const { confettiRepeat } = await import('./confettiModel');
+    expect(confettiRepeat(true)).toBe(0);
+  });
+  it('모션 감소가 꺼지면 무한 반복한다', async () => {
+    const { confettiRepeat } = await import('./confettiModel');
+    expect(confettiRepeat(false)).toBe(Infinity);
+  });
+});
