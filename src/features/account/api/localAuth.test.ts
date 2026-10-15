@@ -1,6 +1,12 @@
 // @vitest-environment jsdom
-import { afterEach, describe, expect, it } from 'vitest';
+import { createHash, webcrypto } from 'node:crypto';
+import { afterEach, beforeAll, describe, expect, it, vi } from 'vitest';
 import { createLocalAuthApi } from './localAuth';
+
+// jsdom의 crypto에는 subtle이 없어 Node Web Crypto로 대체한다.
+beforeAll(() => {
+  vi.stubGlobal('crypto', webcrypto);
+});
 
 function memStorage(): Storage {
   const m = new Map<string, string>();
@@ -21,6 +27,14 @@ afterEach(() => {
 });
 
 describe('createLocalAuthApi', () => {
+  it('기존 저장분의 비밀번호 해시와 호환된다', async () => {
+    const store = memStorage();
+    const passHash = createHash('sha256').update('hamsudoku:123456').digest('hex');
+    store.setItem('hamsudoku:account:v1', JSON.stringify({ uid: null, email: 'e@x.y', passHash }));
+    const api = createLocalAuthApi(store);
+    expect(await api.signin('e@x.y', '123456')).toEqual({ ok: true });
+    expect((await api.signin('e@x.y', '654321')).ok).toBe(false);
+  });
   it('처음 보는 이메일이면 계정을 만들고 로그인 상태가 된다', async () => {
     const api = createLocalAuthApi(memStorage());
     const r = await api.signup('e@x.y', '123456');

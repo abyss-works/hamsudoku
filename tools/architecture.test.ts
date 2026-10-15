@@ -581,6 +581,9 @@ function inspectServiceDirectAccess(path: string, sourceOverride?: ts.SourceFile
         if (!name.startsWith('src/server/') && /^(?:@supabase\/|@prisma\/|.*generated\/prisma)/.test(dep.module)) {
           failures.push(`${name}: 서버 SDK 직접 참조`);
         }
+        if (!name.startsWith('src/server/') && /^node:/.test(dep.module)) {
+          failures.push(`${name}: 클라이언트 경계의 Node 내장 모듈 참조`);
+        }
         if (isApiReactDependency(name, dep)) {
           failures.push(`${name}: API에서 React 참조`);
         }
