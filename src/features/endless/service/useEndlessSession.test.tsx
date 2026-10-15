@@ -39,7 +39,7 @@ afterEach(() => {
 
 describe('useEndlessSession 소유 계정', () => {
   it('다른 계정의 미러 대신 서버 요약으로 초기 상태를 만든다', () => {
-    storeMirror(applyClear(emptyMirror(seasonId(new Date())), 3), localStorage, 'user-a');
+    storeMirror(applyClear(emptyMirror(seasonId(new Date())), 3), 'user-a');
     storeMirror(applyClear(emptyMirror(seasonId(new Date())), 2));
     const { result } = renderHook(() =>
       useEndlessSession({ owner: 'user-b', seed: { balance: 7, streak: { current: 1, best: 4 } } }),
@@ -50,7 +50,7 @@ describe('useEndlessSession 소유 계정', () => {
   });
   it('저장된 소유 계정 미러가 있으면 그것을 우선한다', () => {
     const season = seasonId(new Date());
-    storeMirror(applyClear(emptyMirror(season), 3), localStorage, 'user-a');
+    storeMirror(applyClear(emptyMirror(season), 3), 'user-a');
     const { result } = renderHook(() => useEndlessSession({ owner: 'user-a', seed: { balance: 0, streak: { current: 0, best: 0 } } }));
     expect(result.current.mirror.wallet.balance).toBe(3);
   });

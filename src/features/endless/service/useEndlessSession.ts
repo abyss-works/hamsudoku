@@ -45,7 +45,7 @@ export interface EndlessSessionOptions {
 // 다른 계정이나 게스트의 저장분을 현재 계정 값으로 해석하지 않는다.
 function initialMirror(options: EndlessSessionOptions): EndlessMirror {
   const season = seasonId(new Date());
-  const stored = loadStoredMirror(season, localStorage, options.owner);
+  const stored = loadStoredMirror(season, options.owner);
   if (stored) return stored;
   const empty = emptyMirror(season);
   if (!options.seed) return empty;
@@ -87,7 +87,7 @@ export function useEndlessSession(options: EndlessSessionOptions = {}): EndlessS
 
   const setMirrorBoth = useCallback((next: EndlessMirror) => {
     mirrorRef.current = next;
-    storeMirror(next, localStorage, ownerRef.current);
+    storeMirror(next, ownerRef.current);
   }, []);
 
   const start = useCallback(async () => {

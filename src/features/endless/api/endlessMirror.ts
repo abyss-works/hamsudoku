@@ -8,7 +8,7 @@ function mirrorKey(owner?: string | null): string {
 }
 
 // 저장된 미러를 읽는다. 없거나 깨졌으면 null이다.
-export function loadStoredMirror(season: string, store: Storage = localStorage, owner?: string | null): EndlessMirror | null {
+export function loadStoredMirror(season: string, owner?: string | null, store: Storage = localStorage): EndlessMirror | null {
   try {
     const raw = store.getItem(mirrorKey(owner));
     if (!raw) return null;
@@ -20,13 +20,13 @@ export function loadStoredMirror(season: string, store: Storage = localStorage, 
   }
 }
 
-export function loadMirror(season: string, store: Storage = localStorage, owner?: string | null): EndlessMirror {
-  return loadStoredMirror(season, store, owner) ?? emptyMirror(season);
+export function loadMirror(season: string, owner?: string | null, store: Storage = localStorage): EndlessMirror {
+  return loadStoredMirror(season, owner, store) ?? emptyMirror(season);
 }
 
 // 미러는 서버 응답으로 재구축되는 보조 저장이다. 쓰기 실패(quota·접근 제한)는
 // 관측만 하고 호출자의 상태 전이와 서버 제출을 막지 않는다.
-export function storeMirror(mirror: EndlessMirror, store: Storage = localStorage, owner?: string | null): void {
+export function storeMirror(mirror: EndlessMirror, owner?: string | null, store: Storage = localStorage): void {
   try {
     store.setItem(mirrorKey(owner), JSON.stringify(mirror));
   } catch {
