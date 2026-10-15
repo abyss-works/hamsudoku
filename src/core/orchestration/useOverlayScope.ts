@@ -1,12 +1,6 @@
-import { useCallback, useEffect, useMemo } from 'react';
+import { useCallback, useEffect, useId, useMemo } from 'react';
 import { useOverlay } from './overlayContext';
 import type { CloseOverlayOptions, ScopedOverlayHandle, ScopedOverlayRequest } from './overlayTypes';
-
-let scopeCounter = 0;
-function createScopeToken(scopeId: string): string {
-  scopeCounter += 1;
-  return `${scopeId}__${scopeCounter}`;
-}
 
 interface ScopeInstance {
   scopeId: string;
@@ -17,13 +11,15 @@ interface ScopeInstance {
 export function useOverlayScope(scopeId: string): ScopedOverlayHandle {
   const { setScope, expireScope, open: rawOpen, close: rawClose, isOpen, current } = useOverlay();
 
+  // 인스턴스 식별은 렌더 중 가변 전역을 쓰지 않고 React가 부여하는 안정 id를 사용한다.
+  const instanceId = useId();
   const instance = useMemo<ScopeInstance>(() => {
     return {
       scopeId,
-      scopeToken: createScopeToken(scopeId),
+      scopeToken: `${scopeId}__${instanceId}`,
       isActive: true,
     };
-  }, [scopeId]);
+  }, [scopeId, instanceId]);
 
   useEffect(() => {
     instance.isActive = true;
