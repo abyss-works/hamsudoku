@@ -32,10 +32,14 @@ export function useEndlessGame(session: EndlessSession, { overlay, track, showEn
 
   const boundStageId = session.stageId;
   const boundRoundId = session.roundId;
+  // 커밋된 시도만 ref에 반영한다. 렌더 중 갱신하면 보류된(미커밋) 다음 시도 렌더가
+  // 현재 화면의 액션을 무효화한다.
   const stageRef = useRef(session.stageId);
   const roundRef = useRef(session.roundId);
-  stageRef.current = session.stageId;
-  roundRef.current = session.roundId;
+  useEffect(() => {
+    stageRef.current = session.stageId;
+    roundRef.current = session.roundId;
+  }, [session.stageId, session.roundId]);
 
   const clearModel = endlessClearModel({
     result: session.finishResult,
