@@ -1,7 +1,6 @@
 import { PrismaPg } from '@prisma/adapter-pg';
 import { Pool } from 'pg';
 import { PrismaClient } from '../../../prisma/generated/prisma/client';
-import { mergeClear } from '../../shared/merge';
 import { rankedSeasonId, rankingFrozen, seasonWindow } from '../../shared/season';
 import { clampBigInt64, clampInt32 } from './numeric';
 import type { DbPort } from './port';
@@ -126,22 +125,22 @@ export function createPrismaDb(client: PrismaClient = prisma): DbPort {
     },
     async recordVerified(userId: string, stageCode: string, elapsedSec: number, atIso: string) {
       // 요약 기록과 이벤트는 함께 저장되거나 함께 취소된다.
+      // 요약은 DB 측 조건부 upsert로 갱신하여 동시 제출이 같은 이전 값을 읽고 덮어쓰는 경합을 막는다.
+      // LEAST는 NULL을 무시하고 GREATEST는 최신 시각을 고르므로 공유 병합 규칙과 같은 결과를 낸다.
+      const best = elapsedSec > 0 ? elapsedSec : null;
+      const at = new Date(atIso);
       await client.$transaction(async (tx) => {
-        const prev = await tx.clearRecord.findUnique({
-          where: { userId_stageCode: { userId, stageCode } },
-        });
-        const merged = mergeClear(
-          prev ? { bestElapsedSec: prev.bestElapsedSec, attempts: prev.attempts, lastClearedAt: prev.lastClearedAt.toISOString() } : null,
-          elapsedSec,
-          atIso,
-        );
-        await tx.clearRecord.upsert({
-          where: { userId_stageCode: { userId, stageCode } },
-          create: { userId, stageCode, bestElapsedSec: merged.bestElapsedSec, attempts: merged.attempts, lastClearedAt: new Date(merged.lastClearedAt) },
-          update: { bestElapsedSec: merged.bestElapsedSec, attempts: merged.attempts, lastClearedAt: new Date(merged.lastClearedAt) },
-        });
+        await tx.$executeRaw`
+          INSERT INTO "ClearRecord" ("userId", "stageCode", "bestElapsedSec", "attempts", "lastClearedAt", "updatedAt")
+          VALUES (${userId}, ${stageCode}, ${best}, 1, ${at}, ${at})
+          ON CONFLICT ("userId", "stageCode") DO UPDATE SET
+            "attempts" = "ClearRecord"."attempts" + 1,
+            "bestElapsedSec" = LEAST("ClearRecord"."bestElapsedSec", EXCLUDED."bestElapsedSec"),
+            "lastClearedAt" = GREATEST("ClearRecord"."lastClearedAt", EXCLUDED."lastClearedAt"),
+            "updatedAt" = ${at}
+        `;
         await tx.clearEvent.create({
-          data: { userId, stageCode, elapsedSec, verified: true, clearedAt: new Date(atIso) },
+          data: { userId, stageCode, elapsedSec, verified: true, clearedAt: at },
         });
       });
     },
