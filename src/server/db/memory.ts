@@ -268,6 +268,13 @@ export function createMemoryDb(): DbPort {
     },
     async commitEndlessClear(userId, stageId, input) {
       return seasonSerializer.runExclusive(input.season, async () => {
+        if (input.minGapMs !== undefined) {
+          const atMs = Date.parse(input.atIso);
+          const lastVerified = endlessEvents
+            .filter((e) => e.userId === userId && e.verified)
+            .reduce<number | null>((max, e) => Math.max(max ?? 0, Date.parse(e.createdAt)), null);
+          if (lastVerified !== null && atMs - lastVerified < input.minGapMs) return null;
+        }
         const key = progressKey(userId, stageId);
         const prev = endlessProgress.get(key) ?? { cleared: false, attempts: 0, lastPlayedAt: '' };
         endlessProgress.set(key, { cleared: true, attempts: prev.attempts + 1, lastPlayedAt: input.atIso });

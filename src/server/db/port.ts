@@ -133,8 +133,10 @@ export interface EndlessDbPort {
       elapsedMs: number;
       suspicious: boolean;
       atIso: string;
+      /** 직전 검증 클리어와의 최소 간격(ms). 직렬화 경계 안에서 검사하며 미달이면 아무것도 쓰지 않고 null을 돌려준다. */
+      minGapMs?: number;
     },
-  ): Promise<EndlessSummary>;
+  ): Promise<EndlessSummary | null>;
   commitEndlessFail(userId: string, stageId: string, atIso: string): Promise<{ streak: StreakRow }>;
   appendEndlessEvent(
     userId: string,

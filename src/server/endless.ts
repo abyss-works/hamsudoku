@@ -97,7 +97,10 @@ async function settleEndlessClear(
     elapsedMs,
     suspicious,
     atIso: nowIso,
+    minGapMs: MIN_SUBMIT_GAP_MS,
   });
+  // 위 사전 검사를 함께 통과한 동시 제출은 커밋 직렬화 안의 검사에서 걸러진다.
+  if (!summary) return invalid('제출 간격 하한', '제출이 너무 잦아요.');
   return {
     status: 200,
     body: { ok: true, earned: input.seedLeft, balance: summary.balance, streak: summary.streak.current, suspicious },

@@ -83,6 +83,28 @@ describe('submitEndlessClear', () => {
     expect(r.body).toMatchObject({ ok: false });
   });
 
+  it('간격 하한 안의 동시 제출 2건 중 하나만 보상한다', async () => {
+    const db = createMemoryDb();
+    await db.insertStage(stage('e-1'));
+    await db.insertStage(stage('e-2'));
+    const a1 = await db.issueAttempt('u1', 'e-1');
+    const a2 = await db.issueAttempt('u1', 'e-2');
+    const base = Date.parse(a1.issuedAt) + 11_000;
+    const t1 = new Date(base).toISOString();
+    const t2 = new Date(base + 500).toISOString();
+    // 두 요청이 커밋 전 같은 최근 이벤트를 읽는 경합을 만든다.
+    const [r1, r2] = await Promise.all([
+      submitEndlessClear(db, 'u1', input(a1.id, 'e-1'), t1),
+      submitEndlessClear(db, 'u1', input(a2.id, 'e-2'), t2),
+    ]);
+    const okCount = [r1.body, r2.body].filter((b) => b?.ok).length;
+    expect(okCount).toBe(1);
+    expect((await db.getEndlessSummary('u1')).balance).toBe(3);
+    const events = await db.listRecentEndlessEvents('u1', 5);
+    expect(events.filter((e) => e.verified)).toHaveLength(1);
+    expect(events.find((e) => !e.verified)).toMatchObject({ reason: '제출 간격 하한' });
+  });
+
   it.each([3_000, 5_000, 9_999])('%dms의 빠른 정상 풀이를 보상한다', async (elapsedMs) => {
     const db = createMemoryDb();
     await db.insertStage(stage('e-fast'));

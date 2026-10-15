@@ -52,7 +52,7 @@ describe('시즌 집계와 영속화 (Step 1)', () => {
       atIso: '2026-10-11T17:00:00.000Z',
     });
     // 지갑 잔액에는 정상 반영
-    expect(clearResult.balance).toBe(3);
+    expect(clearResult?.balance).toBe(3);
 
     // W41 확정 시 마감 창 획득은 제외됨
     const finalizedW41 = await finalizeSeason(db, '2026-W41', new Date('2026-10-11T18:00:00.000Z'));

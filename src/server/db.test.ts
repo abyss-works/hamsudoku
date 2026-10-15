@@ -122,7 +122,7 @@ describe('endless DbPort', () => {
     await db.insertStage(stage('e-2'));
     await db.commitEndlessClear('u1', 'e-1', { earned: 3, season: '2026-W41', seedLeft: 3, elapsedMs: 30000, suspicious: false, atIso: '2026-10-07T00:00:00.000Z' });
     const s = await db.commitEndlessClear('u1', 'e-2', { earned: 1, season: '2026-W41', seedLeft: 1, elapsedMs: 40000, suspicious: false, atIso: '2026-10-07T00:00:00.000Z' });
-    expect(s.streak).toEqual({ current: 0, best: 1 });
+    expect(s?.streak).toEqual({ current: 0, best: 1 });
   });
 
   it('실패는 attempts를 올리고 current를 리셋한다', async () => {
@@ -195,8 +195,8 @@ describe('endless DbPort', () => {
       suspicious: false,
       atIso: '2026-10-07T00:00:00.000Z',
     });
-    expect(s1.balance).toBe(3);
-    expect(s1.clearedCount).toBe(1);
+    expect(s1?.balance).toBe(3);
+    expect(s1?.clearedCount).toBe(1);
 
     const st1 = await db.getStage('e-1');
     expect(st1?.clears).toBe(1);
@@ -211,8 +211,8 @@ describe('endless DbPort', () => {
       suspicious: false,
       atIso: '2026-10-07T00:00:10.000Z',
     });
-    expect(s2.balance).toBe(6);
-    expect(s2.clearedCount).toBe(1);
+    expect(s2?.balance).toBe(6);
+    expect(s2?.clearedCount).toBe(1);
 
     const st2 = await db.getStage('e-1');
     expect(st2?.clears).toBe(2);
@@ -489,7 +489,7 @@ describe('Prisma advisory lock 및 트랜잭션 공유 (결함 1 & 2)', () => {
       atIso: '2026-10-11T15:05:00.000Z',
     });
 
-    expect(res.balance).toBe(3);
+    expect(res?.balance).toBe(3);
     const summary = await db.getEndlessSummary('user-late');
     expect(summary.balance).toBe(3);
 
