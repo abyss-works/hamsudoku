@@ -50,7 +50,12 @@ class SeasonSerialization {
 
 let nextId = 0;
 
-export function createMemoryDb(): DbPort {
+// 테스트 전용 확장. 진행 기록과 이벤트가 어긋난 비정상 데이터를 주입해 보정 도구의 차단 동작을 검증한다.
+export interface MemoryDbTestHooks {
+  injectInconsistentProgress(userId: string, stageId: string, input: { cleared: boolean; attempts: number }): Promise<void>;
+}
+
+export function createMemoryDb(): DbPort & MemoryDbTestHooks {
   const seasonSerializer = new SeasonSerialization();
   const finalizations = new Map<string, { header: SeasonFinalizationRow; results: SeasonRankResultRow[] }>();
   const users = new Map<string, { email: string | null; hasProfile: boolean }>();
@@ -84,7 +89,7 @@ export function createMemoryDb(): DbPort {
   const clearedCountOf = (userId: string) =>
     [...endlessProgress.entries()].filter(([k, v]) => k.startsWith(`${userId}:`) && v.cleared).length;
 
-  const memoryDb: DbPort & { getRawSeedLedger?: () => typeof seedLedger } = {
+  const memoryDb: DbPort & MemoryDbTestHooks & { getRawSeedLedger?: () => typeof seedLedger } = {
     async ensureUser(userId: string, email: string | null) {
       const prev = users.get(userId);
       users.set(userId, { email: email ?? prev?.email ?? null, hasProfile: true });
