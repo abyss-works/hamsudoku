@@ -1,14 +1,14 @@
 import type { ReactNode } from 'react';
 import { EndlessBoard } from './EndlessBoard';
 import { GameHelpPanel } from '../sudoku/GameHelpPanel';
-import type { useEndlessGame } from '../../../features/endless/service/useEndlessGame';
+import type { EndlessGameView } from '../../../features/endless/service/useEndlessGame';
 import { BootSplash } from '../../ui/BootSplash';
 import { GameHeader } from '../sudoku/GameHeader';
 import { SeedStatus } from '../sudoku/SeedStatus';
 
 export interface EndlessGameScreenProps {
   onBack: () => void;
-  session: ReturnType<typeof useEndlessGame>;
+  session: EndlessGameView;
   clearOverlay?: ReactNode;
   gameOverOverlay?: ReactNode;
 }

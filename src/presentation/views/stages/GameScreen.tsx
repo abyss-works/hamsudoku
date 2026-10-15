@@ -1,7 +1,7 @@
 import type { ReactNode } from 'react';
 import type { Stage } from '../../../features/stages/model/catalog';
 import { SudokuBoard } from '../sudoku/SudokuBoard';
-import type { useStageGame } from '../../../features/stages/service/useStageGame';
+import type { StageGameView } from '../../../features/stages/service/useStageGame';
 import { GameHelpPanel } from '../sudoku/GameHelpPanel';
 import { GameHeader } from '../sudoku/GameHeader';
 import { HamsterProgress } from './HamsterProgress';
@@ -11,7 +11,7 @@ import { stageHudModel } from './stageHudModel';
 export interface GameScreenProps {
   stage: Stage;
   onBack: () => void;
-  game: ReturnType<typeof useStageGame>;
+  game: StageGameView;
   clearOverlay?: ReactNode;
 }
 

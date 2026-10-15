@@ -92,3 +92,9 @@ export function useEndlessGame(session: EndlessSession, { overlay, track, showEn
     },
   };
 }
+
+// 무한모드 화면이 의존하는 표시·액션 계약. 화면은 훅 반환 전체가 아니라 이 집합에만 의존한다.
+export type EndlessGameView = Pick<
+  ReturnType<typeof useEndlessGame>,
+  'puzzle' | 'error' | 'showEntryLoading' | 'hud' | 'roundId' | 'reportWrong' | 'finishBoard'
+>;
