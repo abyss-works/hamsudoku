@@ -65,6 +65,19 @@ describe('앱 Service', () => {
     expect(deps.pushClear).toHaveBeenLastCalledWith('1-1', 11, undefined);
   });
 
+  it('재도전은 새 입장 키를 발급해 두 번째 클리어 제출에 사용한다', async () => {
+    deps.fetchAttemptKey.mockResolvedValueOnce('first-attempt').mockResolvedValueOnce('second-attempt');
+    const { result } = renderHook(useAppService);
+    act(() => result.current.enter(result.current.chapters[0].stages[0]));
+    await act(async () => {});
+    await act(async () => result.current.handleRecord('1-1', 10));
+    expect(deps.pushClear).toHaveBeenLastCalledWith('1-1', 10, 'first-attempt');
+    act(() => result.current.handleRetry());
+    await act(async () => {});
+    await act(async () => result.current.handleRecord('1-1', 11));
+    expect(deps.pushClear).toHaveBeenLastCalledWith('1-1', 11, 'second-attempt');
+  });
+
   it('기록 제출 뒤 늦게 도착한 입장 키를 재시도 기록에 사용하지 않는다', async () => {
     let complete!: (value: string) => void;
     deps.fetchAttemptKey.mockReturnValueOnce(new Promise((resolve) => { complete = resolve; }));

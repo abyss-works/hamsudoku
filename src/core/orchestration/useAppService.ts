@@ -57,6 +57,11 @@ export function useAppService() {
     recordsSync.recordClear(code, elapsedSec, navigation.stage);
   };
 
+  // 재도전은 새 판 시작이므로 진입과 같은 입장 키 발급 조율을 다시 거친다.
+  const handleRetry = () => {
+    if (navigation.stage) recordsSync.prepareAttempt(navigation.stage);
+  };
+
   useSoundPreferences(sound);
   const toggleSound = useSoundToggle(sound, () => setSound(!sound));
 
@@ -76,6 +81,7 @@ export function useAppService() {
     linkError: navigation.linkError,
     enter: navigation.enter,
     handleRecord,
+    handleRetry,
     signinThenSwitch: transfer.signinThenSwitch,
     beginSwitch: transfer.beginSwitch,
     cancelSignin: transfer.cancelSignin,
