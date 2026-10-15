@@ -328,6 +328,15 @@ export function createPrismaDb(client: PrismaClient = prisma): DbPort {
         if (typeof (tx as any).$queryRaw === 'function') {
           await tx.$queryRaw`SELECT id FROM "EndlessStage" WHERE id = ${stageId} FOR UPDATE`;
         }
+        // 제출 간격 검사는 잠금 안에서 수행해 동시 제출이 같은 직전 이벤트를 읽고 함께 통과하는 경합을 막는다.
+        if (input.minGapMs !== undefined) {
+          const last = await tx.endlessEvent.findFirst({
+            where: { userId, verified: true },
+            orderBy: { createdAt: 'desc' },
+            select: { createdAt: true },
+          });
+          if (last && new Date(input.atIso).getTime() - last.createdAt.getTime() < input.minGapMs) return null;
+        }
         await tx.endlessProgress.upsert({
           where: { userId_stageId: { userId, stageId } },
           create: { userId, stageId, cleared: true, attempts: 1, lastPlayedAt: new Date(input.atIso) },
