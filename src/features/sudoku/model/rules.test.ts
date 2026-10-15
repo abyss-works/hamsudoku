@@ -1,7 +1,7 @@
 import { describe, expect, it } from 'vitest';
 import { PUZZLES } from './puzzles';
 import { cellConflicted, countHamsters, getViolations, isCleared, isSolutionCell, type CellState } from './rules';
-import { countSolutions } from './solver';
+import { countSolutions } from '../../../shared/sudoku/solver';
 
 const blank = (): CellState[][] => Array.from({ length: 5 }, () => Array(5).fill('empty'));
 

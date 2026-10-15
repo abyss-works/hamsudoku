@@ -43,7 +43,11 @@ export function useBoardInteraction(puzzle: Puzzle, cells: CellState[][], xMarks
 
   const inside = ([x, y]: GridPoint) => x >= 0 && y >= 0 && x < size && y < size;
 
-  const handlePress = (r: number, c: number) => {
+  // 시작 칸의 대기 싱글탭 취소자. 스트로크가 확정될 때 호출한다.
+  const cancelPendingTap = useRef<(() => void) | null>(null);
+
+  const handlePress = (r: number, c: number, cancelTap?: () => void) => {
+    cancelPendingTap.current = cancelTap ?? null;
     onPress(r, c);
     lastPoint.current = [c + 0.5, r + 0.5];
   };
@@ -80,7 +84,11 @@ export function useBoardInteraction(puzzle: Puzzle, cells: CellState[][], xMarks
 
   const handleUp = () => {
     lastPoint.current = null;
-    if (onRelease()) suppressClick.current = true;
+    if (onRelease()) {
+      suppressClick.current = true;
+      cancelPendingTap.current?.();
+    }
+    cancelPendingTap.current = null;
   };
 
   const handleClickCapture = (e: React.SyntheticEvent) => {
@@ -89,6 +97,8 @@ export function useBoardInteraction(puzzle: Puzzle, cells: CellState[][], xMarks
     suppressClick.current = false;
   };
 
-  const handleCancel = () => { lastPoint.current = null; onRelease(); };
-  return { projected, boardRef, controls, handlePress, handleMove, handleUp, handleClickCapture, handleCancel };
+  const handleCancel = () => { lastPoint.current = null; cancelPendingTap.current = null; onRelease(); };
+  // 보드를 벗어나면 경로를 끊는다. 밖에서 move를 받지 못해도 재진입 위치와 떠난 위치를 잇지 않는다.
+  const handleLeave = () => { lastPoint.current = null; };
+  return { projected, boardRef, controls, handlePress, handleMove, handleUp, handleClickCapture, handleCancel, handleLeave };
 }

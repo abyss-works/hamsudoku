@@ -28,8 +28,15 @@ export function resetSoundForTests(): void {
   lastStart = 0;
 }
 
+// 끄면 아직 시작하지 않은 대기 큐와 타이머를 함께 버린다. 이미 시작된 재생은 건드리지 않는다.
 export function setSfxEnabled(on: boolean): void {
   enabled = on;
+  if (on) return;
+  queue.length = 0;
+  if (timer !== null) {
+    clearTimeout(timer);
+    timer = null;
+  }
 }
 
 export function isSfxEnabled(): boolean {
@@ -100,11 +107,17 @@ function audioCtx(): AudioContext | null {
   return (Howler as unknown as { ctx?: AudioContext | null }).ctx ?? null;
 }
 
+// 끊긴 컨텍스트를 깨운다. iOS 사파리는 장치 점유 상태에서 resume을 거부하므로
+// 거부를 흡수한다. 다음 복귀나 재생 시도에서 다시 깨운다.
+function wake(ctx: AudioContext): void {
+  ctx.resume().catch(() => {});
+}
+
 // 끊긴 공유 컨텍스트를 깨운다. iOS 사파리는 백그라운드에서 suspend시키고
 // 복귀해도 안 깨우므로 복귀 감지(아래)에서 부른다.
 export function recoverAudio(): void {
   const ctx = audioCtx();
-  if (ctx && ctx.state === 'suspended') void ctx.resume();
+  if (ctx && ctx.state === 'suspended') wake(ctx);
 }
 
 // 복귀하면 재연결한다. 리로드하지 않는다(판이 날아간다).
@@ -150,7 +163,7 @@ function liveCtx(): AudioContext | null {
   const ctx = audioCtx();
   if (!ctx) return null;
   if (ctx.state === 'suspended') {
-    void ctx.resume();
+    wake(ctx);
     return null;
   }
   return ctx;

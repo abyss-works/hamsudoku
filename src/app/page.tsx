@@ -1,11 +1,14 @@
 'use client';
 
-import App from "../core/composition/App";
-import { ErrorBoundary } from "../ui/ErrorBoundary";
+import App from '../App';
+import { ErrorBoundary } from '../core/ErrorBoundary';
+import { ErrorFallback } from '../presentation/ui/ErrorFallback';
 
 export default function Page() {
   return (
-    <ErrorBoundary>
+    <ErrorBoundary renderFallback={({ retry, reload }) => (
+      <ErrorFallback onRetry={retry} onReload={reload} />
+    )}>
       <App />
     </ErrorBoundary>
   );

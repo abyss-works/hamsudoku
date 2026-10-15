@@ -1,7 +1,8 @@
 import type { Stage } from '../../features/stages/model/catalog';
 import { useStageGame } from '../../features/stages/service/useStageGame';
-import { OverlayProvider } from '../../ui/OverlayProvider';
-import { GameScreen } from '../../views/stages/GameScreen';
+import { OverlayProvider } from './OverlayProvider';
+import { useOverlayScope } from '../orchestration/useOverlayScope';
+import { GameScreen } from '../../presentation/views/stages/GameScreen';
 import { StageOverlayHost } from './StageOverlayHost';
 
 export interface StageSceneProps {
@@ -9,10 +10,12 @@ export interface StageSceneProps {
   onBack: () => void;
   onNextMap: () => void;
   onRecord: (stageCode: string, elapsedSec: number) => void;
+  onRetry?: () => void;
 }
 
-function StageSceneContent({ stage, onBack, onNextMap, onRecord }: StageSceneProps) {
-  const game = useStageGame(stage, onRecord);
+function StageSceneContent({ stage, onBack, onNextMap, onRecord, onRetry }: StageSceneProps) {
+  const overlay = useOverlayScope(`stage-${stage.code}`);
+  const game = useStageGame(stage, onRecord, overlay);
 
   return (
     <GameScreen
@@ -22,7 +25,10 @@ function StageSceneContent({ stage, onBack, onNextMap, onRecord }: StageScenePro
       clearOverlay={
         <StageOverlayHost
           total={stage.puzzle.size}
-          onReset={game.retry}
+          onReset={() => {
+            game.retry();
+            onRetry?.();
+          }}
           onNextMap={onNextMap}
           onBrowse={onBack}
         />

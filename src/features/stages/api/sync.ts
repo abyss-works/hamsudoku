@@ -51,32 +51,43 @@ async function fetchServerRecords(): Promise<{ status: 200 | 401; clears: Server
   return { status: 200, clears: data.clears ?? [] };
 }
 
-export async function pull(local: ClearEntry[]): Promise<{ clears: ClearEntry[]; unauthorized: boolean }> {
+// 조회 결과 계약. failed는 네트워크·서버 실패로 clears가 로컬 입력 그대로임을 뜻하며,
+// 호출자는 이 결과로 저장 데이터를 교체하지 않는다.
+export interface PullResult {
+  clears: ClearEntry[];
+  unauthorized: boolean;
+  failed: boolean;
+}
+
+export async function pull(local: ClearEntry[]): Promise<PullResult> {
   let server: ServerRecord[];
   try {
     const r = await fetchServerRecords();
-    if (r.status === 401) return { clears: local, unauthorized: true };
+    if (r.status === 401) return { clears: local, unauthorized: true, failed: false };
     server = r.clears;
   } catch {
-    return { clears: local, unauthorized: false };
+    return { clears: local, unauthorized: false, failed: true };
   }
-  return { clears: mergeClearEntries(local, server), unauthorized: false };
+  return { clears: mergeClearEntries(local, server), unauthorized: false, failed: false };
 }
 
 // 화해: 서버에 없는 로컬 기록을 미검증으로 밀어올린 뒤 합친다.
-export async function reconcile(local: ClearEntry[]): Promise<{ clears: ClearEntry[]; unauthorized: boolean }> {
+// isActive는 각 전송 직전에 호출자의 계정 컨텍스트가 유효한지 확인한다. 세션이 바뀐 뒤의
+// 전송은 다른 계정으로 기록되므로 중단하고 실패로 돌려 병합에 쓰이지 않게 한다.
+export async function reconcile(local: ClearEntry[], isActive: () => boolean = () => true): Promise<PullResult> {
   let server: ServerRecord[];
   try {
     const r = await fetchServerRecords();
-    if (r.status === 401) return { clears: local, unauthorized: true };
+    if (r.status === 401) return { clears: local, unauthorized: true, failed: false };
     server = r.clears;
   } catch {
-    return { clears: local, unauthorized: false };
+    return { clears: local, unauthorized: false, failed: true };
   }
   const seen = new Map(server.map((s) => [s.stageCode, s.lastClearedAt] as const));
   for (const c of local) {
     const at = seen.get(c.stageCode);
     if (at === undefined || at < c.clearedAt) {
+      if (!isActive()) return { clears: local, unauthorized: false, failed: true };
       try {
         await postClear({ stageCode: c.stageCode, elapsedSec: c.elapsedSec });
       } catch {
@@ -84,6 +95,7 @@ export async function reconcile(local: ClearEntry[]): Promise<{ clears: ClearEnt
       }
     }
   }
-  return { clears: mergeClearEntries(local, server), unauthorized: false };
+  if (!isActive()) return { clears: local, unauthorized: false, failed: true };
+  return { clears: mergeClearEntries(local, server), unauthorized: false, failed: false };
 }
 

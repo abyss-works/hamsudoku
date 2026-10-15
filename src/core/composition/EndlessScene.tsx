@@ -1,17 +1,25 @@
 import { useEndlessGame } from '../../features/endless/service/useEndlessGame';
-import { OverlayProvider } from '../../ui/OverlayProvider';
-import { EndlessGameScreen } from '../../views/endless/EndlessGameScreen';
+import { useEndlessSession, type EndlessSessionOptions } from '../../features/endless/service/useEndlessSession';
+import { OverlayProvider } from './OverlayProvider';
+import { EndlessGameScreen } from '../../presentation/views/endless/EndlessGameScreen';
+import { useOverlayScope } from '../orchestration/useOverlayScope';
+import { useDelayedLoading } from '../orchestration/useDelayedLoading';
+import { useLoading } from './LoadingProvider';
 import {
   EndlessClearOverlayHost,
   EndlessGameOverOverlayHost,
 } from './EndlessOverlayHost';
 
-export interface EndlessSceneProps {
+export interface EndlessSceneProps extends EndlessSessionOptions {
   onBack: () => void;
 }
 
-function EndlessSceneContent({ onBack }: EndlessSceneProps) {
-  const session = useEndlessGame();
+function EndlessSceneContent({ onBack, owner, seed }: EndlessSceneProps) {
+  const sessionState = useEndlessSession({ owner, seed });
+  const overlay = useOverlayScope(`endless-${sessionState.roundId}`);
+  const { track } = useLoading();
+  const showEntryLoading = useDelayedLoading(!sessionState.puzzle);
+  const session = useEndlessGame(sessionState, { overlay, track, showEntryLoading });
 
   return (
     <EndlessGameScreen

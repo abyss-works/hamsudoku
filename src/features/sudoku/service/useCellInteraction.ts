@@ -1,7 +1,9 @@
 import { useEffect, useRef, type PointerEvent } from 'react';
 import { delayForPointerType, type TapKind } from '../model/tap';
 
-export function useCellInteraction(onTap: (kind: TapKind) => void, onPress: () => void) {
+// onPress는 대기 중인 싱글탭 취소자를 함께 받는다. 보드가 스트로크를 확정하면 이를 호출해
+// 시작 칸의 지연 single 확정이 스트로크 결과를 덮지 않게 한다.
+export function useCellInteraction(onTap: (kind: TapKind) => void, onPress: (cancelPendingTap: () => void) => void) {
   const latestTap = useRef(onTap);
   latestTap.current = onTap;
   const timer = useRef<number | null>(null);
@@ -32,9 +34,15 @@ export function useCellInteraction(onTap: (kind: TapKind) => void, onPress: () =
     }, delayForPointerType(pointerKind.current));
   };
 
+  const cancelPendingTap = () => {
+    if (timer.current === null) return;
+    window.clearTimeout(timer.current);
+    timer.current = null;
+  };
+
   const handlePress = (e: PointerEvent) => {
     pointerKind.current = e.pointerType ?? null;
-    onPress();
+    onPress(cancelPendingTap);
   };
 
   const handleDoubleClick = () => {

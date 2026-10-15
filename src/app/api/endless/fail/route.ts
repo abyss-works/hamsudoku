@@ -1,7 +1,7 @@
 import { NextResponse } from 'next/server';
 import { failRequestSchema } from '../../../../shared/endless';
 import { getSessionUser } from '../../../../server/auth';
-import { createPrismaDb } from '../../../../server/db';
+import { createPrismaDb } from '../../../../server/db/prisma';
 import { submitEndlessFail } from '../../../../server/endless';
 
 export async function POST(req: Request) {

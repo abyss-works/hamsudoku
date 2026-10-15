@@ -1,16 +1,16 @@
 import { useEffect, useRef } from 'react';
-import { useEndlessSession } from './useEndlessSession';
-import { useDelayedLoading } from '../../../ui/useDelayedLoading';
-import { useLoading } from '../../../ui/LoadingProvider';
+import type { OverlayActions } from '../../../shared/overlay';
+import type { EndlessSession } from './useEndlessSession';
 import { endlessClearModel, endlessHudModel } from '../model/screenModels';
-import { useOverlayScope } from '../../../ui/useOverlayScope';
 
-export function useEndlessGame() {
-  const session = useEndlessSession();
-  const { track } = useLoading();
+export interface EndlessGameOptions {
+  overlay: OverlayActions;
+  track<T>(promise: Promise<T>): Promise<T>;
+  showEntryLoading: boolean;
+}
+
+export function useEndlessGame(session: EndlessSession, { overlay, track, showEntryLoading }: EndlessGameOptions) {
   const started = useRef(false);
-  const showEntryLoading = useDelayedLoading(!session.puzzle);
-  const overlay = useOverlayScope(`endless-${session.roundId}`);
   const openedGameOverRef = useRef(false);
 
   useEffect(() => {
@@ -32,10 +32,14 @@ export function useEndlessGame() {
 
   const boundStageId = session.stageId;
   const boundRoundId = session.roundId;
+  // 커밋된 시도만 ref에 반영한다. 렌더 중 갱신하면 보류된(미커밋) 다음 시도 렌더가
+  // 현재 화면의 액션을 무효화한다.
   const stageRef = useRef(session.stageId);
   const roundRef = useRef(session.roundId);
-  stageRef.current = session.stageId;
-  roundRef.current = session.roundId;
+  useEffect(() => {
+    stageRef.current = session.stageId;
+    roundRef.current = session.roundId;
+  }, [session.stageId, session.roundId]);
 
   const clearModel = endlessClearModel({
     result: session.finishResult,

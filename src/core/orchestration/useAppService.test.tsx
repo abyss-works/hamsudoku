@@ -18,7 +18,7 @@ vi.mock('../../features/stages/service/useStages', () => ({ useStages: () => ({ 
   { id: 's2', code: '1-2', title: '둘째 판', locked: false, puzzle: PUZZLES[0] },
 ] }], loading: false, error: null }) }));
 vi.mock('../../features/endless/service/useEndlessSummary', () => ({ useEndlessSummary: () => deps.summary }));
-vi.mock('../../ui/useFontsReady', () => ({ useFontsReady: () => true }));
+vi.mock('./useFontsReady', () => ({ useFontsReady: () => true }));
 vi.mock('../../features/stages/api/sync', () => ({ reconcile: deps.reconcile, pull: deps.pull, pushClear: deps.pushClear, fetchAttemptKey: deps.fetchAttemptKey }));
 
 beforeEach(() => {
@@ -63,6 +63,19 @@ describe('앱 Service', () => {
     await act(async () => complete('previous-attempt'));
     await act(async () => result.current.handleRecord('1-1', 11));
     expect(deps.pushClear).toHaveBeenLastCalledWith('1-1', 11, undefined);
+  });
+
+  it('재도전은 새 입장 키를 발급해 두 번째 클리어 제출에 사용한다', async () => {
+    deps.fetchAttemptKey.mockResolvedValueOnce('first-attempt').mockResolvedValueOnce('second-attempt');
+    const { result } = renderHook(useAppService);
+    act(() => result.current.enter(result.current.chapters[0].stages[0]));
+    await act(async () => {});
+    await act(async () => result.current.handleRecord('1-1', 10));
+    expect(deps.pushClear).toHaveBeenLastCalledWith('1-1', 10, 'first-attempt');
+    act(() => result.current.handleRetry());
+    await act(async () => {});
+    await act(async () => result.current.handleRecord('1-1', 11));
+    expect(deps.pushClear).toHaveBeenLastCalledWith('1-1', 11, 'second-attempt');
   });
 
   it('기록 제출 뒤 늦게 도착한 입장 키를 재시도 기록에 사용하지 않는다', async () => {

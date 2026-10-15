@@ -2,7 +2,7 @@ import fs from 'node:fs';
 import { PrismaPg } from '@prisma/adapter-pg';
 import { Pool } from 'pg';
 import { PrismaClient } from '../prisma/generated/prisma/client';
-import { generateEndlessPool } from './generate';
+import { generateEndlessPool } from '../src/shared/sudoku/endlessPoolGenerator';
 
 function loadEnvLocal() {
   const text = fs.existsSync('.env.local') ? fs.readFileSync('.env.local', 'utf8') : '';

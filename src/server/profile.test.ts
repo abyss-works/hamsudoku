@@ -1,6 +1,6 @@
-import { describe, expect, it } from 'vitest';
-import { createMemoryDb } from './db';
-import { fetchNickname, lookupNicknames, saveNickname } from './profile';
+import { describe, expect, it, vi } from 'vitest';
+import { createMemoryDb } from './db/memory';
+import { displayNicknames, fetchNickname, lookupNicknames, saveNickname } from './profile';
 
 describe('saveNickname', () => {
   it('검증을 통과한 닉네임이 저장된다', async () => {
@@ -49,5 +49,21 @@ describe('lookupNicknames', () => {
   it('세션 없으면 401이다', async () => {
     const db = createMemoryDb();
     expect((await lookupNicknames(db, null, ['u1'])).status).toBe(401);
+  });
+});
+
+describe('displayNicknames', () => {
+  it('조회에 성공하면 uid별 닉네임을 돌려준다', async () => {
+    const db = createMemoryDb();
+    await saveNickname(db, 'u1', '햄찌');
+    expect(await displayNicknames(db, ['u1', 'u2'])).toEqual({ u1: '햄찌', u2: null });
+  });
+  it('조회가 실패하면 관측하고 모든 uid를 null로 돌려준다', async () => {
+    const db = createMemoryDb();
+    db.lookupNicknames = async () => { throw new Error('db down'); };
+    const warn = vi.spyOn(console, 'warn').mockImplementation(() => {});
+    expect(await displayNicknames(db, ['u1', 'u2'])).toEqual({ u1: null, u2: null });
+    expect(warn).toHaveBeenCalledWith('Nickname lookup failed');
+    warn.mockRestore();
   });
 });

@@ -7,7 +7,7 @@ vi.mock('../../../../server/auth', () => ({
   getSessionUser: vi.fn(async () => ({ uid: 'u1', email: null })),
 }));
 
-vi.mock('../../../../server/db', () => ({
+vi.mock('../../../../server/db/prisma', () => ({
   createPrismaDb: vi.fn(() => ({})),
 }));
 

@@ -2,7 +2,8 @@ import { describe, expect, it, vi } from 'vitest';
 import { PrismaPg } from '@prisma/adapter-pg';
 import type { PrismaClient } from '../../prisma/generated/prisma/client';
 import { Pool } from 'pg';
-import { createMemoryDb, createPrismaDb } from './db';
+import { createMemoryDb } from './db/memory';
+import { createPrismaDb } from './db/prisma';
 import {
   evaluateSupplyDecision,
   requestSupply,

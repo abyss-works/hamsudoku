@@ -1,6 +1,6 @@
 import { useEffect, useState } from 'react';
-import { useDelayedLoading } from '../../ui/useDelayedLoading';
-import { useFontsReady } from '../../ui/useFontsReady';
+import { useDelayedLoading } from './useDelayedLoading';
+import { useFontsReady } from './useFontsReady';
 import { dismissStaticSplash } from './appBrowser';
 import { BOOT_TIMEOUT_MS, bootReady } from './appLogic';
 

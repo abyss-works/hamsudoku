@@ -1,5 +1,5 @@
 import fs from 'node:fs';
-import { createPrismaDb } from '../src/server/db';
+import { createPrismaDb } from '../src/server/db/prisma';
 import { createRankStore, rebuildFromLedger } from '../src/server/rank';
 import { seasonId, seasonStartUtc } from '../src/shared/season';
 

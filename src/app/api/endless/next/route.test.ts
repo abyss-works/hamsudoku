@@ -25,7 +25,7 @@ const mockDb = {
   markSupplyJobPublishFailed: vi.fn(async () => {}),
 };
 
-vi.mock('../../../../server/db', () => ({
+vi.mock('../../../../server/db/prisma', () => ({
   createPrismaDb: vi.fn(() => mockDb),
 }));
 

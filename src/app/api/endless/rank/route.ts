@@ -2,7 +2,8 @@ import { NextResponse } from 'next/server';
 import { rankResponseSchema, type RankEntry } from '../../../../shared/endless';
 import { rankedSeasonId, rankingFrozen, seasonWindow } from '../../../../shared/season';
 import { getSessionUser } from '../../../../server/auth';
-import { createPrismaDb } from '../../../../server/db';
+import { createPrismaDb } from '../../../../server/db/prisma';
+import { displayNicknames } from '../../../../server/profile';
 import { rankStoreFromEnv } from '../../../../server/rank';
 import { createQStashPublisher } from '../../../../server/qstashPublisher';
 import { getFinalizedSeasonTop, getFinalizedUserRank } from '../../../../server/seasonFinalization';
@@ -19,7 +20,7 @@ export async function GET() {
   const finalizedTop = await getFinalizedSeasonTop(db, season, 50);
   if (finalizedTop) {
     const top50 = finalizedTop.results.slice(0, 50);
-    const nicknames = await db.lookupNicknames(top50.map((r) => r.userId));
+    const nicknames = await displayNicknames(db, top50.map((r) => r.userId));
     const top: RankEntry[] = top50.map((r) => ({
       userId: r.userId,
       nickname: nicknames[r.userId] ?? null,
@@ -85,7 +86,7 @@ export async function GET() {
     // Redis 오류 시 빈 목록으로 폴백하되 내 DB 점수는 보존한다.
   }
 
-  const nicknames = await db.lookupNicknames(entries.map((e) => e.userId));
+  const nicknames = await displayNicknames(db, entries.map((e) => e.userId));
   const top: RankEntry[] = entries.map((e) => ({
     userId: e.userId,
     nickname: nicknames[e.userId] ?? null,

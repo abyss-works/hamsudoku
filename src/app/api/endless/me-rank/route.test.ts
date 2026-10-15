@@ -2,14 +2,14 @@
 import { afterEach, describe, expect, it, vi } from 'vitest';
 import { GET } from './route';
 import { getSessionUser } from '../../../../server/auth';
-import { createPrismaDb } from '../../../../server/db';
+import { createPrismaDb } from '../../../../server/db/prisma';
 import { rankStoreFromEnv } from '../../../../server/rank';
 
 vi.mock('../../../../server/auth', () => ({
   getSessionUser: vi.fn(async () => ({ uid: 'u1', email: null })),
 }));
 
-vi.mock('../../../../server/db', () => ({
+vi.mock('../../../../server/db/prisma', () => ({
   createPrismaDb: vi.fn(() => ({
     getSeasonFinalization: vi.fn(async () => null),
     getFinalizedUserRank: vi.fn(async () => null),

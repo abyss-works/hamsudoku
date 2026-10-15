@@ -1,5 +1,5 @@
 import { performance } from 'node:perf_hooks';
-import { generateEndlessPool } from '../tools/generate';
+import { generateEndlessPool } from '../src/shared/sudoku/endlessPoolGenerator';
 
 interface BatchMeasurement {
   seed: number;

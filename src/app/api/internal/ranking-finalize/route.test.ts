@@ -1,7 +1,8 @@
 // @vitest-environment node
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 import { GET as getRankRoute } from '../../endless/rank/route';
-import { createMemoryDb, type DbPort } from '../../../../server/db';
+import { createMemoryDb } from '../../../../server/db/memory';
+import type { DbPort } from '../../../../server/db/port';
 import { createTestQStashSignature } from '../../../../server/qstashTestHelper';
 import { POST } from './route';
 
@@ -10,8 +11,8 @@ const TEST_KEY = 'test_qstash_signing_key';
 
 let testDb: DbPort;
 
-vi.mock('../../../../server/db', async (importOriginal) => {
-  const actual = await importOriginal<typeof import('../../../../server/db')>();
+vi.mock('../../../../server/db/prisma', async (importOriginal) => {
+  const actual = await importOriginal<typeof import('../../../../server/db/prisma')>();
   return {
     ...actual,
     createPrismaDb: () => testDb,

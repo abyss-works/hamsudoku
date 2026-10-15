@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest';
-import { createMemoryDb } from './db';
+import { createMemoryDb } from './db/memory';
 import { PERFECT_SUSPICIOUS_AT, submitEndlessClear, submitEndlessFail } from './endless';
 
 const stage = (id: string) => ({ id, size: 7, regions: '0'.repeat(49), solution: '0,0;1,1', tier: 2, seed: 1 });
@@ -19,6 +19,36 @@ describe('submitEndlessClear', () => {
     const r = await submitEndlessClear(db, 'u1', input(a.id, 'e-1'), nowIso);
     expect(r.status).toBe(200);
     expect(r.body).toMatchObject({ ok: true, earned: 3, balance: 3, streak: 1, suspicious: false });
+  });
+
+  it('보상 저장이 실패하면 키 소모를 되돌려 재제출을 허용한다', async () => {
+    const db = createMemoryDb();
+    await db.insertStage(stage('e-1'));
+    const a = await db.issueAttempt('u1', 'e-1');
+    const nowIso = new Date(Date.parse(a.issuedAt) + 11_000).toISOString();
+    const original = db.commitEndlessClear;
+    db.commitEndlessClear = async () => {
+      throw new Error('db down');
+    };
+    await expect(submitEndlessClear(db, 'u1', input(a.id, 'e-1'), nowIso)).rejects.toThrow('db down');
+    db.commitEndlessClear = original;
+    const retry = await submitEndlessClear(db, 'u1', input(a.id, 'e-1'), nowIso);
+    expect(retry.body).toMatchObject({ ok: true, balance: 3 });
+    expect(await db.listRecentEndlessEvents('u1', 5)).toHaveLength(1);
+  });
+
+  it('실패 기록 저장이 실패하면 키 소모를 되돌려 재보고를 허용한다', async () => {
+    const db = createMemoryDb();
+    await db.insertStage(stage('e-1'));
+    const a = await db.issueAttempt('u1', 'e-1');
+    const nowIso = new Date(Date.parse(a.issuedAt) + 11_000).toISOString();
+    const original = db.commitEndlessFail;
+    db.commitEndlessFail = async () => {
+      throw new Error('db down');
+    };
+    await expect(submitEndlessFail(db, 'u1', { attemptKey: a.id }, nowIso)).rejects.toThrow('db down');
+    db.commitEndlessFail = original;
+    expect((await submitEndlessFail(db, 'u1', { attemptKey: a.id }, nowIso)).status).toBe(200);
   });
 
   it('재사용 키는 이벤트 없이 무효다', async () => {
@@ -51,6 +81,28 @@ describe('submitEndlessClear', () => {
     const nowIso = new Date(Date.parse(a.issuedAt) + 11_000).toISOString();
     const r = await submitEndlessClear(db, 'u1', { ...input(a.id, 'e-1'), solution: [[0, 0], [0, 1]] }, nowIso);
     expect(r.body).toMatchObject({ ok: false });
+  });
+
+  it('간격 하한 안의 동시 제출 2건 중 하나만 보상한다', async () => {
+    const db = createMemoryDb();
+    await db.insertStage(stage('e-1'));
+    await db.insertStage(stage('e-2'));
+    const a1 = await db.issueAttempt('u1', 'e-1');
+    const a2 = await db.issueAttempt('u1', 'e-2');
+    const base = Date.parse(a1.issuedAt) + 11_000;
+    const t1 = new Date(base).toISOString();
+    const t2 = new Date(base + 500).toISOString();
+    // 두 요청이 커밋 전 같은 최근 이벤트를 읽는 경합을 만든다.
+    const [r1, r2] = await Promise.all([
+      submitEndlessClear(db, 'u1', input(a1.id, 'e-1'), t1),
+      submitEndlessClear(db, 'u1', input(a2.id, 'e-2'), t2),
+    ]);
+    const okCount = [r1.body, r2.body].filter((b) => b?.ok).length;
+    expect(okCount).toBe(1);
+    expect((await db.getEndlessSummary('u1')).balance).toBe(3);
+    const events = await db.listRecentEndlessEvents('u1', 5);
+    expect(events.filter((e) => e.verified)).toHaveLength(1);
+    expect(events.find((e) => !e.verified)).toMatchObject({ reason: '제출 간격 하한' });
   });
 
   it.each([3_000, 5_000, 9_999])('%dms의 빠른 정상 풀이를 보상한다', async (elapsedMs) => {
@@ -200,6 +252,16 @@ describe('submitEndlessFail', () => {
     const nowIso = new Date(Date.parse(a.issuedAt) + 5_000).toISOString();
     const r = await submitEndlessFail(db, 'u1', { attemptKey: a.id }, nowIso);
     expect(r.status).toBe(200);
+  });
+
+  it('실제 판이 없는 키는 403이며 키를 소모하지 않는다', async () => {
+    const db = createMemoryDb();
+    const a = await db.issueAttempt('u1', '1-1');
+    const nowIso = new Date(Date.parse(a.issuedAt) + 5_000).toISOString();
+    const r = await submitEndlessFail(db, 'u1', { attemptKey: a.id }, nowIso);
+    expect(r.status).toBe(403);
+    expect((await db.findAttempt(a.id))?.usedAt).toBeNull();
+    expect((await db.getEndlessSummary('u1')).streak).toEqual({ current: 0, best: 0 });
   });
 
   it('무효 키는 403이다', async () => {

@@ -1,6 +1,7 @@
 import { describe, expect, it } from 'vitest';
 import type { PrismaClient } from '../../prisma/generated/prisma/client';
-import { createMemoryDb, createPrismaDb } from './db';
+import { createMemoryDb } from './db/memory';
+import { createPrismaDb } from './db/prisma';
 
 describe('Prisma 개인 확정 순위 조회', () => {
   it('미확정 시즌은 null을 반환해 개인 원장 조회로 이어진다', async () => {
@@ -16,6 +17,48 @@ describe('Prisma 개인 확정 순위 조회', () => {
       seasonRankResult: { findUnique: async () => null },
     } as unknown as PrismaClient);
     expect(await db.getFinalizedUserRank('2026-W41', 'u1')).toEqual({ rank: null, score: 0 });
+  });
+});
+
+describe('Prisma 검증 기록 저장', () => {
+  // 두 요청이 같은 이전 행을 읽는 경합을 재현한다. 저장이 읽은 값을 대입하면 attempts가 한 번만 늘고,
+  // DB 측 원자 갱신(증가·최솟값·최신 시각)을 사용하면 두 번 늘어난다.
+  function stubClient() {
+    const row = { bestElapsedSec: 90, attempts: 1, lastClearedAt: new Date('2026-10-01T00:00:00Z') };
+    const events: unknown[] = [];
+    const client = {
+      $transaction: async (fn: (tx: unknown) => Promise<unknown>) => fn(client),
+      $executeRaw: async (_strings: TemplateStringsArray, ...values: unknown[]) => {
+        // 조건부 upsert의 SQL 의미를 흉내 낸다: attempts + 1, LEAST(best), GREATEST(lastClearedAt).
+        const [, , best, at] = values as [string, string, number | null, Date];
+        row.attempts += 1;
+        if (best !== null && (row.bestElapsedSec === null || best < row.bestElapsedSec)) row.bestElapsedSec = best;
+        if (at > row.lastClearedAt) row.lastClearedAt = at;
+        return 1;
+      },
+      clearRecord: {
+        findUnique: async () => ({ ...row }),
+        upsert: async ({ update }: { update: typeof row }) => {
+          Object.assign(row, update);
+          return row;
+        },
+      },
+      clearEvent: { create: async (arg: unknown) => void events.push(arg) },
+    };
+    return { client, row, events };
+  }
+
+  it('동시 저장 2건은 attempts를 두 번 늘리고 베스트는 최솟값을 유지한다', async () => {
+    const { client, row, events } = stubClient();
+    const db = createPrismaDb(client as unknown as PrismaClient);
+    await Promise.all([
+      db.recordVerified('u1', '1-1', 70, '2026-10-02T00:00:00Z'),
+      db.recordVerified('u1', '1-1', 50, '2026-10-03T00:00:00Z'),
+    ]);
+    expect(row.attempts).toBe(3);
+    expect(row.bestElapsedSec).toBe(50);
+    expect(row.lastClearedAt.toISOString()).toBe('2026-10-03T00:00:00.000Z');
+    expect(events).toHaveLength(2);
   });
 });
 
@@ -79,7 +122,7 @@ describe('endless DbPort', () => {
     await db.insertStage(stage('e-2'));
     await db.commitEndlessClear('u1', 'e-1', { earned: 3, season: '2026-W41', seedLeft: 3, elapsedMs: 30000, suspicious: false, atIso: '2026-10-07T00:00:00.000Z' });
     const s = await db.commitEndlessClear('u1', 'e-2', { earned: 1, season: '2026-W41', seedLeft: 1, elapsedMs: 40000, suspicious: false, atIso: '2026-10-07T00:00:00.000Z' });
-    expect(s.streak).toEqual({ current: 0, best: 1 });
+    expect(s?.streak).toEqual({ current: 0, best: 1 });
   });
 
   it('실패는 attempts를 올리고 current를 리셋한다', async () => {
@@ -152,8 +195,8 @@ describe('endless DbPort', () => {
       suspicious: false,
       atIso: '2026-10-07T00:00:00.000Z',
     });
-    expect(s1.balance).toBe(3);
-    expect(s1.clearedCount).toBe(1);
+    expect(s1?.balance).toBe(3);
+    expect(s1?.clearedCount).toBe(1);
 
     const st1 = await db.getStage('e-1');
     expect(st1?.clears).toBe(1);
@@ -168,8 +211,8 @@ describe('endless DbPort', () => {
       suspicious: false,
       atIso: '2026-10-07T00:00:10.000Z',
     });
-    expect(s2.balance).toBe(6);
-    expect(s2.clearedCount).toBe(1);
+    expect(s2?.balance).toBe(6);
+    expect(s2?.clearedCount).toBe(1);
 
     const st2 = await db.getStage('e-1');
     expect(st2?.clears).toBe(2);
@@ -446,7 +489,7 @@ describe('Prisma advisory lock 및 트랜잭션 공유 (결함 1 & 2)', () => {
       atIso: '2026-10-11T15:05:00.000Z',
     });
 
-    expect(res.balance).toBe(3);
+    expect(res?.balance).toBe(3);
     const summary = await db.getEndlessSummary('user-late');
     expect(summary.balance).toBe(3);
 

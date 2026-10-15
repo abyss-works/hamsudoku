@@ -50,19 +50,22 @@ export function useStageRecordsSync({ account, save, onUnauthorized }: StageReco
       switchedRef.current = false;
       pendingSync.current = { uid: account.uid, replace: true, request: pull([]) };
     } else if (previous === undefined || previous === null) {
-      pendingSync.current = { uid: account.uid, replace: false, request: reconcile([...current.current.clears.values()]) };
+      const uid = account.uid;
+      const isActive = () => !stale() && current.current.account.uid === uid;
+      pendingSync.current = { uid, replace: false, request: reconcile([...current.current.clears.values()], isActive) };
     }
     const request = pendingSync.current;
     if (request?.uid === account.uid) {
       void request.request
-        .then(({ clears: merged, unauthorized }) => {
+        .then(({ clears: merged, unauthorized, failed }) => {
           if (stale()) return;
           if (unauthorized) {
             if (request.replace || current.current.account.email) {
               current.current.onUnauthorized?.();
             }
           } else if (request.replace) {
-            current.current.replace(merged);
+            // 조회 실패는 전체 교체의 근거가 아니다. 기존 기록을 유지한다.
+            if (!failed) current.current.replace(merged);
           } else {
             current.current.mergeIn(merged);
           }
@@ -128,11 +131,11 @@ export function useStageRecordsSync({ account, save, onUnauthorized }: StageReco
     if (!uidRef.current) return;
     const requestGeneration = ++generation.current;
     void pull([])
-      .then(({ clears: merged, unauthorized }) => {
+      .then(({ clears: merged, unauthorized, failed }) => {
         if (generation.current !== requestGeneration) return;
         if (unauthorized) {
           current.current.onUnauthorized?.();
-        } else {
+        } else if (!failed) {
           current.current.replace(merged);
         }
       })

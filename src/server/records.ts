@@ -1,4 +1,5 @@
-import type { DbPort } from './db';
+import type { DbPort } from './db/port';
+import { isStageCode } from '../shared/stageCodes';
 
 // 입장 키 유효시간 2시간. 퍼즐 한 판은 분 단위라 넉넉하고, 방치 키는 만료로 썩는다.
 const ATTEMPT_TTL_MS = 2 * 60 * 60 * 1000;
@@ -7,8 +8,9 @@ export async function issueEntry(
   db: DbPort,
   uid: string | null,
   stageCode: string,
-): Promise<{ status: 200 | 401; key?: string }> {
+): Promise<{ status: 200 | 400 | 401; key?: string }> {
   if (!uid) return { status: 401 };
+  if (!isStageCode(stageCode)) return { status: 400 };
   const a = await db.issueAttempt(uid, stageCode);
   return { status: 200, key: a.id };
 }
@@ -23,12 +25,20 @@ export async function submitClear(
   if (input.attemptKey) {
     const a = await db.findAttempt(input.attemptKey);
     if (!a || a.userId !== uid || a.usedAt !== null) return { status: 403 };
+    // 무한모드 판의 키는 스테이지 기록 경로에서 거부한다. 키는 소모하지 않는다.
+    if (!isStageCode(a.stageCode)) return { status: 403 };
     if (Date.parse(nowIso) - Date.parse(a.issuedAt) > ATTEMPT_TTL_MS) return { status: 403 };
     const used = await db.useAttempt(uid, a.id, a.stageCode, nowIso);
     if (!used) return { status: 403 };
     const elapsed = Date.parse(nowIso) - Date.parse(a.issuedAt);
     const secs = Number.isFinite(elapsed) && elapsed >= 0 ? Math.floor(elapsed / 1000) : input.elapsedSec;
-    await db.recordVerified(uid, a.stageCode, secs, nowIso);
+    // 기록 저장이 실패하면 키 소모를 되돌려 같은 키로 재제출할 수 있게 한다.
+    try {
+      await db.recordVerified(uid, a.stageCode, secs, nowIso);
+    } catch (e) {
+      await db.releaseAttempt(uid, a.id);
+      throw e;
+    }
     const rec = (await db.listRecords(uid)).clears.find((c) => c.stageCode === a.stageCode);
     return { status: 200, bestElapsedSec: rec?.bestElapsedSec ?? secs };
   }

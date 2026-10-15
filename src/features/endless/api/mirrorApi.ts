@@ -1,1 +1,1 @@
-export { loadMirror, storeMirror } from "./endlessMirror";
+export { loadMirror, loadStoredMirror, storeMirror } from "./endlessMirror";

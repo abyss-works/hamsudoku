@@ -1,5 +1,5 @@
 import { describe, expect, it, vi } from 'vitest';
-import { createMemoryDb } from '../src/server/db';
+import { createMemoryDb } from '../src/server/db/memory';
 import { backfillEndlessStats } from './backfill-endless-stats';
 
 const stage = (id: string) => ({ id, size: 7, regions: '0'.repeat(49), solution: '0,0', tier: 2, seed: 1 });

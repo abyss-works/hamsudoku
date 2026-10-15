@@ -1,15 +1,17 @@
 import { useRef, useState } from 'react';
 import type { Stage } from '../model/catalog';
-import { formatElapsed, useElapsed } from '../../sudoku/service/useElapsed';
+import { useElapsed } from './useElapsed';
 import { useHamSudoku } from '../../sudoku/service/useHamSudoku';
 import { playClearSound } from '../../../platform/audio/sound';
-import { stageHudModel } from '../model/selectionLogic';
-import { useOverlayScope } from '../../../ui/useOverlayScope';
+import type { OverlayActions } from '../../../shared/overlay';
 
-export function useStageGame(stage: Stage, onRecord: (stageCode: string, elapsedSec: number) => void) {
+export function useStageGame(
+  stage: Stage,
+  onRecord: (stageCode: string, elapsedSec: number) => void,
+  overlay: OverlayActions,
+) {
   const [runId, setRunId] = useState(0);
   const elapsed = useRef(0);
-  const overlay = useOverlayScope(`stage-${stage.code}-${runId}`);
 
   const board = useHamSudoku(stage.puzzle, {
     onClear: () => {
@@ -21,13 +23,9 @@ export function useStageGame(stage: Stage, onRecord: (stageCode: string, elapsed
   const sec = useElapsed(!board.cleared, runId);
   elapsed.current = sec;
 
-  const elapsedText = formatElapsed(sec);
-  const hud = stageHudModel(stage.code, elapsedText, board.hamsterCount, stage.puzzle.size);
-
   return {
     ...board,
-    elapsedText,
-    hud,
+    elapsedSec: sec,
     closeClear: () => {
       overlay.close({ slot: 'stage-clear' });
     },

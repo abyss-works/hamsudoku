@@ -6,6 +6,7 @@ vi.mock('../../../../server/auth', () => ({
   getSessionUser: vi.fn(async () => ({ uid: 'u1', email: null })),
 }));
 
+let nicknameFailure = false;
 let enqueuedSeason: string | null = null;
 let enqueueResult: Promise<{ messageId: string }> | null = null;
 vi.mock('../../../../server/qstashPublisher', () => ({
@@ -17,7 +18,7 @@ vi.mock('../../../../server/qstashPublisher', () => ({
   }),
 }));
 
-vi.mock('../../../../server/db', () => ({
+vi.mock('../../../../server/db/prisma', () => ({
   createPrismaDb: vi.fn(() => ({
     getSeasonFinalization: vi.fn(async () => null),
     getFinalizedSeasonTop: vi.fn(async (season: string) => {
@@ -37,7 +38,10 @@ vi.mock('../../../../server/db', () => ({
     }),
     getUserSeasonRank: vi.fn(async () => ({ rank: 1, score: 50 })),
     listSeasonEarnings: vi.fn(async () => [{ userId: 'u1', amount: 50 }]),
-    lookupNicknames: vi.fn(async () => ({ u1: '햄찌' })),
+    lookupNicknames: vi.fn(async () => {
+      if (nicknameFailure) throw new Error('db down');
+      return { u1: '햄찌' };
+    }),
   })),
 }));
 
@@ -50,6 +54,7 @@ vi.mock('../../../../server/rank', () => ({
 }));
 
 afterEach(() => {
+  nicknameFailure = false;
   enqueuedSeason = null;
   enqueueResult = null;
   vi.useRealTimers();
@@ -113,5 +118,20 @@ describe('GET /api/endless/rank 마감 창 및 확정 상태', () => {
     expect(body.season).toBe('2026-W41');
     expect(body.frozen).toBe(false);
     expect(body.status).toBe('active');
+  });
+});
+
+describe('GET /api/endless/rank 닉네임 조회 격리', () => {
+  it('닉네임 조회가 실패해도 점수 목록은 닉네임 null로 반환한다', async () => {
+    vi.useFakeTimers();
+    vi.setSystemTime(new Date('2026-10-13T12:00:00Z'));
+    nicknameFailure = true;
+    const warn = vi.spyOn(console, 'warn').mockImplementation(() => {});
+    const res = await GET();
+    expect(res.status).toBe(200);
+    const body = await res.json();
+    expect(body.status).toBe('active');
+    expect(body.me).toEqual({ rank: 1, score: 50 });
+    expect(warn).toHaveBeenCalledWith('Nickname lookup failed');
   });
 });
