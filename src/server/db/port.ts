@@ -115,11 +115,6 @@ export interface StageRecordDbPort {
   atomicReaggregateStageStats?(
     stageId: string,
   ): Promise<{ ok: boolean; updated: boolean; error?: string }>;
-  injectInconsistentProgress?(
-    userId: string,
-    stageId: string,
-    input: { cleared: boolean; attempts: number },
-  ): Promise<void>;
 }
 
 export interface EndlessDbPort {
