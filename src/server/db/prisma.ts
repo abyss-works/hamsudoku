@@ -118,22 +118,31 @@ export function createPrismaDb(client: PrismaClient = prisma): DbPort {
         usedAt: a.usedAt ? a.usedAt.toISOString() : null,
       };
     },
+    async releaseAttempt(userId: string, key: string) {
+      await client.attempt.updateMany({
+        where: { id: key, userId },
+        data: { usedAt: null },
+      });
+    },
     async recordVerified(userId: string, stageCode: string, elapsedSec: number, atIso: string) {
-      const prev = await client.clearRecord.findUnique({
-        where: { userId_stageCode: { userId, stageCode } },
-      });
-      const merged = mergeClear(
-        prev ? { bestElapsedSec: prev.bestElapsedSec, attempts: prev.attempts, lastClearedAt: prev.lastClearedAt.toISOString() } : null,
-        elapsedSec,
-        atIso,
-      );
-      await client.clearRecord.upsert({
-        where: { userId_stageCode: { userId, stageCode } },
-        create: { userId, stageCode, bestElapsedSec: merged.bestElapsedSec, attempts: merged.attempts, lastClearedAt: new Date(merged.lastClearedAt) },
-        update: { bestElapsedSec: merged.bestElapsedSec, attempts: merged.attempts, lastClearedAt: new Date(merged.lastClearedAt) },
-      });
-      await client.clearEvent.create({
-        data: { userId, stageCode, elapsedSec, verified: true, clearedAt: new Date(atIso) },
+      // 요약 기록과 이벤트는 함께 저장되거나 함께 취소된다.
+      await client.$transaction(async (tx) => {
+        const prev = await tx.clearRecord.findUnique({
+          where: { userId_stageCode: { userId, stageCode } },
+        });
+        const merged = mergeClear(
+          prev ? { bestElapsedSec: prev.bestElapsedSec, attempts: prev.attempts, lastClearedAt: prev.lastClearedAt.toISOString() } : null,
+          elapsedSec,
+          atIso,
+        );
+        await tx.clearRecord.upsert({
+          where: { userId_stageCode: { userId, stageCode } },
+          create: { userId, stageCode, bestElapsedSec: merged.bestElapsedSec, attempts: merged.attempts, lastClearedAt: new Date(merged.lastClearedAt) },
+          update: { bestElapsedSec: merged.bestElapsedSec, attempts: merged.attempts, lastClearedAt: new Date(merged.lastClearedAt) },
+        });
+        await tx.clearEvent.create({
+          data: { userId, stageCode, elapsedSec, verified: true, clearedAt: new Date(atIso) },
+        });
       });
     },
     async recordUnverified(userId: string, stageCode: string, elapsedSec: number, atIso: string) {

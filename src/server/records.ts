@@ -28,7 +28,13 @@ export async function submitClear(
     if (!used) return { status: 403 };
     const elapsed = Date.parse(nowIso) - Date.parse(a.issuedAt);
     const secs = Number.isFinite(elapsed) && elapsed >= 0 ? Math.floor(elapsed / 1000) : input.elapsedSec;
-    await db.recordVerified(uid, a.stageCode, secs, nowIso);
+    // 기록 저장이 실패하면 키 소모를 되돌려 같은 키로 재제출할 수 있게 한다.
+    try {
+      await db.recordVerified(uid, a.stageCode, secs, nowIso);
+    } catch (e) {
+      await db.releaseAttempt(uid, a.id);
+      throw e;
+    }
     const rec = (await db.listRecords(uid)).clears.find((c) => c.stageCode === a.stageCode);
     return { status: 200, bestElapsedSec: rec?.bestElapsedSec ?? secs };
   }

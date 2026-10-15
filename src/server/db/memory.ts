@@ -121,6 +121,10 @@ export function createMemoryDb(): DbPort {
     async findAttempt(key: string) {
       return attempts.get(key) ?? null;
     },
+    async releaseAttempt(userId: string, key: string) {
+      const a = attempts.get(key);
+      if (a && a.userId === userId) a.usedAt = null;
+    },
     async recordVerified(userId: string, stageCode: string, elapsedSec: number, atIso: string) {
       const key = `${userId}:${stageCode}`;
       const prev = records.get(key) ?? null;

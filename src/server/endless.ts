@@ -1,6 +1,6 @@
 import type { ClearResponse } from '../shared/endless';
 import { seasonId } from '../shared/season';
-import type { DbPort } from './db/port';
+import type { Attempt, DbPort, EndlessStageRow } from './db/port';
 
 export const MIN_CLEAR_MS = 3_000;
 export const MIN_SUBMIT_GAP_MS = 1_000;
@@ -45,6 +45,25 @@ export async function submitEndlessClear(
   const used = await db.useAttempt(uid, attempt.id, attempt.stageCode, nowIso);
   if (!used) return { status: 200, body: { ok: false, reason: '입장 키가 유효하지 않아요.' } };
 
+  // 키 소모 뒤의 저장이 실패하면 소모를 되돌려 같은 키로 재제출할 수 있게 한다.
+  try {
+    return await settleEndlessClear(db, uid, input, stage, attempt, nowIso);
+  } catch (e) {
+    await db.releaseAttempt(uid, attempt.id);
+    throw e;
+  }
+}
+
+// 키 소모 뒤의 검증·이벤트·보상 저장. 예외는 호출자가 키 소모 복구에 사용한다.
+async function settleEndlessClear(
+  db: DbPort,
+  uid: string,
+  input: { stageId: string; solution: [number, number][]; seedLeft: number },
+  stage: EndlessStageRow,
+  attempt: Attempt,
+  nowIso: string,
+): Promise<{ status: 200; body: ClearResponse }> {
+  const now = Date.parse(nowIso);
   const elapsedMs = now - Date.parse(attempt.issuedAt);
   const invalid = async (eventReason: string, msg: string): Promise<{ status: 200; body: ClearResponse }> => {
     await db.appendEndlessEvent(uid, input.stageId, {
@@ -99,6 +118,11 @@ export async function submitEndlessFail(
   }
   const used = await db.useAttempt(uid, attempt.id, attempt.stageCode, nowIso);
   if (!used) return { status: 403 };
-  await db.commitEndlessFail(uid, attempt.stageCode, nowIso);
+  try {
+    await db.commitEndlessFail(uid, attempt.stageCode, nowIso);
+  } catch (e) {
+    await db.releaseAttempt(uid, attempt.id);
+    throw e;
+  }
   return { status: 200 };
 }
