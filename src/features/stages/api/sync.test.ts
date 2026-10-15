@@ -84,4 +84,29 @@ describe('reconcile', () => {
     expect(posts).toEqual(['/api/clear']);
     expect(clears).toHaveLength(1);
   });
+  it('계정 컨텍스트가 바뀌면 남은 기록을 올리지 않는다', async () => {
+    const posts: string[] = [];
+    let release!: () => void;
+    vi.stubGlobal(
+      'fetch',
+      vi.fn(async (url: string) => {
+        if (typeof url === 'string' && url.endsWith('/api/records')) return Response.json({ clears: [] });
+        posts.push(String(url));
+        // 첫 전송을 보류해 두고, 그 사이에 계정 컨텍스트가 바뀐 상황을 만든다.
+        return new Promise<Response>((resolve) => {
+          release = () => resolve(Response.json({ ok: true }));
+        });
+      }),
+    );
+    let alive = true;
+    const local = [entry('1-1', 60, 't1'), entry('1-2', 70, 't2'), entry('1-3', 80, 't3')];
+    const pending = reconcile(local, () => alive);
+    await vi.waitFor(() => expect(posts).toHaveLength(1));
+    alive = false;
+    release();
+    const { clears, failed } = await pending;
+    expect(posts).toHaveLength(1);
+    expect(failed).toBe(true);
+    expect(clears).toEqual(local);
+  });
 });

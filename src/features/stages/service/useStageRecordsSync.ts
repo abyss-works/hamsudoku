@@ -50,7 +50,9 @@ export function useStageRecordsSync({ account, save, onUnauthorized }: StageReco
       switchedRef.current = false;
       pendingSync.current = { uid: account.uid, replace: true, request: pull([]) };
     } else if (previous === undefined || previous === null) {
-      pendingSync.current = { uid: account.uid, replace: false, request: reconcile([...current.current.clears.values()]) };
+      const uid = account.uid;
+      const isActive = () => !stale() && current.current.account.uid === uid;
+      pendingSync.current = { uid, replace: false, request: reconcile([...current.current.clears.values()], isActive) };
     }
     const request = pendingSync.current;
     if (request?.uid === account.uid) {
