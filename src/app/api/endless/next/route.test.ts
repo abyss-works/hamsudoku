@@ -3,6 +3,9 @@ import { afterEach, describe, expect, it, vi } from 'vitest';
 import { POST } from './route';
 import { publishQStashChunk } from '../../../../server/qstash';
 
+const sentryLogger = vi.hoisted(() => ({ warn: vi.fn() }));
+vi.mock('@sentry/nextjs', () => ({ logger: sentryLogger }));
+
 vi.mock('../../../../server/auth', () => ({
   getSessionUser: vi.fn(async () => ({ uid: 'u1', email: null })),
 }));
@@ -81,3 +84,16 @@ describe('POST /api/endless/next', () => {
   });
 });
 
+
+describe('POST /api/endless/next 풀 고갈 로그', () => {
+  it('뽑을 판이 없으면 503과 함께 구조화 경고를 남긴다', async () => {
+    mockDb.pickUnclearedStage.mockResolvedValueOnce(null as never);
+    const res = await POST(new Request('http://localhost/api/endless/next', {
+      method: 'POST',
+      body: JSON.stringify({ clientPublicKey: 'pk' }),
+      headers: { 'Content-Type': 'application/json' },
+    }));
+    expect(res.status).toBe(503);
+    expect(sentryLogger.warn).toHaveBeenCalledWith('Endless pool empty', {});
+  });
+});

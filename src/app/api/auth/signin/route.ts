@@ -1,3 +1,4 @@
+import * as Sentry from '@sentry/nextjs';
 import { NextResponse } from 'next/server';
 import { z } from 'zod';
 import { getSessionUser, signInWithEmail } from '../../../../server/auth';
@@ -12,6 +13,9 @@ export async function POST(req: Request) {
   if (result.ok) {
     const { uid } = await getSessionUser();
     if (uid) await createPrismaDb().ensureUser(uid, parsed.data.email);
+  } else {
+    // 식별자(이메일·비밀번호)를 싣지 않고 실패 코드만 남긴다.
+    Sentry.logger.warn('Auth signin failed', { code: result.code ?? 'unknown' });
   }
   return NextResponse.json(result, { status: result.ok ? 200 : 401 });
 }
