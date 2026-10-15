@@ -72,7 +72,9 @@ export async function pull(local: ClearEntry[]): Promise<PullResult> {
 }
 
 // 화해: 서버에 없는 로컬 기록을 미검증으로 밀어올린 뒤 합친다.
-export async function reconcile(local: ClearEntry[]): Promise<PullResult> {
+// isActive는 각 전송 직전에 호출자의 계정 컨텍스트가 유효한지 확인한다. 세션이 바뀐 뒤의
+// 전송은 다른 계정으로 기록되므로 중단하고 실패로 돌려 병합에 쓰이지 않게 한다.
+export async function reconcile(local: ClearEntry[], isActive: () => boolean = () => true): Promise<PullResult> {
   let server: ServerRecord[];
   try {
     const r = await fetchServerRecords();
@@ -85,6 +87,7 @@ export async function reconcile(local: ClearEntry[]): Promise<PullResult> {
   for (const c of local) {
     const at = seen.get(c.stageCode);
     if (at === undefined || at < c.clearedAt) {
+      if (!isActive()) return { clears: local, unauthorized: false, failed: true };
       try {
         await postClear({ stageCode: c.stageCode, elapsedSec: c.elapsedSec });
       } catch {
@@ -92,6 +95,7 @@ export async function reconcile(local: ClearEntry[]): Promise<PullResult> {
       }
     }
   }
+  if (!isActive()) return { clears: local, unauthorized: false, failed: true };
   return { clears: mergeClearEntries(local, server), unauthorized: false, failed: false };
 }
 
