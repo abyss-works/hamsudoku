@@ -67,14 +67,15 @@ export async function ensureSession(): Promise<string | null> {
   return data.user?.id ?? null;
 }
 
+// 세션 판정은 액세스 토큰의 서명을 로컬에서 검증한 claims로 한다. 프로젝트가 비대칭 서명키(ES256)를
+// 쓰므로 공개키(JWKS)만으로 검증되어 요청마다 Auth 서버를 왕복하지 않는다.
 export async function getSessionUser(): Promise<{ uid: string | null; email: string | null }> {
   const supabase = await userClient();
   if (!supabase) return { uid: null, email: null };
-  const {
-    data: { user },
-  } = await supabase.auth.getUser();
-  if (!user) return { uid: null, email: null };
-  return { uid: user.id, email: !user.is_anonymous && user.email ? user.email : null };
+  const { data, error } = await supabase.auth.getClaims();
+  const claims = data?.claims;
+  if (error || !claims?.sub) return { uid: null, email: null };
+  return { uid: claims.sub, email: !claims.is_anonymous && claims.email ? claims.email : null };
 }
 
 export async function currentAccount(): Promise<string | null> {
