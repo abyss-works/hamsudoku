@@ -65,7 +65,7 @@ export function SudokuBoard({
             key={`${cell.row}-${cell.col}`}
             {...cell}
             onTap={(kind) => onCell(cell.row, cell.col, kind)}
-            onPress={() => handlePress(cell.row, cell.col)}
+            onPress={(cancelPendingTap) => handlePress(cell.row, cell.col, cancelPendingTap)}
           />
         )))}
       </div>

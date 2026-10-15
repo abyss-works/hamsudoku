@@ -44,3 +44,21 @@ describe('useBoardInteraction 경로', () => {
     expect(onEnter.mock.calls).toEqual([[0, size - 1]]);
   });
 });
+
+describe('useBoardInteraction 대기 탭 취소', () => {
+  it('스트로크가 확정되면 시작 칸의 대기 싱글탭을 취소한다', () => {
+    const { hook } = setup(() => true);
+    const cancel = vi.fn();
+    act(() => hook.result.current.handlePress(0, 0, cancel));
+    act(() => hook.result.current.handleUp());
+    expect(cancel).toHaveBeenCalledTimes(1);
+  });
+
+  it('스트로크가 확정되지 않으면 대기 싱글탭을 유지한다', () => {
+    const { hook } = setup(() => false);
+    const cancel = vi.fn();
+    act(() => hook.result.current.handlePress(0, 0, cancel));
+    act(() => hook.result.current.handleUp());
+    expect(cancel).not.toHaveBeenCalled();
+  });
+});
