@@ -75,6 +75,19 @@ describe('sound', () => {
     playSfx('mark');
     expect(Howl).not.toHaveBeenCalled();
   });
+  it('대기 큐가 있는 상태에서 끄면 남은 큐를 버리고, 다시 켜도 재생하지 않는다', () => {
+    playSfx('mark');
+    playSfx('erase');
+    playSfx('good');
+    vi.advanceTimersByTime(0);
+    expect(totalPlays()).toBe(1);
+    setSfxEnabled(false);
+    vi.runAllTimers();
+    expect(totalPlays()).toBe(1);
+    setSfxEnabled(true);
+    vi.runAllTimers();
+    expect(totalPlays()).toBe(1);
+  });
 
   it('서버에서는 재생하지 않는다', () => {
     const w = globalThis.window;
