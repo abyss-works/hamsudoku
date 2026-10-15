@@ -14,5 +14,6 @@ export async function POST(req: Request) {
   if (uid) await db.ensureUser(uid, email);
   const result = await issueEntry(db, uid, parsed.data.stageCode);
   if (result.status === 401) return NextResponse.json({ ok: false, msg: '로그인이 필요해요.' }, { status: 401 });
+  if (result.status === 400) return NextResponse.json({ ok: false, msg: '스테이지 코드를 확인하세요.' }, { status: 400 });
   return NextResponse.json({ attemptKey: result.key });
 }
