@@ -409,6 +409,10 @@ describe('Prisma advisory lock 및 트랜잭션 공유 (결함 1 & 2)', () => {
         executedOps.push('tx.$executeRaw:lock');
         return 1;
       },
+      $queryRaw: async () => [],
+      endlessStage: {
+        findUnique: async () => null,
+      },
       endlessProgress: {
         upsert: async () => {
           executedOps.push('tx.endlessProgress.upsert');
