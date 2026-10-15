@@ -90,5 +90,7 @@ export function useBoardInteraction(puzzle: Puzzle, cells: CellState[][], xMarks
   };
 
   const handleCancel = () => { lastPoint.current = null; onRelease(); };
-  return { projected, boardRef, controls, handlePress, handleMove, handleUp, handleClickCapture, handleCancel };
+  // 보드를 벗어나면 경로를 끊는다. 밖에서 move를 받지 못해도 재진입 위치와 떠난 위치를 잇지 않는다.
+  const handleLeave = () => { lastPoint.current = null; };
+  return { projected, boardRef, controls, handlePress, handleMove, handleUp, handleClickCapture, handleCancel, handleLeave };
 }

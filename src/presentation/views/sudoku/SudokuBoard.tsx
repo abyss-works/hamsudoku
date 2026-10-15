@@ -43,7 +43,7 @@ export function SudokuBoard({
   onRelease,
   clearOverlay,
 }: SudokuBoardProps) {
-  const { projected, boardRef, controls, handlePress, handleMove, handleUp, handleClickCapture, handleCancel } =
+  const { projected, boardRef, controls, handlePress, handleMove, handleUp, handleClickCapture, handleCancel, handleLeave } =
     useBoardInteraction(puzzle, cells, xMarks, violations, pulse, hitKey, shake, onPress, onEnter, onRelease, autoMarks);
 
   return (
@@ -57,6 +57,7 @@ export function SudokuBoard({
         onPointerMove={handleMove}
         onPointerUp={handleUp}
         onPointerCancel={handleCancel}
+        onPointerLeave={handleLeave}
         onClickCapture={handleClickCapture}
       >
         {projected.map((line) => line.map((cell) => (
