@@ -21,6 +21,36 @@ describe('submitEndlessClear', () => {
     expect(r.body).toMatchObject({ ok: true, earned: 3, balance: 3, streak: 1, suspicious: false });
   });
 
+  it('보상 저장이 실패하면 키 소모를 되돌려 재제출을 허용한다', async () => {
+    const db = createMemoryDb();
+    await db.insertStage(stage('e-1'));
+    const a = await db.issueAttempt('u1', 'e-1');
+    const nowIso = new Date(Date.parse(a.issuedAt) + 11_000).toISOString();
+    const original = db.commitEndlessClear;
+    db.commitEndlessClear = async () => {
+      throw new Error('db down');
+    };
+    await expect(submitEndlessClear(db, 'u1', input(a.id, 'e-1'), nowIso)).rejects.toThrow('db down');
+    db.commitEndlessClear = original;
+    const retry = await submitEndlessClear(db, 'u1', input(a.id, 'e-1'), nowIso);
+    expect(retry.body).toMatchObject({ ok: true, balance: 3 });
+    expect(await db.listRecentEndlessEvents('u1', 5)).toHaveLength(1);
+  });
+
+  it('실패 기록 저장이 실패하면 키 소모를 되돌려 재보고를 허용한다', async () => {
+    const db = createMemoryDb();
+    await db.insertStage(stage('e-1'));
+    const a = await db.issueAttempt('u1', 'e-1');
+    const nowIso = new Date(Date.parse(a.issuedAt) + 11_000).toISOString();
+    const original = db.commitEndlessFail;
+    db.commitEndlessFail = async () => {
+      throw new Error('db down');
+    };
+    await expect(submitEndlessFail(db, 'u1', { attemptKey: a.id }, nowIso)).rejects.toThrow('db down');
+    db.commitEndlessFail = original;
+    expect((await submitEndlessFail(db, 'u1', { attemptKey: a.id }, nowIso)).status).toBe(200);
+  });
+
   it('재사용 키는 이벤트 없이 무효다', async () => {
     const db = createMemoryDb();
     await db.insertStage(stage('e-1'));

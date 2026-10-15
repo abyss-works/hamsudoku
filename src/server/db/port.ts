@@ -86,6 +86,8 @@ export interface AccountDbPort {
   issueAttempt(userId: string, stageCode: string): Promise<Attempt>;
   findAttempt(key: string): Promise<Attempt | null>;
   useAttempt(userId: string, key: string, stageCode: string, nowIso: string): Promise<Attempt | null>;
+  /** 소모한 키의 후속 저장이 실패했을 때 소모를 되돌린다. 소유자가 다르면 무시한다. */
+  releaseAttempt(userId: string, key: string): Promise<void>;
 }
 
 export interface StageRecordDbPort {

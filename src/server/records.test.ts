@@ -9,6 +9,17 @@ describe('submitClear', () => {
     expect((await submitClear(db, 'u1', { attemptKey: key, elapsedSec: 60 }, 't1')).status).toBe(200);
     expect((await submitClear(db, 'u1', { attemptKey: key, elapsedSec: 60 }, 't2')).status).toBe(403);
   });
+  it('기록 저장이 실패하면 키 소모를 되돌려 재제출을 허용한다', async () => {
+    const db = createMemoryDb();
+    const { key } = await issueEntry(db, 'u1', '1-1');
+    const original = db.recordVerified;
+    db.recordVerified = async () => {
+      throw new Error('db down');
+    };
+    await expect(submitClear(db, 'u1', { attemptKey: key, elapsedSec: 60 }, 't1')).rejects.toThrow('db down');
+    db.recordVerified = original;
+    expect((await submitClear(db, 'u1', { attemptKey: key, elapsedSec: 60 }, 't1')).status).toBe(200);
+  });
   it('오프라인분(키 없음)은 미검증으로만 쌓인다', async () => {
     const db = createMemoryDb();
     expect((await submitClear(db, 'u1', { stageCode: '1-1', elapsedSec: 60 }, 't1')).status).toBe(200);
