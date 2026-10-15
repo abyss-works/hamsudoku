@@ -28,8 +28,15 @@ export function resetSoundForTests(): void {
   lastStart = 0;
 }
 
+// 끄면 아직 시작하지 않은 대기 큐와 타이머를 함께 버린다. 이미 시작된 재생은 건드리지 않는다.
 export function setSfxEnabled(on: boolean): void {
   enabled = on;
+  if (on) return;
+  queue.length = 0;
+  if (timer !== null) {
+    clearTimeout(timer);
+    timer = null;
+  }
 }
 
 export function isSfxEnabled(): boolean {
