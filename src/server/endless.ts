@@ -116,6 +116,8 @@ export async function submitEndlessFail(
   if (!attempt || attempt.userId !== uid || attempt.usedAt !== null || now - Date.parse(attempt.issuedAt) > ATTEMPT_TTL_MS) {
     return { status: 403 };
   }
+  // 키가 가리키는 판이 무한모드 판이어야 한다. 다른 모드의 키는 소모하지 않고 거부한다.
+  if (!(await db.getStage(attempt.stageCode))) return { status: 403 };
   const used = await db.useAttempt(uid, attempt.id, attempt.stageCode, nowIso);
   if (!used) return { status: 403 };
   try {

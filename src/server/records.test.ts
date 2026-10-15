@@ -20,6 +20,18 @@ describe('submitClear', () => {
     db.recordVerified = original;
     expect((await submitClear(db, 'u1', { attemptKey: key, elapsedSec: 60 }, 't1')).status).toBe(200);
   });
+  it('카탈로그에 없는 코드로는 입장 키를 발급하지 않는다', async () => {
+    const db = createMemoryDb();
+    expect((await issueEntry(db, 'u1', 'e-1-3')).status).toBe(400);
+    expect((await issueEntry(db, 'u1', '9-9')).status).toBe(400);
+  });
+  it('무한모드 판의 키는 스테이지 제출로 쓸 수 없다', async () => {
+    const db = createMemoryDb();
+    const a = await db.issueAttempt('u1', 'e-1-3');
+    expect((await submitClear(db, 'u1', { attemptKey: a.id, elapsedSec: 60 }, 't1')).status).toBe(403);
+    expect((await fetchRecords(db, 'u1')).clears).toEqual([]);
+    expect((await db.findAttempt(a.id))?.usedAt).toBeNull();
+  });
   it('오프라인분(키 없음)은 미검증으로만 쌓인다', async () => {
     const db = createMemoryDb();
     expect((await submitClear(db, 'u1', { stageCode: '1-1', elapsedSec: 60 }, 't1')).status).toBe(200);

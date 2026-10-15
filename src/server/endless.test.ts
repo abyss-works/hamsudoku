@@ -232,6 +232,16 @@ describe('submitEndlessFail', () => {
     expect(r.status).toBe(200);
   });
 
+  it('실제 판이 없는 키는 403이며 키를 소모하지 않는다', async () => {
+    const db = createMemoryDb();
+    const a = await db.issueAttempt('u1', '1-1');
+    const nowIso = new Date(Date.parse(a.issuedAt) + 5_000).toISOString();
+    const r = await submitEndlessFail(db, 'u1', { attemptKey: a.id }, nowIso);
+    expect(r.status).toBe(403);
+    expect((await db.findAttempt(a.id))?.usedAt).toBeNull();
+    expect((await db.getEndlessSummary('u1')).streak).toEqual({ current: 0, best: 0 });
+  });
+
   it('무효 키는 403이다', async () => {
     const db = createMemoryDb();
     const r = await submitEndlessFail(db, 'u1', { attemptKey: 'nope' }, new Date().toISOString());
