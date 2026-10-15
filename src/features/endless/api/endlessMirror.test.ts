@@ -20,6 +20,14 @@ describe('endlessMirror', () => {
     storeMirror(m);
     expect(loadMirror('2026-W41')).toEqual(m);
   });
+  it('저장소 쓰기가 실패해도 예외를 전파하지 않는다', () => {
+    const broken = {
+      setItem: () => {
+        throw new Error('QuotaExceededError');
+      },
+    } as unknown as Storage;
+    expect(() => storeMirror(emptyMirror('2026-W41'), broken)).not.toThrow();
+  });
   it('무오답 클리어는 current를 올리고 best를 갱신한다', () => {
     const m = applyClear(emptyMirror('2026-W41'), 3);
     expect(m.wallet.balance).toBe(3);
