@@ -15,7 +15,7 @@ export { BOOT_TIMEOUT_MS } from './core/orchestration/appLogic';
 function AppView() {
   const {
     screen, stage, chapterId, clears, sound, account, chapters, loading, error, summary,
-    ready, showBootLoading, linkError, enter, handleRecord, signinThenSwitch,
+    ready, showBootLoading, linkError, enter, handleRecord, handleRetry, signinThenSwitch,
     beginSwitch, cancelSignin, handleLogout, goHome, goNextMap, toggleSound,
     browse, openEndless, openLogin, home,
   } = useAppService();
@@ -68,6 +68,7 @@ function AppView() {
               onBack={() => browse()}
               onNextMap={goNextMap}
               onRecord={handleRecord}
+              onRetry={handleRetry}
             />
           )}
           {screen === 'endless' && (
