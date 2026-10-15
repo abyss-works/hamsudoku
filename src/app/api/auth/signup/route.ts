@@ -1,3 +1,4 @@
+import * as Sentry from '@sentry/nextjs';
 import { NextResponse } from 'next/server';
 import { z } from 'zod';
 import { getSessionUser, signUpWithEmail } from '../../../../server/auth';
@@ -14,6 +15,8 @@ export async function POST(req: Request) {
     if (uid) await createPrismaDb().ensureUser(uid, parsed.data.email);
     return NextResponse.json(result, { status: 200 });
   }
+  // 식별자(이메일·비밀번호)를 싣지 않고 실패 코드만 남긴다.
+  Sentry.logger.warn('Auth signup failed', { code: result.code ?? 'unknown' });
   // 중복 이메일은 요청 형식이 아니라 상태 충돌이므로 409를 내린다.
   if (result.code === 'email_exists' || result.code === 'user_already_exists') {
     return NextResponse.json(result, { status: 409 });
