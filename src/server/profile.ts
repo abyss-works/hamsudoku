@@ -32,3 +32,16 @@ export async function lookupNicknames(
   if (!uid) return { status: 401, nicknames: {} };
   return { status: 200, nicknames: await db.lookupNicknames(userIds.slice(0, LOOKUP_LIMIT)) };
 }
+
+// 표시용 닉네임 조회. 저장소 실패를 관측하고 전체 null로 대체하여 점수 목록 응답을 유지한다.
+export async function displayNicknames(
+  db: DbPort,
+  userIds: string[],
+): Promise<Record<string, string | null>> {
+  try {
+    return await db.lookupNicknames(userIds);
+  } catch {
+    console.warn('Nickname lookup failed');
+    return Object.fromEntries(userIds.map((id) => [id, null]));
+  }
+}
