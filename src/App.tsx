@@ -70,7 +70,14 @@ function AppView() {
               onRecord={handleRecord}
             />
           )}
-          {screen === 'endless' && <EndlessScene onBack={() => home()} />}
+          {screen === 'endless' && (
+            <EndlessScene
+              key={account.uid ?? 'guest'}
+              owner={account.uid}
+              seed={summary.me ? { balance: summary.me.wallet.balance, streak: summary.me.streak } : undefined}
+              onBack={() => home()}
+            />
+          )}
           {screen === 'login' && (
             <LoginScreen
               signup={account.signup}

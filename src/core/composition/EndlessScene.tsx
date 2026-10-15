@@ -1,5 +1,5 @@
 import { useEndlessGame } from '../../features/endless/service/useEndlessGame';
-import { useEndlessSession } from '../../features/endless/service/useEndlessSession';
+import { useEndlessSession, type EndlessSessionOptions } from '../../features/endless/service/useEndlessSession';
 import { OverlayProvider } from './OverlayProvider';
 import { EndlessGameScreen } from '../../presentation/views/endless/EndlessGameScreen';
 import { useOverlayScope } from '../orchestration/useOverlayScope';
@@ -10,12 +10,12 @@ import {
   EndlessGameOverOverlayHost,
 } from './EndlessOverlayHost';
 
-export interface EndlessSceneProps {
+export interface EndlessSceneProps extends EndlessSessionOptions {
   onBack: () => void;
 }
 
-function EndlessSceneContent({ onBack }: EndlessSceneProps) {
-  const sessionState = useEndlessSession();
+function EndlessSceneContent({ onBack, owner, seed }: EndlessSceneProps) {
+  const sessionState = useEndlessSession({ owner, seed });
   const overlay = useOverlayScope(`endless-${sessionState.roundId}`);
   const { track } = useLoading();
   const showEntryLoading = useDelayedLoading(!sessionState.puzzle);

@@ -1,7 +1,8 @@
 import { useCallback, useEffect, useRef, useState } from 'react';
 import type { EndlessMirror } from '../../../shared/endless';
 import { seasonId } from '../../../shared/season';
-import { loadMirror, storeMirror } from '../api/mirrorApi';
+import { loadStoredMirror, storeMirror } from '../api/mirrorApi';
+import { emptyMirror } from '../../../shared/endlessMirrorRules';
 import type { Puzzle } from '../../sudoku/model/puzzles';
 import {
   createInitialEndlessSessionState,
@@ -33,9 +34,29 @@ export interface EndlessSession {
 
 export { RETRY_DELAY_MS };
 
-export function useEndlessSession(): EndlessSession {
+export interface EndlessSessionOptions {
+  /** 미러의 소유 계정. 없으면 게스트 저장분을 사용한다. */
+  owner?: string | null;
+  /** 소유 계정의 저장 미러가 없을 때 초기값으로 쓰는 서버 요약. */
+  seed?: { balance: number; streak: { current: number; best: number } };
+}
+
+// 초기 미러: 소유 계정의 저장분 → 서버 요약 → 빈 미러 순서로 고른다.
+// 다른 계정이나 게스트의 저장분을 현재 계정 값으로 해석하지 않는다.
+function initialMirror(options: EndlessSessionOptions): EndlessMirror {
+  const season = seasonId(new Date());
+  const stored = loadStoredMirror(season, localStorage, options.owner);
+  if (stored) return stored;
+  const empty = emptyMirror(season);
+  if (!options.seed) return empty;
+  return { ...empty, wallet: { balance: options.seed.balance }, streak: { ...options.seed.streak } };
+}
+
+export function useEndlessSession(options: EndlessSessionOptions = {}): EndlessSession {
+  const ownerRef = useRef(options.owner ?? null);
+  ownerRef.current = options.owner ?? null;
   const [state, setState] = useState<EndlessSessionState>(() =>
-    createInitialEndlessSessionState(loadMirror(seasonId(new Date()))),
+    createInitialEndlessSessionState(initialMirror(options)),
   );
 
   const attemptKeyRef = useRef<string | null>(null);
@@ -66,7 +87,7 @@ export function useEndlessSession(): EndlessSession {
 
   const setMirrorBoth = useCallback((next: EndlessMirror) => {
     mirrorRef.current = next;
-    storeMirror(next);
+    storeMirror(next, localStorage, ownerRef.current);
   }, []);
 
   const start = useCallback(async () => {
