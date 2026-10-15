@@ -20,6 +20,48 @@ describe('Prisma 개인 확정 순위 조회', () => {
   });
 });
 
+describe('Prisma 검증 기록 저장', () => {
+  // 두 요청이 같은 이전 행을 읽는 경합을 재현한다. 저장이 읽은 값을 대입하면 attempts가 한 번만 늘고,
+  // DB 측 원자 갱신(증가·최솟값·최신 시각)을 사용하면 두 번 늘어난다.
+  function stubClient() {
+    const row = { bestElapsedSec: 90, attempts: 1, lastClearedAt: new Date('2026-10-01T00:00:00Z') };
+    const events: unknown[] = [];
+    const client = {
+      $transaction: async (fn: (tx: unknown) => Promise<unknown>) => fn(client),
+      $executeRaw: async (_strings: TemplateStringsArray, ...values: unknown[]) => {
+        // 조건부 upsert의 SQL 의미를 흉내 낸다: attempts + 1, LEAST(best), GREATEST(lastClearedAt).
+        const [, , best, at] = values as [string, string, number | null, Date];
+        row.attempts += 1;
+        if (best !== null && (row.bestElapsedSec === null || best < row.bestElapsedSec)) row.bestElapsedSec = best;
+        if (at > row.lastClearedAt) row.lastClearedAt = at;
+        return 1;
+      },
+      clearRecord: {
+        findUnique: async () => ({ ...row }),
+        upsert: async ({ update }: { update: typeof row }) => {
+          Object.assign(row, update);
+          return row;
+        },
+      },
+      clearEvent: { create: async (arg: unknown) => void events.push(arg) },
+    };
+    return { client, row, events };
+  }
+
+  it('동시 저장 2건은 attempts를 두 번 늘리고 베스트는 최솟값을 유지한다', async () => {
+    const { client, row, events } = stubClient();
+    const db = createPrismaDb(client as unknown as PrismaClient);
+    await Promise.all([
+      db.recordVerified('u1', '1-1', 70, '2026-10-02T00:00:00Z'),
+      db.recordVerified('u1', '1-1', 50, '2026-10-03T00:00:00Z'),
+    ]);
+    expect(row.attempts).toBe(3);
+    expect(row.bestElapsedSec).toBe(50);
+    expect(row.lastClearedAt.toISOString()).toBe('2026-10-03T00:00:00.000Z');
+    expect(events).toHaveLength(2);
+  });
+});
+
 describe('DbPort', () => {
   it('쓴 키는 재사용이 안 된다', async () => {
     const db = createMemoryDb();
