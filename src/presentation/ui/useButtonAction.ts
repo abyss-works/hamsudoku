@@ -7,6 +7,3 @@ export function buttonAction(onClick?: (event: MouseEvent<HTMLButtonElement>) =>
     onClick?.(event);
   };
 }
-
-// 하위 호환성을 위해 유지
-export const useButtonAction = buttonAction;
