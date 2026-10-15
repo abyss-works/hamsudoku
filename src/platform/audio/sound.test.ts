@@ -132,10 +132,22 @@ function fakeCtx(scheduled: ScheduledNote[], gains: number[], state = 'running')
     currentTime: 10,
     state,
     destination: {},
-    resume: vi.fn(),
+    resume: vi.fn(() => Promise.resolve()),
     createOscillator: () => new FakeOsc(),
     createGain: () => new FakeGain(),
   };
+}
+
+// 거부되는 resume 결과. 호출자가 catch를 붙였는지 handled로 확인한다.
+function rejectedResume() {
+  const handled = vi.fn();
+  const promise = Promise.reject(new Error('Failed to start the audio device'));
+  promise.catch(() => {});
+  promise.catch = ((onRejected: (reason: unknown) => unknown) => {
+    handled();
+    return Promise.prototype.catch.call(promise, onRejected);
+  }) as typeof promise.catch;
+  return { promise, handled };
 }
 
 function useCtx(ctx: FakeCtx | null) {
@@ -193,6 +205,15 @@ describe('progression', () => {
     expect(ctx.resume).toHaveBeenCalled();
     expect(scheduled).toHaveLength(0);
   });
+
+  it('깨우기 거부를 처리한다', () => {
+    const ctx = fakeCtx([], [], 'suspended');
+    const rejection = rejectedResume();
+    ctx.resume = vi.fn(() => rejection.promise);
+    useCtx(ctx);
+    playGoodProgression(3);
+    expect(rejection.handled).toHaveBeenCalled();
+  });
 });
 
 describe('bad rate', () => {
@@ -221,6 +242,16 @@ describe('recoverAudio', () => {
     useCtx(ctx);
     recoverAudio();
     expect(ctx.resume).toHaveBeenCalled();
+  });
+
+  it('깨우기 거부를 처리한다', () => {
+    const ctx = fakeCtx([], [], 'suspended');
+    const rejection = rejectedResume();
+    ctx.resume = vi.fn(() => rejection.promise);
+    useCtx(ctx);
+    recoverAudio();
+    expect(ctx.resume).toHaveBeenCalled();
+    expect(rejection.handled).toHaveBeenCalled();
   });
 
   it('돌아가는 컨텍스트는 건드리지 않는다', () => {
