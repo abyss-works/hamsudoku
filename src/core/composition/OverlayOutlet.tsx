@@ -1,5 +1,6 @@
 import type { OverlayRenderer } from '../orchestration/overlayTypes';
 import { useOverlay } from '../orchestration/overlayContext';
+import { ModalHost } from './ModalHost';
 
 export interface OverlayOutletProps {
   slot?: string;
@@ -27,8 +28,12 @@ export function OverlayOutlet({ slot = 'default', className, render, children }:
   }
 
   if (className) {
-    return <div className={className}>{content}</div>;
+    return (
+      <ModalHost>
+        <div className={className}>{content}</div>
+      </ModalHost>
+    );
   }
 
-  return <>{content}</>;
+  return <ModalHost>{content}</ModalHost>;
 }
