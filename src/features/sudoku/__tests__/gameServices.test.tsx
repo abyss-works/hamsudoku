@@ -41,3 +41,18 @@ it('두 클릭 이후 브라우저 dblclick은 같은 확정을 반복하지 않
   act(() => { result.current.handleClick(); result.current.handleClick(); result.current.handleDoubleClick(); });
   expect(onTap.mock.calls).toEqual([['double']]);
 });
+
+it('press는 대기 중인 싱글탭 취소자를 전달하고, 취소하면 single이 확정되지 않는다', async () => {
+  const cell = await import('../service/useCellInteraction');
+  vi.useFakeTimers();
+  const onTap = vi.fn();
+  const onPress = vi.fn<(cancelPendingTap: () => void) => void>();
+  const { result } = renderHook(() => cell.useCellInteraction(onTap, onPress));
+  act(() => result.current.handleClick());
+  act(() => result.current.handlePress({ pointerType: 'mouse' } as never));
+  expect(onPress).toHaveBeenCalledTimes(1);
+  const cancel = onPress.mock.calls[0][0];
+  act(() => cancel());
+  act(() => vi.runAllTimers());
+  expect(onTap).not.toHaveBeenCalled();
+});

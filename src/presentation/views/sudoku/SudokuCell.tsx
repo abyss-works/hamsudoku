@@ -16,7 +16,7 @@ export interface SudokuCellProps {
   pulseDelaySec?: number;
   ariaLabel: string;
   onTap: (kind: TapKind) => void;
-  onPress: () => void;
+  onPress: (cancelPendingTap: () => void) => void;
 }
 
 export function SudokuCell({
