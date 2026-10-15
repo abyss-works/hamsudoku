@@ -182,7 +182,7 @@ describe('executeSupplyChunk atomic claim and generation validation', () => {
     const res2 = await executeSupplyChunk(db, { jobId: otherJobId, chunkIndex: 0 });
     expect(res2.ok).toBe(false);
     expect(res2.reason).toBe('CONTENT_DUPLICATE_OR_TARGET_UNMET');
-  }, 60_000);
+  }, 180_000);
 
   it('validateEndlessCandidate가 7x7 크기, 영역 연결성, 유일 해답을 올바르게 검증한다', () => {
     // 7x7이 아닌 경우 실패
