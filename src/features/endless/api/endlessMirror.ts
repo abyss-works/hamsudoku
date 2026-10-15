@@ -14,6 +14,12 @@ export function loadMirror(season: string, store: Storage = localStorage): Endle
   }
 }
 
+// 미러는 서버 응답으로 재구축되는 보조 저장이다. 쓰기 실패(quota·접근 제한)는
+// 관측만 하고 호출자의 상태 전이와 서버 제출을 막지 않는다.
 export function storeMirror(mirror: EndlessMirror, store: Storage = localStorage): void {
-  store.setItem(ENDLESS_MIRROR_KEY, JSON.stringify(mirror));
+  try {
+    store.setItem(ENDLESS_MIRROR_KEY, JSON.stringify(mirror));
+  } catch {
+    console.warn('Endless mirror store failed');
+  }
 }
