@@ -54,7 +54,7 @@ describe('ENDLESS_BAND', () => {
   const m7: Measure = {
     size: 7, tier: 2, t0: 30, t1: 3, t2: 1, t3: 0, t3Attempts: 0, chains: [], maxChain: 0, score: 20,
   };
-  it('레벨 4·5 수준 후보를 통과시킨다', () => {
+  it('레벨 4 전체와 레벨 5 하위 수준 후보를 통과시킨다', () => {
     expect(inBand(m7, shape, ENDLESS_BAND)).toBe(true);
     expect(inBand({ ...m7, tier: 3, t1: 4, t2: 2, t3: 1, maxChain: 3, score: 60 }, shape, ENDLESS_BAND)).toBe(true);
   });
@@ -62,6 +62,7 @@ describe('ENDLESS_BAND', () => {
     expect(inBand({ ...m7, size: 6 }, shape, ENDLESS_BAND)).toBe(false);
     expect(inBand({ ...m7, tier: 4 }, shape, ENDLESS_BAND)).toBe(false);
     expect(inBand({ ...m7, score: 100 }, shape, ENDLESS_BAND)).toBe(false);
+    expect(inBand({ ...m7, score: 61 }, shape, ENDLESS_BAND)).toBe(false);
     expect(inBand({ ...m7, score: 14 }, shape, ENDLESS_BAND)).toBe(false);
   });
 });

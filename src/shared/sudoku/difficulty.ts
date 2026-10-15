@@ -29,7 +29,7 @@ export const ENDLESS_BAND: BandConfig = {
   t3: { min: 0, max: 2 },
   maxChain: 4,
   singles: { min: 0, max: 1 },
-  score: { min: 15, max: 90 },
+  score: { min: 15, max: 60 },
 };
 
 function within(value: number, range: Range): boolean {
