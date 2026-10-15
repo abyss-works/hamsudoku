@@ -1,3 +1,4 @@
+import * as Sentry from '@sentry/nextjs';
 import { NextResponse } from 'next/server';
 import { nextRequestSchema, nextResponseSchema } from '../../../../shared/endless';
 import { getSessionUser } from '../../../../server/auth';
@@ -37,7 +38,10 @@ export async function handleNext(req: Request, deps?: NextRouteDeps) {
   }
 
   const stage = await db.pickUnclearedStage(uid);
-  if (!stage) return NextResponse.json({ ok: false, msg: '새 판을 준비 중이에요.' }, { status: 503 });
+  if (!stage) {
+    Sentry.logger.warn('Endless pool empty', {});
+    return NextResponse.json({ ok: false, msg: '새 판을 준비 중이에요.' }, { status: 503 });
+  }
   const attempt = await db.issueAttempt(uid, stage.id);
   const encrypted = await encryptSolution(body.data.clientPublicKey, stage.solution);
   return NextResponse.json(

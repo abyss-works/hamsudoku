@@ -6,7 +6,7 @@ export default defineConfig({
     exclude: [...configDefaults.exclude, '**/.worktrees/**'],
     testTimeout: 30000,
     // 파일마다 워커를 띄우면 CPU 수 이상으로 경합이 생겨 DOM 렌더 대기가 간헐 실패한다.
-    maxWorkers: '50%',
+    maxWorkers: 4,
     setupFiles: ['./vitest.setup.ts'],
   },
 });

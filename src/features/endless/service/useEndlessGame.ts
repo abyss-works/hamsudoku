@@ -1,4 +1,4 @@
-import { useEffect, useRef } from 'react';
+import { useEffect, useLayoutEffect, useRef } from 'react';
 import type { OverlayActions } from '../../../shared/overlay';
 import type { EndlessSession } from './useEndlessSession';
 import { endlessClearModel, endlessHudModel } from '../model/screenModels';
@@ -33,10 +33,11 @@ export function useEndlessGame(session: EndlessSession, { overlay, track, showEn
   const boundStageId = session.stageId;
   const boundRoundId = session.roundId;
   // 커밋된 시도만 ref에 반영한다. 렌더 중 갱신하면 보류된(미커밋) 다음 시도 렌더가
-  // 현재 화면의 액션을 무효화한다.
+  // 현재 화면의 액션을 무효화한다. 커밋 직후 이벤트가 이전 시도로 판정되지 않도록
+  // 페인트 전에 동기 실행되는 layout effect로 맞춘다.
   const stageRef = useRef(session.stageId);
   const roundRef = useRef(session.roundId);
-  useEffect(() => {
+  useLayoutEffect(() => {
     stageRef.current = session.stageId;
     roundRef.current = session.roundId;
   }, [session.stageId, session.roundId]);
@@ -91,3 +92,9 @@ export function useEndlessGame(session: EndlessSession, { overlay, track, showEn
     },
   };
 }
+
+// 무한모드 화면이 의존하는 표시·액션 계약. 화면은 훅 반환 전체가 아니라 이 집합에만 의존한다.
+export type EndlessGameView = Pick<
+  ReturnType<typeof useEndlessGame>,
+  'puzzle' | 'error' | 'showEntryLoading' | 'hud' | 'roundId' | 'reportWrong' | 'finishBoard'
+>;

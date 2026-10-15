@@ -1,6 +1,6 @@
 import { PrismaPg } from '@prisma/adapter-pg';
 import { Pool } from 'pg';
-import { PrismaClient } from '../../../prisma/generated/prisma/client';
+import { PrismaClient, type Prisma } from '../../../prisma/generated/prisma/client';
 import { rankedSeasonId, rankingFrozen, seasonWindow } from '../../shared/season';
 import { clampBigInt64, clampInt32 } from './numeric';
 import type { DbPort } from './port';
@@ -325,9 +325,7 @@ export function createPrismaDb(client: PrismaClient = prisma): DbPort {
         // 시즌 advisory lock으로 트랜잭션 내 직렬화 보장
         await tx.$executeRaw`SELECT pg_advisory_xact_lock(hashtext('season:' || ${input.season}))`;
         // 행 레벨 락으로 동시 클리어 시 가산 손실 방지
-        if (typeof (tx as any).$queryRaw === 'function') {
-          await tx.$queryRaw`SELECT id FROM "EndlessStage" WHERE id = ${stageId} FOR UPDATE`;
-        }
+        await tx.$queryRaw`SELECT id FROM "EndlessStage" WHERE id = ${stageId} FOR UPDATE`;
         // 제출 간격 검사는 잠금 안에서 수행해 동시 제출이 같은 직전 이벤트를 읽고 함께 통과하는 경합을 막는다.
         if (input.minGapMs !== undefined) {
           const last = await tx.endlessEvent.findFirst({
@@ -381,7 +379,7 @@ export function createPrismaDb(client: PrismaClient = prisma): DbPort {
           data: { userId, stageId, seedLeft: input.seedLeft, elapsedMs: input.elapsedMs, verified: true, suspicious: input.suspicious },
         });
 
-        const stageRow = tx.endlessStage ? await tx.endlessStage.findUnique({ where: { id: stageId } }) : null;
+        const stageRow = await tx.endlessStage.findUnique({ where: { id: stageId } });
         if (stageRow) {
           const nextPlays = clampInt32(stageRow.plays + 1);
           const nextClears = clampInt32(stageRow.clears + 1);
@@ -489,7 +487,7 @@ export function createPrismaDb(client: PrismaClient = prisma): DbPort {
       return rows.map((r) => ({ userId: r.userId, score: Number(r.score) }));
     },
     async saveSeasonFinalization(header, results) {
-      const runSave = async (tx: any) => {
+      const runSave = async (tx: Prisma.TransactionClient) => {
         await tx.seasonFinalization.upsert({
           where: { season: header.season },
           create: {
@@ -516,11 +514,10 @@ export function createPrismaDb(client: PrismaClient = prisma): DbPort {
           });
         }
       };
-      if (typeof (client as any).$transaction === 'function') {
-        await (client as any).$transaction(runSave);
-      } else {
-        await runSave(client);
-      }
+      // runWithSeasonLock이 넘긴 트랜잭션 클라이언트에는 $transaction이 없다. 그 안에서는 같은 트랜잭션으로 저장한다.
+      const target: PrismaClient | Prisma.TransactionClient = client;
+      if ('$transaction' in target) await target.$transaction(runSave);
+      else await runSave(target);
     },
     async getSeasonFinalization(season) {
       const h = await client.seasonFinalization.findUnique({
@@ -771,10 +768,8 @@ export function createPrismaDb(client: PrismaClient = prisma): DbPort {
     async claimSupplyChunk(jobId, chunkIndex, nowIso, leaseDurationMs) {
       return client.$transaction(async (tx) => {
         // 행 레벨 락으로 동시 claim 요청 직렬화
-        if (typeof (tx as any).$queryRaw === 'function') {
-          await tx.$queryRaw`SELECT id FROM "EndlessSupplyJob" WHERE id = ${jobId} FOR UPDATE`;
-          await tx.$queryRaw`SELECT id FROM "EndlessSupplyChunk" WHERE "jobId" = ${jobId} AND "chunkIndex" = ${chunkIndex} FOR UPDATE`;
-        }
+        await tx.$queryRaw`SELECT id FROM "EndlessSupplyJob" WHERE id = ${jobId} FOR UPDATE`;
+        await tx.$queryRaw`SELECT id FROM "EndlessSupplyChunk" WHERE "jobId" = ${jobId} AND "chunkIndex" = ${chunkIndex} FOR UPDATE`;
 
         const job = await tx.endlessSupplyJob.findUnique({ where: { id: jobId } });
         const chunk = await tx.endlessSupplyChunk.findUnique({
@@ -814,10 +809,8 @@ export function createPrismaDb(client: PrismaClient = prisma): DbPort {
     async insertSupplyBatch(jobId, chunkIndex, stageRows, completedAtIso, claimToken) {
       return client.$transaction(async (tx) => {
         // 행 레벨 락 획득
-        if (typeof (tx as any).$queryRaw === 'function') {
-          await tx.$queryRaw`SELECT id FROM "EndlessSupplyJob" WHERE id = ${jobId} FOR UPDATE`;
-          await tx.$queryRaw`SELECT id FROM "EndlessSupplyChunk" WHERE "jobId" = ${jobId} AND "chunkIndex" = ${chunkIndex} FOR UPDATE`;
-        }
+        await tx.$queryRaw`SELECT id FROM "EndlessSupplyJob" WHERE id = ${jobId} FOR UPDATE`;
+        await tx.$queryRaw`SELECT id FROM "EndlessSupplyChunk" WHERE "jobId" = ${jobId} AND "chunkIndex" = ${chunkIndex} FOR UPDATE`;
 
         const completedDate = new Date(completedAtIso);
         const job = await tx.endlessSupplyJob.findUnique({ where: { id: jobId } });
@@ -901,10 +894,8 @@ export function createPrismaDb(client: PrismaClient = prisma): DbPort {
     },
     async failSupplyChunk(jobId, chunkIndex, _reason, claimToken) {
       await client.$transaction(async (tx) => {
-        if (typeof (tx as any).$queryRaw === 'function') {
-          await tx.$queryRaw`SELECT id FROM "EndlessSupplyJob" WHERE id = ${jobId} FOR UPDATE`;
-          await tx.$queryRaw`SELECT id FROM "EndlessSupplyChunk" WHERE "jobId" = ${jobId} AND "chunkIndex" = ${chunkIndex} FOR UPDATE`;
-        }
+        await tx.$queryRaw`SELECT id FROM "EndlessSupplyJob" WHERE id = ${jobId} FOR UPDATE`;
+        await tx.$queryRaw`SELECT id FROM "EndlessSupplyChunk" WHERE "jobId" = ${jobId} AND "chunkIndex" = ${chunkIndex} FOR UPDATE`;
         const chunk = await tx.endlessSupplyChunk.findUnique({
           where: { jobId_chunkIndex: { jobId, chunkIndex } },
         });
