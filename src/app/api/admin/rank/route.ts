@@ -3,6 +3,7 @@ import { z } from 'zod';
 import { isAdmin } from '../../../../server/admin';
 import { getSessionUser } from '../../../../server/auth';
 import { createPrismaDb } from '../../../../server/db/prisma';
+import { displayNicknames } from '../../../../server/profile';
 import { rankStoreFromEnv } from '../../../../server/rank';
 import { seasonId } from '../../../../shared/season';
 
@@ -17,7 +18,7 @@ export async function GET() {
   const season = seasonId(new Date());
   const snapshot = await store.topAll(season, 200);
   const db = createPrismaDb();
-  const nicknames = await db.lookupNicknames(snapshot.entries.map((e) => e.userId));
+  const nicknames = await displayNicknames(db, snapshot.entries.map((e) => e.userId));
   // 닉네임이 없는 엔트리 = 게스트. 관리 화면은 이걸 기본으로 보여준다.
   const entries = snapshot.entries.map((e) => ({
     userId: e.userId,
