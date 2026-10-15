@@ -22,8 +22,9 @@ describe('pull', () => {
       'fetch',
       okRecords([{ stageCode: '1-1', bestElapsedSec: 50, attempts: 2, lastClearedAt: 't9' }]),
     );
-    const { clears, unauthorized } = await pull([entry('1-1', 90, 't1')]);
+    const { clears, unauthorized, failed } = await pull([entry('1-1', 90, 't1')]);
     expect(unauthorized).toBe(false);
+    expect(failed).toBe(false);
     expect(clears.find((c) => c.stageCode === '1-1')).toMatchObject({ elapsedSec: 50, attempts: 2 });
   });
   it('서버가 죽으면 로컬을 그대로 둔다', async () => {
@@ -34,9 +35,16 @@ describe('pull', () => {
       }),
     );
     const local = [entry('1-1', 90, 't1')];
-    const { clears, unauthorized } = await pull(local);
+    const { clears, unauthorized, failed } = await pull(local);
     expect(unauthorized).toBe(false);
+    expect(failed).toBe(true);
     expect(clears).toEqual(local);
+  });
+  it('5xx도 조회 실패로 표시한다', async () => {
+    vi.stubGlobal('fetch', vi.fn(async () => new Response(null, { status: 500 })));
+    const { failed, unauthorized } = await pull([]);
+    expect(failed).toBe(true);
+    expect(unauthorized).toBe(false);
   });
   it('401이면 미인증으로 알린다', async () => {
     vi.stubGlobal('fetch', vi.fn(async () => new Response(null, { status: 401 })));

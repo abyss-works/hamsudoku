@@ -51,27 +51,35 @@ async function fetchServerRecords(): Promise<{ status: 200 | 401; clears: Server
   return { status: 200, clears: data.clears ?? [] };
 }
 
-export async function pull(local: ClearEntry[]): Promise<{ clears: ClearEntry[]; unauthorized: boolean }> {
+// 조회 결과 계약. failed는 네트워크·서버 실패로 clears가 로컬 입력 그대로임을 뜻하며,
+// 호출자는 이 결과로 저장 데이터를 교체하지 않는다.
+export interface PullResult {
+  clears: ClearEntry[];
+  unauthorized: boolean;
+  failed: boolean;
+}
+
+export async function pull(local: ClearEntry[]): Promise<PullResult> {
   let server: ServerRecord[];
   try {
     const r = await fetchServerRecords();
-    if (r.status === 401) return { clears: local, unauthorized: true };
+    if (r.status === 401) return { clears: local, unauthorized: true, failed: false };
     server = r.clears;
   } catch {
-    return { clears: local, unauthorized: false };
+    return { clears: local, unauthorized: false, failed: true };
   }
-  return { clears: mergeClearEntries(local, server), unauthorized: false };
+  return { clears: mergeClearEntries(local, server), unauthorized: false, failed: false };
 }
 
 // 화해: 서버에 없는 로컬 기록을 미검증으로 밀어올린 뒤 합친다.
-export async function reconcile(local: ClearEntry[]): Promise<{ clears: ClearEntry[]; unauthorized: boolean }> {
+export async function reconcile(local: ClearEntry[]): Promise<PullResult> {
   let server: ServerRecord[];
   try {
     const r = await fetchServerRecords();
-    if (r.status === 401) return { clears: local, unauthorized: true };
+    if (r.status === 401) return { clears: local, unauthorized: true, failed: false };
     server = r.clears;
   } catch {
-    return { clears: local, unauthorized: false };
+    return { clears: local, unauthorized: false, failed: true };
   }
   const seen = new Map(server.map((s) => [s.stageCode, s.lastClearedAt] as const));
   for (const c of local) {
@@ -84,6 +92,6 @@ export async function reconcile(local: ClearEntry[]): Promise<{ clears: ClearEnt
       }
     }
   }
-  return { clears: mergeClearEntries(local, server), unauthorized: false };
+  return { clears: mergeClearEntries(local, server), unauthorized: false, failed: false };
 }
 

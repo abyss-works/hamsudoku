@@ -257,6 +257,53 @@ describe('스테이지 기록 동기화 (useStageRecordsSync)', () => {
     expect(syncMocks.pull).toHaveBeenCalledWith([]);
   });
 
+  it('beginSwitch의 조회가 실패하면 기존 기록을 빈 목록으로 교체하지 않는다', async () => {
+    syncMocks.pull.mockResolvedValue({ clears: [], unauthorized: false, failed: true });
+    mockClears.set('1-1', { stageCode: '1-1', elapsedSec: 10, attempts: 1, clearedAt: '2026-10-10T00:00:00.000Z' });
+    let account = { ...defaultAccount };
+    const { result, rerender } = renderHook(() =>
+      useStageRecordsSync({
+        account,
+        save: { clears: mockClears, record: mockRecord, replace: mockReplace, mergeIn: mockMergeIn },
+        onUnauthorized: mockOnUnauthorized,
+      })
+    );
+
+    act(() => result.current.markSwitched(true));
+    account = { ...defaultAccount, uid: 'user-b' };
+    rerender();
+    await act(async () => {
+      result.current.beginSwitch();
+    });
+
+    expect(syncMocks.pull).toHaveBeenCalledWith([]);
+    expect(mockReplace).not.toHaveBeenCalled();
+    expect(mockClears.has('1-1')).toBe(true);
+  });
+
+  it('전환 후 효과의 조회가 실패하면 기존 기록을 빈 목록으로 교체하지 않는다', async () => {
+    syncMocks.pull.mockResolvedValue({ clears: [], unauthorized: false, failed: true });
+    mockClears.set('1-1', { stageCode: '1-1', elapsedSec: 10, attempts: 1, clearedAt: '2026-10-10T00:00:00.000Z' });
+    let account = { ...defaultAccount };
+    const { result, rerender } = renderHook(() =>
+      useStageRecordsSync({
+        account,
+        save: { clears: mockClears, record: mockRecord, replace: mockReplace, mergeIn: mockMergeIn },
+        onUnauthorized: mockOnUnauthorized,
+      })
+    );
+
+    act(() => result.current.markSwitched(false));
+    account = { ...defaultAccount, uid: 'user-b' };
+    await act(async () => {
+      rerender();
+    });
+
+    expect(syncMocks.pull).toHaveBeenCalledWith([]);
+    expect(mockReplace).not.toHaveBeenCalled();
+    expect(mockClears.has('1-1')).toBe(true);
+  });
+
   it('cancelSwitch 호출 시 유보 플래그를 해제하고 세대를 증가시켜 비동기 응답을 무시한다', async () => {
     let completePull!: (value: unknown) => void;
     syncMocks.pull.mockReturnValueOnce(new Promise((resolve) => { completePull = resolve; }));
