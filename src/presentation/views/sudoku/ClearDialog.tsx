@@ -11,14 +11,15 @@ export interface ClearDialogProps {
   onReset: () => void;
   onNextMap: () => void;
   onBrowse: () => void;
+  reduceMotion?: boolean;
 }
 
-export function ClearDialog({ total, onReset, onNextMap, onBrowse }: ClearDialogProps) {
+export function ClearDialog({ total, onReset, onNextMap, onBrowse, reduceMotion = false }: ClearDialogProps) {
   const { title, partyIndices } = clearDialogPresentation(total);
 
   return (
     <Overlay label="클리어">
-      <Confetti />
+      <Confetti reduceMotion={reduceMotion} />
       <motion.div
         className="clear-party"
         aria-hidden="true"

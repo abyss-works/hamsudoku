@@ -7,16 +7,18 @@ export interface EndlessClearDialogProps {
   model: EndlessClearModel;
   onNext: () => void;
   onExit: () => void;
+  reduceMotion?: boolean;
 }
 
 export function EndlessClearDialog({
   model,
   onNext,
   onExit,
+  reduceMotion = false,
 }: EndlessClearDialogProps) {
   return (
     <Overlay label="클리어">
-      {model.showConfetti && <Confetti />}
+      {model.showConfetti && <Confetti reduceMotion={reduceMotion} />}
       <p className="clear-title">{model.title}</p>
       {model.note && <p className="home-note">{model.note}</p>}
       <div className="clear-actions">

@@ -1,9 +1,10 @@
 import type { CSSProperties } from 'react';
 import { motion } from 'framer-motion';
-import { confettiPiecesModel } from './confettiModel';
+import { confettiPiecesModel, confettiRepeat } from './confettiModel';
 
-export function Confetti({ count = 24 }: { count?: number }) {
+export function Confetti({ count = 24, reduceMotion = false }: { count?: number; reduceMotion?: boolean }) {
   const pieces = confettiPiecesModel(count);
+  const repeat = confettiRepeat(reduceMotion);
 
   return (
     <div className="confetti" aria-hidden="true">
@@ -13,7 +14,7 @@ export function Confetti({ count = 24 }: { count?: number }) {
           style={{ left: p.x, background: p.color } as CSSProperties}
           initial={{ y: -12, rotate: 0 }}
           animate={{ y: '110vh', rotate: 540 }}
-          transition={{ duration: p.duration, repeat: Infinity, ease: 'linear' }}
+          transition={{ duration: p.duration, repeat, ease: 'linear' }}
         />
       ))}
     </div>
