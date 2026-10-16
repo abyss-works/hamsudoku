@@ -9,7 +9,7 @@ import { requestSupply, type SupplyEnqueuer } from '../endlessPool/supply';
 import { deferRankEarning } from '../seasonRanking/rankCache';
 import { countsForRanking } from '../seasonRanking/rules';
 import { appendEarning, lockSeasonForEarning } from '../seasonRanking/store';
-import { findPlaySummary, listRecentPlayEvents, pickUnclearedStage, type PlayableStage, type PlaySummary } from './queries';
+import { findPlaySummary, findSubmissionHistory, pickUnclearedStage, type PlayableStage, type PlaySummary } from './queries';
 import { assessSubmission, clearRejection, PERFECT_WINDOW, solutionMatches } from './rules';
 import { appendPlayEvent, commitClear, commitFail, lockPlayer } from './store';
 
@@ -82,7 +82,8 @@ export async function submitEndlessClear(
     const committed = await withTransaction(async (tx) => {
       await lockSeasonForEarning(tx, season);
       await lockPlayer(tx, uid);
-      const verdict = assessSubmission(await listRecentPlayEvents(tx, uid, PERFECT_WINDOW), now);
+      const history = await findSubmissionHistory(tx, uid, PERFECT_WINDOW);
+      const verdict = assessSubmission(history.recent, history.lastVerifiedAt, now);
       if (verdict.tooSoon) return null;
       const summary = await commitClear(tx, {
         userId: uid,

@@ -28,22 +28,20 @@ describe('assessSubmission', () => {
   const now = new Date('2026-10-21T03:00:00.000Z');
   const at = (msBefore: number) => new Date(now.getTime() - msBefore);
 
-  it('최근 검증 클리어와 1초 미만이면 너무 잦은 제출이다', () => {
-    expect(assessSubmission([{ verified: true, seedLeft: 2, createdAt: at(999) }], now).tooSoon).toBe(true);
-    expect(assessSubmission([{ verified: true, seedLeft: 2, createdAt: at(1000) }], now).tooSoon).toBe(false);
+  it('마지막 검증 클리어와 1초 미만이면 너무 잦은 제출이다', () => {
+    expect(assessSubmission([], at(999), now).tooSoon).toBe(true);
+    expect(assessSubmission([], at(1000), now).tooSoon).toBe(false);
   });
 
-  it('간격은 가장 최근의 검증 클리어로 판정하고 무효 이벤트는 건너뛴다', () => {
-    const recent = [
-      { verified: false, seedLeft: 2, createdAt: at(10) },
-      { verified: true, seedLeft: 2, createdAt: at(5000) },
-    ];
-    expect(assessSubmission(recent, now).tooSoon).toBe(false);
+  it('간격은 최근 이벤트가 아니라 마지막 검증 클리어 시각으로 판정한다', () => {
+    const recent = [{ verified: false, seedLeft: 2, createdAt: at(10) }];
+    expect(assessSubmission(recent, at(5000), now).tooSoon).toBe(false);
+    expect(assessSubmission(recent, null, now).tooSoon).toBe(false);
   });
 
   it('최근 이벤트 중 씨앗 3개 검증 클리어가 16건 이상이면 의심 표시를 한다', () => {
     const perfect = (n: number) => Array.from({ length: n }, (_, i) => ({ verified: true, seedLeft: 3, createdAt: at(60_000 + i) }));
-    expect(assessSubmission(perfect(15), now).suspicious).toBe(false);
-    expect(assessSubmission(perfect(16), now).suspicious).toBe(true);
+    expect(assessSubmission(perfect(15), at(60_000), now).suspicious).toBe(false);
+    expect(assessSubmission(perfect(16), at(60_000), now).suspicious).toBe(true);
   });
 });

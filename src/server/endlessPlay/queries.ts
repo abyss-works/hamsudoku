@@ -1,6 +1,5 @@
-import { desc, eq, sql } from 'drizzle-orm';
+import { sql } from 'drizzle-orm';
 import type { Executor } from '../db/client';
-import { endlessEvents } from './schema';
 
 export interface PlayEvent {
   seedLeft: number;
@@ -8,14 +7,42 @@ export interface PlayEvent {
   createdAt: Date;
 }
 
-/** 사용자의 최근 제출 이벤트(검증·무효 포함)를 기록 시각 역순으로 반환한다. */
-export async function listRecentPlayEvents(executor: Executor, userId: string, limit: number): Promise<PlayEvent[]> {
-  return executor
-    .select({ seedLeft: endlessEvents.seedLeft, verified: endlessEvents.verified, createdAt: endlessEvents.createdAt })
-    .from(endlessEvents)
-    .where(eq(endlessEvents.userId, userId))
-    .orderBy(desc(endlessEvents.createdAt))
-    .limit(limit);
+export interface SubmissionHistory {
+  /** 최근 제출 이벤트(검증·무효 포함), 기록 시각 역순. */
+  recent: PlayEvent[];
+  /** 개수 제한과 무관한 마지막 검증 클리어 시각. 없으면 null이다. */
+  lastVerifiedAt: Date | null;
+}
+
+/**
+ * 제출 판정에 쓰는 이력을 한 문장으로 조회한다. 시각은 UTC 기준 epoch 밀리초로 받아 세션 시간대의 영향을 받지 않는다.
+ */
+export async function findSubmissionHistory(executor: Executor, userId: string, limit: number): Promise<SubmissionHistory> {
+  const result = await executor.execute<{
+    seedLeft: number | null;
+    verified: boolean | null;
+    createdAtMs: number | null;
+    lastVerifiedMs: number | null;
+  }>(sql`
+    select r."seedLeft", r."verified", (extract(epoch from r."createdAt") * 1000)::float8 as "createdAtMs",
+      (select (extract(epoch from "createdAt") * 1000)::float8 from "EndlessEvent"
+        where "userId" = ${userId} and "verified" order by "createdAt" desc limit 1) as "lastVerifiedMs"
+    from (select 1) as base
+    left join lateral (
+      select "seedLeft", "verified", "createdAt" from "EndlessEvent"
+      where "userId" = ${userId} order by "createdAt" desc limit ${limit}
+    ) r on true
+    order by r."createdAt" desc
+  `);
+  const [first] = result.rows;
+  return {
+    recent: result.rows.flatMap((row) =>
+      row.seedLeft === null || row.verified === null || row.createdAtMs === null
+        ? []
+        : [{ seedLeft: row.seedLeft, verified: row.verified, createdAt: new Date(row.createdAtMs) }],
+    ),
+    lastVerifiedAt: first.lastVerifiedMs === null ? null : new Date(first.lastVerifiedMs),
+  };
 }
 
 export interface PlayableStage {

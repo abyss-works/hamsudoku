@@ -40,5 +40,8 @@ export const endlessEvents = pgTable(
     reason: text('reason'),
     createdAt: timestamp('createdAt', { precision: 3, mode: 'date' }).default(sql`CURRENT_TIMESTAMP`).notNull(),
   },
-  (table) => [index('EndlessEvent_userId_stageId_idx').on(table.userId, table.stageId)],
+  (table) => [
+    index('EndlessEvent_userId_stageId_idx').on(table.userId, table.stageId),
+    index('EndlessEvent_userId_createdAt_idx').on(table.userId, table.createdAt),
+  ],
 ).enableRLS();
