@@ -29,7 +29,9 @@ export function useStoreDatabase(): StoreDatabase {
     const { rows } = await database.pool.query<{ tablename: string }>(
       "select tablename from pg_tables where schemaname = 'public'",
     );
-    await database.pool.query(`truncate table ${rows.map((r) => `"${r.tablename}"`).join(', ')} cascade`);
+    if (rows.length > 0) {
+      await database.pool.query(`truncate table ${rows.map((r) => `"${r.tablename}"`).join(', ')} cascade`);
+    }
   });
 
   return {
