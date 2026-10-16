@@ -1,7 +1,7 @@
 import { readdirSync, readFileSync } from 'node:fs';
 import { join } from 'node:path';
 import { Client } from 'pg';
-import { GenericContainer, type StartedTestContainer } from 'testcontainers';
+import { GenericContainer, Wait, type StartedTestContainer } from 'testcontainers';
 import type { TestProject } from 'vitest/node';
 import { DB_TEST_IMAGE, TEMPLATE_DATABASE } from './config';
 
@@ -76,6 +76,10 @@ export default async function setup(project: TestProject) {
   const container: StartedTestContainer = await new GenericContainer(DB_TEST_IMAGE)
     .withEnvironment({ POSTGRES_PASSWORD: PASSWORD })
     .withExposedPorts(5432)
+    // 이미지 자체 상태 검사는 시작 유예 없이 약 20초 안에 준비되지 않으면 실패로 판정한다.
+    // 포트 개방만 기다리고 초기화 완료는 waitForDatabase가 역할 생성으로 판정한다.
+    .withWaitStrategy(Wait.forListeningPorts())
+    .withStartupTimeout(120_000)
     .start();
 
   const adminUrl = `postgresql://postgres:${PASSWORD}@${container.getHost()}:${container.getMappedPort(5432)}/postgres`;
