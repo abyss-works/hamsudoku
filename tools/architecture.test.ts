@@ -821,10 +821,6 @@ const ALLOWED_SERVER_FEATURE_DEPS: Record<string, string[]> = {
 // 기존 저장소 계약(server/db/prisma·port)을 직접 쓰는 이관 전 route handler. 이관 태스크마다 목록을 줄인다.
 const LEGACY_ROUTE_DB_IMPORTS = new Set([
   'src/app/api/admin/rank/route.ts',
-  'src/app/api/attempts/route.ts',
-  'src/app/api/auth/signin/route.ts',
-  'src/app/api/auth/signup/route.ts',
-  'src/app/api/clear/route.ts',
   'src/app/api/endless/clear/route.ts',
   'src/app/api/endless/fail/route.ts',
   'src/app/api/endless/me/route.ts',
@@ -833,10 +829,6 @@ const LEGACY_ROUTE_DB_IMPORTS = new Set([
   'src/app/api/endless/rank/route.ts',
   'src/app/api/internal/endless-generate/route.ts',
   'src/app/api/internal/ranking-finalize/route.ts',
-  'src/app/api/profile/lookup/route.ts',
-  'src/app/api/profile/me/route.ts',
-  'src/app/api/profile/nickname/route.ts',
-  'src/app/api/records/route.ts',
 ]);
 
 type ServerRole = 'route' | 'db' | 'schema' | 'store' | 'queries' | 'rules' | 'useCase' | 'other';
