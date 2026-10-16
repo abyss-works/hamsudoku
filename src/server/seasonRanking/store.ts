@@ -61,7 +61,7 @@ export async function insertSeasonResultsFromLedger(
   season: string,
   window: SeasonWindow,
 ): Promise<SeasonRankResult[]> {
-  const result = await tx.execute<SeasonRankResult>(sql`
+  const result = await tx.execute<{ season: string; userId: string; score: number; rank: number }>(sql`
     insert into "SeasonRankResult" ("season", "userId", "score", "rank")
     select ${season}, "userId", "score",
       (row_number() over (order by "score" desc, "userId" collate "C" desc))::int
