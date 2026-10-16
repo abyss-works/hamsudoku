@@ -32,3 +32,17 @@ export async function createTestDatabase(): Promise<TestDatabase> {
     drop: () => runAdmin(`drop database if exists "${name}" with (force)`),
   };
 }
+
+/** 아무 마이그레이션도 적용하지 않은 빈 데이터베이스. 스키마 생성 경로를 비교할 때 쓴다. */
+export async function createEmptyDatabase(): Promise<TestDatabase> {
+  const name = `empty_${randomUUID().replaceAll('-', '')}`;
+  await runAdmin(`create database "${name}"`);
+  await runAdmin(`alter database "${name}" set statement_timeout = '${STATEMENT_TIMEOUT}'`);
+
+  const url = new URL(inject('dbAdminUrl'));
+  url.pathname = `/${name}`;
+  return {
+    url: url.toString(),
+    drop: () => runAdmin(`drop database if exists "${name}" with (force)`),
+  };
+}

@@ -804,3 +804,333 @@ function inspectPureFailures(path: string, sourceOverride?: ts.SourceFile): stri
   });
 
 });
+
+// ---- 서버 데이터 계층 ----
+
+// 서버 기능과 허용 의존. 다른 기능의 테이블은 SQL 안에서 읽을 수 있고 쓰기는 소유 기능의 store만 수행한다.
+const SERVER_FEATURES = new Set(['account', 'attempt', 'stageRecord', 'endlessPool', 'endlessPlay', 'seasonRanking']);
+const ALLOWED_SERVER_FEATURE_DEPS: Record<string, string[]> = {
+  account: [],
+  attempt: [],
+  endlessPool: [],
+  stageRecord: ['attempt'],
+  endlessPlay: ['attempt', 'endlessPool', 'seasonRanking'],
+  seasonRanking: ['account'],
+};
+
+// 기존 저장소 계약(server/db/prisma·port)을 직접 쓰는 이관 전 route handler. 이관 태스크마다 목록을 줄인다.
+const LEGACY_ROUTE_DB_IMPORTS = new Set([
+  'src/app/api/admin/rank/route.ts',
+  'src/app/api/attempts/route.ts',
+  'src/app/api/auth/signin/route.ts',
+  'src/app/api/auth/signup/route.ts',
+  'src/app/api/clear/route.ts',
+  'src/app/api/endless/clear/route.ts',
+  'src/app/api/endless/fail/route.ts',
+  'src/app/api/endless/me/route.ts',
+  'src/app/api/endless/me-rank/route.ts',
+  'src/app/api/endless/next/route.ts',
+  'src/app/api/endless/rank/route.ts',
+  'src/app/api/internal/endless-generate/route.ts',
+  'src/app/api/internal/ranking-finalize/route.ts',
+  'src/app/api/profile/lookup/route.ts',
+  'src/app/api/profile/me/route.ts',
+  'src/app/api/profile/nickname/route.ts',
+  'src/app/api/records/route.ts',
+]);
+
+type ServerRole = 'route' | 'db' | 'schema' | 'store' | 'queries' | 'rules' | 'useCase' | 'other';
+
+function serverModule(relPath: string): { role: ServerRole; feature?: string } {
+  const path = relPath.replace(/\.(tsx?|jsx?)$/, '');
+  if (/^src\/app\/api\/.+\/route$/.test(path)) return { role: 'route' };
+  if (path.startsWith('src/server/db/')) return { role: 'db' };
+  const match = /^src\/server\/([^/]+)\/(.+)$/.exec(path);
+  if (!match || !SERVER_FEATURES.has(match[1])) return { role: 'other' };
+  const file = match[2];
+  const role: ServerRole =
+    file === 'schema' || file === 'store' || file === 'queries' || file === 'rules' ? file : 'useCase';
+  return { role, feature: match[1] };
+}
+
+const QUERY_BUILDER = /^drizzle-orm(\/|$)/;
+const WRITE_METHODS = new Set(['insert', 'update', 'delete']);
+
+function writeCalls(path: string, sourceOverride?: ts.SourceFile): { method: string; target: string }[] {
+  const calls: { method: string; target: string }[] = [];
+  inspect(
+    path,
+    (node) => {
+      if (
+        ts.isCallExpression(node) &&
+        ts.isPropertyAccessExpression(node.expression) &&
+        WRITE_METHODS.has(node.expression.name.text) &&
+        node.arguments[0] &&
+        ts.isIdentifier(node.arguments[0])
+      ) {
+        calls.push({ method: node.expression.name.text, target: node.arguments[0].text });
+      }
+    },
+    sourceOverride,
+  );
+  return calls;
+}
+
+function serverLayerFailures(path: string, sourceOverride?: ts.SourceFile): string[] {
+  const fromLabel = label(path);
+  const from = serverModule(fromLabel);
+  if (from.role === 'other' || from.role === 'schema') return [];
+  const failures: string[] = [];
+  const foreignTables = new Set<string>();
+
+  for (const dep of getImportsAndExports(path, sourceOverride)) {
+    if (QUERY_BUILDER.test(dep.module)) {
+      const subject = from.role === 'route' ? 'route handler' : from.role === 'useCase' ? 'use case' : from.role;
+      if (from.role === 'route' || from.role === 'useCase' || from.role === 'rules') {
+        failures.push(`${fromLabel} -> ${dep.module}: ${subject}는 쿼리 빌더를 참조할 수 없다`);
+      }
+      continue;
+    }
+    if (!dep.resolved) continue;
+    const toLabel = label(dep.resolved);
+    const to = serverModule(toLabel);
+
+    if (from.role === 'route' && ['db', 'schema', 'store', 'queries'].includes(to.role)) {
+      failures.push(`${fromLabel} -> ${toLabel}: route handler는 ${to.role}를 참조할 수 없다`);
+    }
+    if (from.role === 'useCase' && to.role === 'schema') {
+      failures.push(`${fromLabel} -> ${toLabel}: use case는 schema를 참조할 수 없다`);
+    }
+    if (from.role === 'rules' && ['db', 'schema', 'store', 'queries'].includes(to.role)) {
+      failures.push(`${fromLabel} -> ${toLabel}: rules는 ${to.role}를 참조할 수 없다`);
+    }
+    if ((from.role === 'store' || from.role === 'queries') && toLabel === 'src/server/db/client') {
+      for (const name of dep.names.filter((n) => n === 'db' || n === 'withTransaction')) {
+        failures.push(`${fromLabel} -> ${toLabel}: ${from.role}는 전역 db 인스턴스(${name})를 참조할 수 없다`);
+      }
+    }
+    if (from.role === 'db' && to.feature) {
+      failures.push(`${fromLabel} -> ${toLabel}: db는 기능 모듈을 참조할 수 없다`);
+    }
+    if (from.feature && to.feature && from.feature !== to.feature) {
+      if (!(ALLOWED_SERVER_FEATURE_DEPS[from.feature] ?? []).includes(to.feature)) {
+        failures.push(`${fromLabel} -> ${toLabel}: 허용되지 않은 서버 기능 의존성 (${from.feature} -> ${to.feature})`);
+      }
+      if (to.role === 'schema') for (const name of dep.names) foreignTables.add(name);
+    }
+  }
+
+  if (from.role === 'queries') {
+    for (const call of writeCalls(path, sourceOverride)) {
+      failures.push(`${fromLabel}: queries는 쓰기(${call.method})를 수행할 수 없다`);
+    }
+  }
+  if (from.role === 'store') {
+    for (const call of writeCalls(path, sourceOverride).filter((c) => foreignTables.has(c.target))) {
+      failures.push(`${fromLabel}: 다른 기능 테이블 쓰기 (${call.method} ${call.target})`);
+    }
+  }
+  return failures;
+}
+
+// 트랜잭션 풀러는 문장마다 다른 서버 연결을 줄 수 있다. 연결에 남는 상태를 만드는 사용을 금지한다.
+const SESSION_ADVISORY_LOCK = /\bpg_(try_)?advisory_lock(_shared)?\s*\(/i;
+const SESSION_SET = /(^|;)\s*set\s+(?!local\b)(session\s+)?[a-z_][\w.]*\s*(=|to\b)/i;
+
+function literalText(node: ts.Node): string | null {
+  if (ts.isStringLiteral(node) || ts.isNoSubstitutionTemplateLiteral(node)) return node.text;
+  if (ts.isTemplateExpression(node)) {
+    return node.head.text + node.templateSpans.map((span) => `?${span.literal.text}`).join('');
+  }
+  return null;
+}
+
+function poolerFailures(path: string, sourceOverride?: ts.SourceFile): string[] {
+  const fileLabel = label(path);
+  const failures: string[] = [];
+  inspect(
+    path,
+    (node) => {
+      if (
+        ts.isCallExpression(node) &&
+        ts.isPropertyAccessExpression(node.expression) &&
+        node.expression.name.text === 'prepare'
+      ) {
+        failures.push(`${fileLabel}: prepared statement 사용`);
+      }
+      const text = literalText(node);
+      if (text === null) return;
+      if (SESSION_ADVISORY_LOCK.test(text)) failures.push(`${fileLabel}: 세션 수준 advisory lock 사용`);
+      if (SESSION_SET.test(text)) failures.push(`${fileLabel}: 트랜잭션 밖에서 유지되는 SET 사용`);
+    },
+    sourceOverride,
+  );
+  return failures;
+}
+
+function fixture(relPath: string, code: string): [string, ts.SourceFile] {
+  const path = join(process.cwd(), relPath);
+  return [path, ts.createSourceFile(basename(relPath), code, ts.ScriptTarget.Latest, true, ts.ScriptKind.TS)];
+}
+
+describe('서버 데이터 계층 경계', () => {
+  it('route handler는 db·schema·store·queries와 쿼리 빌더를 참조하지 않는다', () => {
+    const [path, source] = fixture(
+      'src/app/api/fixture/route.ts',
+      [
+        "import { db } from '../../../server/db/client';",
+        "import { attempts } from '../../../server/attempt/schema';",
+        "import { consumeAttempt } from '../../../server/attempt/store';",
+        "import { listRecords } from '../../../server/stageRecord/queries';",
+        "import { sql } from 'drizzle-orm';",
+        "import { submitClear } from '../../../server/stageRecord/submitClear';",
+      ].join('\n'),
+    );
+    expect(serverLayerFailures(path, source)).toEqual([
+      'src/app/api/fixture/route.ts -> src/server/db/client: route handler는 db를 참조할 수 없다',
+      'src/app/api/fixture/route.ts -> src/server/attempt/schema: route handler는 schema를 참조할 수 없다',
+      'src/app/api/fixture/route.ts -> src/server/attempt/store: route handler는 store를 참조할 수 없다',
+      'src/app/api/fixture/route.ts -> src/server/stageRecord/queries: route handler는 queries를 참조할 수 없다',
+      'src/app/api/fixture/route.ts -> drizzle-orm: route handler는 쿼리 빌더를 참조할 수 없다',
+    ]);
+  });
+
+  it('use case는 쿼리 빌더와 schema를 참조하지 않고 db와 트랜잭션 경계만 사용한다', () => {
+    const [path, source] = fixture(
+      'src/server/stageRecord/submitClear.ts',
+      [
+        "import { db, withTransaction, type Executor } from '../db/client';",
+        "import { eq } from 'drizzle-orm';",
+        "import type { clearRecords } from './schema';",
+        "import { recordClear } from './store';",
+      ].join('\n'),
+    );
+    expect(serverLayerFailures(path, source)).toEqual([
+      'src/server/stageRecord/submitClear.ts -> drizzle-orm: use case는 쿼리 빌더를 참조할 수 없다',
+      'src/server/stageRecord/submitClear.ts -> src/server/stageRecord/schema: use case는 schema를 참조할 수 없다',
+    ]);
+  });
+
+  it('store와 queries는 전역 db 인스턴스 대신 실행 객체 인자를 사용한다', () => {
+    const [storePath, store] = fixture(
+      'src/server/attempt/store.ts',
+      "import { db, type Executor } from '../db/client';\nimport { withTransaction } from '../db/client';",
+    );
+    expect(serverLayerFailures(storePath, store)).toEqual([
+      'src/server/attempt/store.ts -> src/server/db/client: store는 전역 db 인스턴스(db)를 참조할 수 없다',
+      'src/server/attempt/store.ts -> src/server/db/client: store는 전역 db 인스턴스(withTransaction)를 참조할 수 없다',
+    ]);
+    const [queriesPath, queries] = fixture('src/server/attempt/queries.ts', "import type { Executor } from '../db/client';");
+    expect(serverLayerFailures(queriesPath, queries)).toEqual([]);
+  });
+
+  it('queries는 쓰기를 수행하지 않는다', () => {
+    const [path, source] = fixture(
+      'src/server/account/queries.ts',
+      [
+        "import type { Executor } from '../db/client';",
+        "import { profiles } from './schema';",
+        'export async function f(tx: Executor) {',
+        '  await tx.update(profiles).set({ nickname: null });',
+        '  await tx.select().from(profiles);',
+        '}',
+      ].join('\n'),
+    );
+    expect(serverLayerFailures(path, source)).toEqual(['src/server/account/queries.ts: queries는 쓰기(update)를 수행할 수 없다']);
+  });
+
+  it('rules는 db·쿼리 빌더·schema·store·queries를 참조하지 않는다', () => {
+    const [path, source] = fixture(
+      'src/server/endlessPlay/rules.ts',
+      "import { sql } from 'drizzle-orm';\nimport { endlessEvents } from './schema';",
+    );
+    expect(serverLayerFailures(path, source)).toEqual([
+      'src/server/endlessPlay/rules.ts -> drizzle-orm: rules는 쿼리 빌더를 참조할 수 없다',
+      'src/server/endlessPlay/rules.ts -> src/server/endlessPlay/schema: rules는 schema를 참조할 수 없다',
+    ]);
+  });
+
+  it('db 모듈은 기능 모듈을 참조하지 않는다', () => {
+    const [path, source] = fixture('src/server/db/client.ts', "import { users } from '../account/schema';");
+    expect(serverLayerFailures(path, source)).toEqual([
+      'src/server/db/client.ts -> src/server/account/schema: db는 기능 모듈을 참조할 수 없다',
+    ]);
+  });
+
+  it('기능 간 의존은 허용 목록만 따른다', () => {
+    const [allowedPath, allowed] = fixture(
+      'src/server/endlessPlay/submitClear.ts',
+      "import { appendEarning } from '../seasonRanking/store';\nimport { consumeAttempt } from '../attempt/store';",
+    );
+    expect(serverLayerFailures(allowedPath, allowed)).toEqual([]);
+    const [deniedPath, denied] = fixture('src/server/attempt/store.ts', "import { recordStagePlay } from '../endlessPool/store';");
+    expect(serverLayerFailures(deniedPath, denied)).toEqual([
+      'src/server/attempt/store.ts -> src/server/endlessPool/store: 허용되지 않은 서버 기능 의존성 (attempt -> endlessPool)',
+    ]);
+  });
+
+  it('store는 다른 기능 schema의 테이블에 쓰지 않는다', () => {
+    const [path, source] = fixture(
+      'src/server/endlessPlay/store.ts',
+      [
+        "import type { Executor } from '../db/client';",
+        "import { endlessStages } from '../endlessPool/schema';",
+        "import { seedWallets } from './schema';",
+        'export async function f(tx: Executor) {',
+        "  await tx.insert(seedWallets).values({ userId: 'u' });",
+        '  await tx.update(endlessStages).set({ plays: 1 });',
+        '  await tx.select().from(endlessStages);',
+        '}',
+      ].join('\n'),
+    );
+    expect(serverLayerFailures(path, source)).toEqual([
+      'src/server/endlessPlay/store.ts: 다른 기능 테이블 쓰기 (update endlessStages)',
+    ]);
+  });
+
+  it('트랜잭션 풀러와 맞지 않는 prepared statement, 세션 잠금, 세션 SET을 사용하지 않는다', () => {
+    const [path, source] = fixture(
+      'src/server/endlessPlay/store.ts',
+      [
+        "import { sql } from 'drizzle-orm';",
+        'export async function f(tx) {',
+        "  await tx.select().from(t).prepare('named');",
+        '  await tx.execute(sql`select pg_advisory_lock(${1})`);',
+        '  await tx.execute(sql`select pg_try_advisory_lock_shared(1)`);',
+        '  await tx.execute(sql`set statement_timeout = 0`);',
+        '  await tx.execute(sql`select pg_advisory_xact_lock_shared(${1})`);',
+        '  await tx.execute(sql`set local lock_timeout = 1000`);',
+        '  await tx.execute(sql`update ${t} set "plays" = 1`);',
+        '}',
+      ].join('\n'),
+    );
+    expect(poolerFailures(path, source)).toEqual([
+      'src/server/endlessPlay/store.ts: prepared statement 사용',
+      'src/server/endlessPlay/store.ts: 세션 수준 advisory lock 사용',
+      'src/server/endlessPlay/store.ts: 세션 수준 advisory lock 사용',
+      'src/server/endlessPlay/store.ts: 트랜잭션 밖에서 유지되는 SET 사용',
+    ]);
+  });
+
+  it('서버 모듈과 route handler가 서버 데이터 계층 규칙을 준수한다', () => {
+    const failures: string[] = [];
+    for (const file of files) {
+      const fileLabel = label(file);
+      if (!fileLabel.startsWith('src/server/') && !fileLabel.startsWith('src/app/api/')) continue;
+      failures.push(...poolerFailures(file));
+      if (LEGACY_ROUTE_DB_IMPORTS.has(fileLabel)) continue;
+      failures.push(...serverLayerFailures(file));
+    }
+    expect(failures).toEqual([]);
+  });
+
+  it('이관 전 예외 목록은 아직 기존 저장소 계약을 직접 쓰는 route handler만 담는다', () => {
+    const stale = [...LEGACY_ROUTE_DB_IMPORTS].filter(
+      (routeLabel) =>
+        !getImportsAndExports(join(process.cwd(), routeLabel)).some((dep) =>
+          dep.resolved ? /\/src\/server\/db\/(prisma|port)$/.test(dep.resolved) : false,
+        ),
+    );
+    expect(stale).toEqual([]);
+  });
+});
