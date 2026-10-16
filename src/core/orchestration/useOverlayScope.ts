@@ -1,4 +1,4 @@
-import { useCallback, useEffect, useId, useMemo } from 'react';
+import { useCallback, useId, useLayoutEffect, useMemo } from 'react';
 import { useOverlay } from './overlayContext';
 import type { CloseOverlayOptions, ScopedOverlayHandle, ScopedOverlayRequest } from './overlayTypes';
 
@@ -21,7 +21,9 @@ export function useOverlayScope(scopeId: string): ScopedOverlayHandle {
     };
   }, [scopeId, instanceId]);
 
-  useEffect(() => {
+  // 범위 활성화는 커밋과 함께 끝낸다. passive effect에서 바꾸면 새 범위를 그린 커밋과
+  // 활성화 사이에 도착한 입력의 open 요청이 이전 활성 토큰과 불일치로 버려진다.
+  useLayoutEffect(() => {
     instance.isActive = true;
     setScope(instance.scopeId, instance.scopeToken);
     return () => {
