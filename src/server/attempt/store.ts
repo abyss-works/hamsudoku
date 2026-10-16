@@ -26,6 +26,8 @@ export interface ConsumeAttemptInput {
   stageCodePattern?: string;
   /** 키의 판 코드가 이 값과 같을 때만 소모한다. */
   stageCode?: string;
+  /** 키의 판 코드가 무한모드 판으로 존재할 때만 소모한다. */
+  requireEndlessStage?: boolean;
 }
 
 /** 소유자·미사용·유효 시간·판 조건을 모두 만족하는 키를 한 문장으로 소모한다. 조건이 맞지 않으면 null이다. */
@@ -38,6 +40,9 @@ export async function consumeAttempt(executor: Executor, input: ConsumeAttemptIn
   ];
   if (input.stageCodePattern !== undefined) conditions.push(sql`${attempts.stageCode} ~ ${input.stageCodePattern}`);
   if (input.stageCode !== undefined) conditions.push(eq(attempts.stageCode, input.stageCode));
+  if (input.requireEndlessStage) {
+    conditions.push(sql`exists (select 1 from "EndlessStage" where "EndlessStage"."id" = ${attempts.stageCode})`);
+  }
 
   const [row] = await executor
     .update(attempts)
