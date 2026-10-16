@@ -1,6 +1,7 @@
 import { serializeRegions, serializeSolution, stageId } from '../../shared/endlessStageFormat';
 import { generateEndlessPool, validateEndlessCandidate } from '../../shared/sudoku/endlessPoolGenerator';
 import { withTransaction } from '../db/client';
+import { describeDbError } from '../db/errors';
 import { claimSupplyChunk, failSupplyChunk, insertSupplyBatch, type SupplyStageRow } from './store';
 import { SUPPLY_POLICY } from './supply';
 
@@ -65,7 +66,12 @@ export async function executeSupplyChunk(
     }
     return { ok: true, stageCount: rows.length, jobId, chunkIndex };
   } catch (error) {
-    await fail();
+    // 실패 기록의 오류가 원래 오류를 가리지 않게 기록 실패는 요약만 남긴다.
+    try {
+      await fail();
+    } catch (failure) {
+      console.error('Supply chunk failure record failed', describeDbError(failure));
+    }
     throw error;
   }
 }

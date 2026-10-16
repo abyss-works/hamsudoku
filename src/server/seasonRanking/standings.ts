@@ -47,8 +47,10 @@ export async function fetchSeasonRank(uid: string, now: Date, defer: Defer): Pro
   const season = rankedSeasonId(now);
   const window = seasonWindow(season);
 
-  const finalized = await findFinalizedSeasonTop(db, season, TOP_LIMIT);
-  const standing = await findSeasonStanding(db, { season, userId: uid, window });
+  const [finalized, standing] = await Promise.all([
+    findFinalizedSeasonTop(db, season, TOP_LIMIT),
+    findSeasonStanding(db, { season, userId: uid, window }),
+  ]);
   const me = { rank: standing.rank, score: standing.score };
 
   if (finalized) {

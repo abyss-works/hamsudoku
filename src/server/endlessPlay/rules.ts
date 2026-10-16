@@ -33,15 +33,15 @@ export function clearRejection(input: {
 }
 
 /**
- * 최근 이벤트(기록 시각 역순)로 제출 간격과 의심 패턴을 판정한다. 간격은 가장 최근의 검증 클리어로부터 계산하고,
- * 의심 패턴은 최근 이벤트 중 씨앗 3개 검증 클리어 수로 판정한다.
+ * 제출 간격과 의심 패턴을 판정한다. 간격은 마지막 검증 클리어 시각으로부터 계산하고,
+ * 의심 패턴은 최근 이벤트(기록 시각 역순) 중 씨앗 3개 검증 클리어 수로 판정한다.
  */
 export function assessSubmission(
   recent: { verified: boolean; seedLeft: number; createdAt: Date }[],
+  lastVerifiedAt: Date | null,
   now: Date,
 ): { tooSoon: boolean; suspicious: boolean } {
-  const lastVerified = recent.find((event) => event.verified);
-  const tooSoon = lastVerified !== undefined && now.getTime() - lastVerified.createdAt.getTime() < MIN_SUBMIT_GAP_MS;
+  const tooSoon = lastVerifiedAt !== null && now.getTime() - lastVerifiedAt.getTime() < MIN_SUBMIT_GAP_MS;
   const perfectCount = recent.filter((event) => event.verified && event.seedLeft === 3).length;
   return { tooSoon, suspicious: perfectCount >= PERFECT_SUSPICIOUS_AT };
 }

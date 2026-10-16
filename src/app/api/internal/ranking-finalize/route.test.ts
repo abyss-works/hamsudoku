@@ -3,6 +3,21 @@ import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 import { createTestQStashSignature } from '../../../../server/qstashTestHelper';
 import { POST } from './route';
 
+const finalization = vi.hoisted(() => ({ error: null as Error | null }));
+
+vi.mock('../../../../server/seasonRanking/finalization', async (original) => {
+  const actual = await original<typeof import('../../../../server/seasonRanking/finalization')>();
+  return {
+    ...actual,
+    finalizeSeason: async () => {
+      throw finalization.error;
+    },
+    recoverUnfinalizedSeasons: async () => {
+      throw finalization.error;
+    },
+  };
+});
+
 const TEST_SECRET = 'test_internal_secret_value';
 const TEST_KEY = 'test_qstash_signing_key';
 
@@ -87,5 +102,55 @@ describe('/api/internal/ranking-finalize 요청 인증과 형식 검증', () => 
     });
     const resBadSeason = await POST(reqBadSeason);
     expect(resBadSeason.status).toBe(400);
+  });
+});
+
+describe('/api/internal/ranking-finalize 실패 응답', () => {
+  beforeEach(() => {
+    process.env.INTERNAL_SECRET = TEST_SECRET;
+  });
+
+  afterEach(() => {
+    vi.restoreAllMocks();
+    delete process.env.INTERNAL_SECRET;
+    finalization.error = null;
+  });
+
+  function finalize() {
+    return POST(
+      new Request('http://localhost/api/internal/ranking-finalize', {
+        method: 'POST',
+        headers: { authorization: `Bearer ${TEST_SECRET}` },
+        body: JSON.stringify({ season: '2026-W41' }),
+      }),
+    );
+  }
+
+  it('DB 오류는 쿼리 인자를 응답과 로그에 싣지 않는다', async () => {
+    finalization.error = Object.assign(new Error('Failed query: insert into "SeasonRankResult" values ($1)\nparams: secret-user'), {
+      cause: { code: '23505', constraint: 'SeasonRankResult_pkey', table: 'SeasonRankResult' },
+    });
+    const logged = vi.spyOn(console, 'error').mockImplementation(() => {});
+
+    const res = await finalize();
+    const body = await res.json();
+
+    expect(res.status).toBe(500);
+    expect(JSON.stringify(body)).not.toContain('secret-user');
+    expect(JSON.stringify(logged.mock.calls)).not.toContain('secret-user');
+    expect(logged).toHaveBeenCalledWith('Ranking finalization failed', expect.objectContaining({ code: '23505' }));
+  });
+
+  it('끝나지 않은 시즌의 확정 요청은 사유를 그대로 반환한다', async () => {
+    const { SeasonNotEndedError } = await import('../../../../server/seasonRanking/finalization');
+    finalization.error = new SeasonNotEndedError('2026-W41', new Date('2026-10-11T15:00:00.000Z'));
+
+    const res = await finalize();
+
+    expect(res.status).toBe(500);
+    expect(await res.json()).toEqual({
+      ok: false,
+      msg: 'Season 2026-W41 has not ended yet (ends at 2026-10-11T15:00:00.000Z)',
+    });
   });
 });

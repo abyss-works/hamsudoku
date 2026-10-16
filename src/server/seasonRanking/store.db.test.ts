@@ -2,7 +2,7 @@ import { sql } from 'drizzle-orm';
 import { describe, expect, it } from 'vitest';
 import { useStoreDatabase } from '../../../tools/dbTest/storeHarness';
 import { isUniqueViolation } from '../db/errors';
-import { appendEarning, lockSeasonForEarning, lockSeasonForFinalization, saveSeasonFinalization } from './store';
+import { appendEarning, insertSeasonResultsFromLedger, lockSeasonForEarning, lockSeasonForFinalization, saveSeasonFinalizationHeader } from './store';
 
 const store = useStoreDatabase();
 
@@ -131,33 +131,48 @@ describe('seasonRanking 확정 저장', () => {
     finalizedAt: '2026-10-25T15:01:00.000Z',
     status: 'finalized',
   };
+  const window = { startAt: new Date(header.startAt), endAt: new Date(header.endAt) };
+  const inWindow = new Date('2026-10-21T03:00:00.000Z');
 
-  it('확정 머리 행과 전체 참여자 결과를 함께 저장한다', async () => {
-    const results = Array.from({ length: 60 }, (_, i) => ({ season: SEASON, userId: `user-${i}`, score: 100 - i, rank: i + 1 }));
+  async function ledger(userId: string, amount: number, options: { at?: Date; eligible?: boolean } = {}) {
+    await store.query(
+      `insert into "SeedLedger" ("userId", kind, amount, season, "createdAt", "rankingEligible") values ($1, 'earn', $2, $3, $4, $5)`,
+      [userId, amount, SEASON, options.at ?? inWindow, options.eligible ?? true],
+    );
+  }
 
-    await store.withTransaction((tx) => saveSeasonFinalization(tx, header, results));
-
+  it('확정 머리 행을 저장하고 같은 시즌의 중복 저장은 unique 위반으로 거부한다', async () => {
+    await store.withTransaction((tx) => saveSeasonFinalizationHeader(tx, header));
     expect(await store.query(`select season, "startAt", "endAt", "finalizedAt", status from "SeasonFinalization"`)).toEqual([
-      {
-        season: SEASON,
-        startAt: new Date(header.startAt),
-        endAt: new Date(header.endAt),
-        finalizedAt: new Date(header.finalizedAt),
-        status: 'finalized',
-      },
+      { season: SEASON, startAt: window.startAt, endAt: window.endAt, finalizedAt: new Date(header.finalizedAt), status: 'finalized' },
     ]);
-    expect(await store.query(`select count(*)::int as n from "SeasonRankResult"`)).toEqual([{ n: 60 }]);
-  });
-
-  it('참여자가 없어도 머리 행을 저장한다', async () => {
-    await store.withTransaction((tx) => saveSeasonFinalization(tx, header, []));
-    expect(await store.query(`select season from "SeasonFinalization"`)).toEqual([{ season: SEASON }]);
-  });
-
-  it('같은 시즌 결과의 중복 저장은 unique 위반으로 거부한다', async () => {
-    const results = [{ season: SEASON, userId: 'user-a', score: 3, rank: 1 }];
-    await store.withTransaction((tx) => saveSeasonFinalization(tx, header, results));
-    const error = await store.withTransaction((tx) => saveSeasonFinalization(tx, header, results)).catch((e: unknown) => e);
+    const error = await store.withTransaction((tx) => saveSeasonFinalizationHeader(tx, header)).catch((e: unknown) => e);
     expect(isUniqueViolation(error)).toBe(true);
+  });
+
+  it('원장의 랭킹 대상 합계로 점수 내림차순·userId 내림차순 순위를 매겨 저장하고 순위 순서로 반환한다', async () => {
+    await ledger('user-a', 3);
+    await ledger('user-a', 2);
+    await ledger('user-b', 5);
+    await ledger('user-c', 3);
+    await ledger('user-d', 10, { eligible: false });
+    await ledger('user-e', 7, { at: window.endAt });
+    await store.withTransaction((tx) => saveSeasonFinalizationHeader(tx, header));
+
+    const results = await store.withTransaction((tx) => insertSeasonResultsFromLedger(tx, SEASON, window));
+
+    expect(results).toEqual([
+      { season: SEASON, userId: 'user-b', score: 5, rank: 1 },
+      { season: SEASON, userId: 'user-a', score: 5, rank: 2 },
+      { season: SEASON, userId: 'user-c', score: 3, rank: 3 },
+    ]);
+    expect(await store.query(`select "userId", score, rank from "SeasonRankResult" order by rank`)).toEqual(
+      results.map(({ userId, score, rank }) => ({ userId, score, rank })),
+    );
+  });
+
+  it('참여자가 없으면 결과 없이 끝난다', async () => {
+    await store.withTransaction((tx) => saveSeasonFinalizationHeader(tx, header));
+    expect(await store.withTransaction((tx) => insertSeasonResultsFromLedger(tx, SEASON, window))).toEqual([]);
   });
 });

@@ -47,21 +47,6 @@ export async function listSeasonEarnings(
   return result.rows;
 }
 
-/** 확정 집계: 점수 내림차순, 동점은 userId 바이트 순서 내림차순. */
-export async function aggregateSeasonLedger(
-  executor: Executor,
-  season: string,
-  window: SeasonWindow,
-): Promise<{ userId: string; score: number }[]> {
-  const result = await executor.execute<{ userId: string; score: number }>(sql`
-    select "userId", sum("amount")::int as "score" from "SeedLedger"
-    where ${earningsFilter(season, window)}
-    group by "userId"
-    order by "score" desc, "userId" collate "C" desc
-  `);
-  return result.rows;
-}
-
 export interface SeasonStanding {
   finalized: boolean;
   rank: number | null;
@@ -71,7 +56,7 @@ export interface SeasonStanding {
 
 /**
  * 사용자의 시즌 순위를 한 문장으로 조회한다. 확정된 시즌은 확정 결과를, 그 외에는 원장 집계 순위를 쓴다.
- * 점수가 없거나 0 이하이면 순위 없이 0점이다.
+ * 원장 집계는 확정되지 않은 시즌에서만 계산한다. 점수가 없거나 0 이하이면 순위 없이 0점이다.
  */
 export async function findSeasonStanding(
   executor: Executor,
@@ -92,16 +77,20 @@ export async function findSeasonStanding(
       group by "userId"
     ),
     mine as (select "score" from scores where "userId" = ${userId}),
-    final as (select "score", "rank" from "SeasonRankResult" where "season" = ${season} and "userId" = ${userId})
+    final as (select "score", "rank" from "SeasonRankResult" where "season" = ${season} and "userId" = ${userId}),
+    state as (
+      select exists (select 1 from "SeasonFinalization" where "season" = ${season} and "status" = 'finalized') as "finalized"
+    )
     select
-      exists (select 1 from "SeasonFinalization" where "season" = ${season} and "status" = 'finalized') as "finalized",
-      (select "score" from mine) as "liveScore",
-      (select count(*)::int from scores
+      state."finalized",
+      case when state."finalized" then null else (select "score" from mine) end as "liveScore",
+      case when state."finalized" then null else (select count(*)::int from scores
         where "score" > (select "score" from mine)
-           or ("score" = (select "score" from mine) and "userId" collate "C" > ${userId})) + 1 as "liveRank",
+           or ("score" = (select "score" from mine) and "userId" collate "C" > ${userId})) + 1 end as "liveRank",
       (select "score" from final) as "finalScore",
       (select "rank" from final) as "finalRank",
       (select "nickname" from "Profile" where "userId" = ${userId}) as "nickname"
+    from state
   `);
   const row = result.rows[0];
   if (row.finalized) {
@@ -156,6 +145,14 @@ export function findFinalizedSeasonTop(executor: Executor, season: string, limit
 /** 확정된 시즌의 머리 행과 전체 결과. 확정되지 않았으면 null이다. */
 export function findFinalizedSeason(executor: Executor, season: string): Promise<FinalizedSeason | null> {
   return findFinalized(executor, season);
+}
+
+/** 시즌이 확정되었는지 결과 행을 읽지 않고 확인한다. */
+export async function isSeasonFinalized(executor: Executor, season: string): Promise<boolean> {
+  const result = await executor.execute<{ finalized: boolean }>(sql`
+    select exists (select 1 from "SeasonFinalization" where "season" = ${season} and "status" = 'finalized') as "finalized"
+  `);
+  return result.rows[0].finalized;
 }
 
 /** 원장에 적립이 있으면서 확정되지 않은 시즌 목록(오름차순). */

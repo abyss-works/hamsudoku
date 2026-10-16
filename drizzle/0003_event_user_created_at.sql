@@ -1,0 +1,1 @@
+CREATE INDEX "EndlessEvent_userId_createdAt_idx" ON "EndlessEvent" USING btree ("userId","createdAt");

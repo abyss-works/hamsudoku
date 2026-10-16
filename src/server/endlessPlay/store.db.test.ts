@@ -1,7 +1,7 @@
 import { sql } from 'drizzle-orm';
 import { describe, expect, it } from 'vitest';
 import { useStoreDatabase } from '../../../tools/dbTest/storeHarness';
-import { findPlaySummary, listRecentPlayEvents, pickUnclearedStage } from './queries';
+import { findPlaySummary, findSubmissionHistory, pickUnclearedStage } from './queries';
 import { appendPlayEvent, commitClear, commitFail, lockPlayer } from './store';
 
 const store = useStoreDatabase();
@@ -93,7 +93,7 @@ describe('endlessPlay 이벤트와 잠금', () => {
     ).toEqual([{ seedLeft: 2, elapsedMs: 1500, verified: false, suspicious: false, reason: '하한 미달', createdAt: AT }]);
   });
 
-  it('최근 이벤트는 기록 시각 역순으로 지정한 개수만 반환한다', async () => {
+  it('제출 이력은 최근 이벤트를 기록 시각 역순으로 지정한 개수만, 마지막 검증 클리어 시각은 개수와 무관하게 반환한다', async () => {
     for (let i = 0; i < 4; i += 1) {
       await store.query(
         `insert into "EndlessEvent" ("userId", "stageId", "seedLeft", "elapsedMs", verified, "createdAt") values ('user-a', 'e-1-0', $1, 1000, $2, $3)`,
@@ -105,11 +105,19 @@ describe('endlessPlay 이벤트와 잠금', () => {
       [LATER],
     );
 
-    expect(await listRecentPlayEvents(store.db, 'user-a', 3)).toEqual([
-      { seedLeft: 3, verified: false, createdAt: new Date(AT.getTime() + 3000) },
-      { seedLeft: 2, verified: true, createdAt: new Date(AT.getTime() + 2000) },
-      { seedLeft: 1, verified: false, createdAt: new Date(AT.getTime() + 1000) },
-    ]);
+    expect(await findSubmissionHistory(store.db, 'user-a', 3)).toEqual({
+      recent: [
+        { seedLeft: 3, verified: false, createdAt: new Date(AT.getTime() + 3000) },
+        { seedLeft: 2, verified: true, createdAt: new Date(AT.getTime() + 2000) },
+        { seedLeft: 1, verified: false, createdAt: new Date(AT.getTime() + 1000) },
+      ],
+      lastVerifiedAt: new Date(AT.getTime() + 2000),
+    });
+    expect(await findSubmissionHistory(store.db, 'user-a', 1)).toEqual({
+      recent: [{ seedLeft: 3, verified: false, createdAt: new Date(AT.getTime() + 3000) }],
+      lastVerifiedAt: new Date(AT.getTime() + 2000),
+    });
+    expect(await findSubmissionHistory(store.db, 'user-c', 3)).toEqual({ recent: [], lastVerifiedAt: null });
   });
 
   it('같은 사용자의 잠금은 트랜잭션이 끝날 때까지 다음 잠금을 기다리게 한다', async () => {
@@ -178,5 +186,13 @@ describe('endlessPlay 조회', () => {
       [AT],
     );
     expect(await findPlaySummary(store.db, 'user-a')).toEqual({ balance: 17, clearedCount: 2, streak: { current: 2, best: 5 } });
+  });
+});
+
+describe('endlessPlay 이벤트 인덱스', () => {
+  it('사용자별 최근 이벤트 조회용 인덱스가 있다', async () => {
+    expect(
+      await store.query(`select indexdef from pg_indexes where indexname = 'EndlessEvent_userId_createdAt_idx'`),
+    ).toEqual([{ indexdef: expect.stringContaining('("userId", "createdAt")') }]);
   });
 });

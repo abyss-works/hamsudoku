@@ -2,6 +2,7 @@ import type { ClearResponse } from '../../shared/endless';
 import { seasonId } from '../../shared/season';
 import { consumeAttempt, issueAttempt, releaseAttempt } from '../attempt/store';
 import { db, withTransaction } from '../db/client';
+import { describeDbError } from '../db/errors';
 import type { Defer } from '../defer';
 import { findStage } from '../endlessPool/queries';
 import { recordStagePlay } from '../endlessPool/store';
@@ -9,7 +10,7 @@ import { requestSupply, type SupplyEnqueuer } from '../endlessPool/supply';
 import { deferRankEarning } from '../seasonRanking/rankCache';
 import { countsForRanking } from '../seasonRanking/rules';
 import { appendEarning, lockSeasonForEarning } from '../seasonRanking/store';
-import { findPlaySummary, listRecentPlayEvents, pickUnclearedStage, type PlayableStage, type PlaySummary } from './queries';
+import { findPlaySummary, findSubmissionHistory, pickUnclearedStage, type PlayableStage, type PlaySummary } from './queries';
 import { assessSubmission, clearRejection, PERFECT_WINDOW, solutionMatches } from './rules';
 import { appendPlayEvent, commitClear, commitFail, lockPlayer } from './store';
 
@@ -30,12 +31,12 @@ export async function startEndlessStage(
       const decision = await requestSupply(now, enqueuer);
       if (decision.enqueueError) console.warn('Supply enqueue warning (non-fatal):', decision.enqueueError);
     } catch (error) {
-      console.error('Failed to trigger supply:', error);
+      console.error('Failed to trigger supply', describeDbError(error));
     }
   });
   const stage = await pickUnclearedStage(db, uid);
   if (!stage) return null;
-  const attempt = await issueAttempt(db, { userId: uid, stageCode: stage.id });
+  const attempt = await issueAttempt(db, { userId: uid, stageCode: stage.id, issuedAt: now });
   return { stage, attemptKey: attempt.id };
 }
 
@@ -82,7 +83,8 @@ export async function submitEndlessClear(
     const committed = await withTransaction(async (tx) => {
       await lockSeasonForEarning(tx, season);
       await lockPlayer(tx, uid);
-      const verdict = assessSubmission(await listRecentPlayEvents(tx, uid, PERFECT_WINDOW), now);
+      const history = await findSubmissionHistory(tx, uid, PERFECT_WINDOW);
+      const verdict = assessSubmission(history.recent, history.lastVerifiedAt, now);
       if (verdict.tooSoon) return null;
       const summary = await commitClear(tx, {
         userId: uid,

@@ -1,4 +1,4 @@
-import { db, withTransaction } from '../db/client';
+import { withTransaction } from '../db/client';
 import { markSupplyJobPublishFailed, reserveSupplyJob, type SupplyDecision, type SupplyPolicy } from './store';
 
 export const SUPPLY_POLICY: SupplyPolicy = {
@@ -18,11 +18,12 @@ export interface SupplyEnqueuer {
  */
 export async function requestSupply(now: Date, enqueuer?: SupplyEnqueuer): Promise<SupplyDecision & { enqueueError?: string }> {
   const decision = await withTransaction((tx) => reserveSupplyJob(tx, now, SUPPLY_POLICY));
-  if (!decision.shouldEnqueue || !decision.jobId || !enqueuer) return decision;
+  const { jobId } = decision;
+  if (!decision.shouldEnqueue || !jobId || !enqueuer) return decision;
   try {
-    await enqueuer.enqueueChunk(decision.jobId, 0);
+    await enqueuer.enqueueChunk(jobId, 0);
   } catch (error) {
-    await markSupplyJobPublishFailed(db, decision.jobId, now);
+    await withTransaction((tx) => markSupplyJobPublishFailed(tx, jobId, now));
     return { ...decision, enqueueError: (error as Error).message };
   }
   return decision;

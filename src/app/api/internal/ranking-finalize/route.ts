@@ -2,7 +2,7 @@ import { NextResponse } from 'next/server';
 import { z } from 'zod';
 import { seasonIdSchema } from '../../../../shared/endless';
 import { verifyInternalRequest } from '../../../../server/qstash';
-import { finalizeSeason, recoverUnfinalizedSeasons } from '../../../../server/seasonRanking/finalization';
+import { finalizationFailureMessage, finalizeSeason, recoverUnfinalizedSeasons } from '../../../../server/seasonRanking/finalization';
 
 const finalizeBodySchema = z
   .object({
@@ -63,8 +63,7 @@ export async function POST(req: Request) {
       recoveredSeasons: recovered.map((r) => r.header.season),
     });
   } catch (err: unknown) {
-    const msg = err instanceof Error ? err.message : String(err);
-    return NextResponse.json({ ok: false, msg }, { status: 500 });
+    return NextResponse.json({ ok: false, msg: finalizationFailureMessage(err) }, { status: 500 });
   }
 }
 

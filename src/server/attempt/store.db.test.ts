@@ -31,7 +31,7 @@ function consume(overrides: Partial<Parameters<typeof consumeAttempt>[1]> = {}) 
 
 describe('attempt store', () => {
   it('입장 키를 발급하면 DB가 만든 id로 미사용 행을 저장한다', async () => {
-    const issued = await issueAttempt(store.db, { userId: 'user-a', stageCode: '1-3' });
+    const issued = await issueAttempt(store.db, { userId: 'user-a', stageCode: '1-3', issuedAt: new Date() });
 
     expect(issued.id).toMatch(/^[0-9a-f-]{36}$/);
     expect(await store.query(`select id, "userId", "stageCode", "usedAt" from "Attempt"`)).toEqual([
@@ -123,5 +123,13 @@ describe('attempt store 무한모드 판 조건', () => {
     expect(await consumeEndless('key-3')).toBeNull();
     expect(await consumeEndless('key-1')).toMatchObject({ stageCode: 'e-1-0' });
     expect(await store.query(`select id from "Attempt" where "usedAt" is not null`)).toEqual([{ id: 'key-1' }]);
+  });
+});
+
+describe('attempt store 발급 시각', () => {
+  it('발급 시각을 애플리케이션 시각으로 기록한다', async () => {
+    const issuedAt = new Date('2030-01-01T00:00:00.000Z');
+    const issued = await issueAttempt(store.db, { userId: 'user-a', stageCode: '1-1', issuedAt });
+    expect(await store.query(`select "issuedAt" from "Attempt" where id = $1`, [issued.id])).toEqual([{ issuedAt }]);
   });
 });

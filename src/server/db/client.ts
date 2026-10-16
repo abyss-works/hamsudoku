@@ -31,7 +31,9 @@ export function createDatabase(config: PoolConfig): Database {
     }
     try {
       const result = await work(drizzle({ client }));
-      await client.query('commit');
+      // 작업이 오류를 삼켜 트랜잭션이 중단된 상태면 COMMIT은 ROLLBACK으로 끝난다. 이를 성공으로 반환하지 않는다.
+      const committed = await client.query('commit');
+      if (committed.command === 'ROLLBACK') throw new Error('Transaction was rolled back instead of committed');
       client.release();
       return result;
     } catch (error) {

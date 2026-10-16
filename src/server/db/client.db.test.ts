@@ -111,3 +111,17 @@ describe('createDatabase', () => {
     }
   });
 });
+
+describe('withTransaction 커밋 결과', () => {
+  it('작업이 오류를 삼켜 트랜잭션이 중단됐으면 커밋 대신 롤백된 사실을 오류로 알린다', async () => {
+    await expect(
+      database.withTransaction(async (tx) => {
+        await tx.execute(sql`insert into "User" (id) values ('aborted-user')`);
+        await tx.execute(sql`select from missing_table_for_abort`).catch(() => undefined);
+        return 'looks fine';
+      }),
+    ).rejects.toThrow('rolled back');
+    const rows = await database.db.execute(sql`select 1 from "User" where id = 'aborted-user'`);
+    expect(rows.rows).toHaveLength(0);
+  });
+});
