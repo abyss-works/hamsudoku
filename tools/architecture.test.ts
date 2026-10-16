@@ -824,7 +824,6 @@ const LEGACY_ROUTE_DB_IMPORTS = new Set([
   'src/app/api/endless/fail/route.ts',
   'src/app/api/endless/me/route.ts',
   'src/app/api/endless/next/route.ts',
-  'src/app/api/internal/endless-generate/route.ts',
 ]);
 
 type ServerRole = 'route' | 'db' | 'schema' | 'store' | 'queries' | 'rules' | 'useCase' | 'other';

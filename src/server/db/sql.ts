@@ -7,3 +7,8 @@ import { sql, type SQL } from 'drizzle-orm';
 export function utcTimestamp(date: Date): SQL {
   return sql`${date.toISOString()}::timestamp(3)`;
 }
+
+/** raw SQL의 text 배열 값. 쿼리 빌더의 sql 템플릿은 JS 배열을 매개변수 목록으로 펼치므로 배열 생성자로 묶는다. */
+export function textArray(values: string[]): SQL {
+  return values.length === 0 ? sql`array[]::text[]` : sql`array[${sql.join(values.map((value) => sql`${value}`), sql`, `)}]::text[]`;
+}

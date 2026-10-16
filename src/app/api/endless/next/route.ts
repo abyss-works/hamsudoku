@@ -5,7 +5,7 @@ import { getSessionUser } from '../../../../server/auth';
 import { encryptSolution } from '../../../../server/crypto';
 import { createPrismaDb } from '../../../../server/db/prisma';
 import type { DbPort } from '../../../../server/db/port';
-import { requestSupply } from '../../../../server/endlessSupply';
+import { requestSupply } from '../../../../server/endlessPool/supply';
 import { publishQStashChunk } from '../../../../server/qstash';
 
 export interface NextRouteDeps {
@@ -29,7 +29,7 @@ export async function handleNext(req: Request, deps?: NextRouteDeps) {
   const enqueuer = deps?.enqueuer ?? defaultQStashEnqueuer;
 
   try {
-    const decision = await requestSupply(db, new Date().toISOString(), enqueuer);
+    const decision = await requestSupply(new Date(), enqueuer);
     if (decision.enqueueError) {
       console.warn('Supply enqueue warning (non-fatal):', decision.enqueueError);
     }

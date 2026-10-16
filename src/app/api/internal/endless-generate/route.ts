@@ -1,8 +1,6 @@
 import { NextResponse } from 'next/server';
 import { z } from 'zod';
-import { createPrismaDb } from '../../../../server/db/prisma';
-import type { DbPort } from '../../../../server/db/port';
-import { executeSupplyChunk } from '../../../../server/endlessGeneration';
+import { executeSupplyChunk } from '../../../../server/endlessPool/generation';
 import { OfficialQStashVerifier, type QStashVerifier } from '../../../../server/qstash';
 
 // 10x1 청크 구성에 대한 Vercel 함수 최대 실행 시간 (초 단위)
@@ -17,7 +15,6 @@ export const endlessGeneratePayloadSchema = z.object({
 
 export interface GenerateRouteDeps {
   verifier?: QStashVerifier;
-  db?: DbPort;
 }
 
 export async function handleEndlessGenerate(req: Request, deps?: GenerateRouteDeps) {
@@ -44,8 +41,7 @@ export async function handleEndlessGenerate(req: Request, deps?: GenerateRouteDe
     );
   }
 
-  const db = deps?.db ?? createPrismaDb();
-  const result = await executeSupplyChunk(db, {
+  const result = await executeSupplyChunk({
     jobId: parsed.data.jobId,
     chunkIndex: parsed.data.chunkIndex as number,
   });
