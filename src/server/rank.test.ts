@@ -2,13 +2,50 @@ import { describe, expect, it } from 'vitest';
 import { createRankStore, rankStoreFromEnv } from './rank';
 
 type Call = { url: string; init: RequestInit };
+type Command = unknown[];
+
+/** 스냅샷 조회와 갱신 잠금 획득을 한 번에 수행하는 스크립트 호출인지 판별한다. */
+function isReadOrLock(command: Command): boolean {
+  return (
+    command[0] === 'eval' &&
+    command[2] === 2 &&
+    String(command[3]).endsWith(':top') &&
+    String(command[4]).endsWith(':top:lock')
+  );
+}
+
+/** 조회·잠금 스크립트 호출의 동작 방식 인자(read 또는 lock)를 돌려준다. */
+function readOrLockMode(command: Command): unknown {
+  return command[7];
+}
+
+/** 원장 스냅샷 게시 스크립트 호출인지 판별한다. */
+function isPublish(command: Command): boolean {
+  return command[0] === 'eval' && command[2] === 3;
+}
+
+/** 소유자 토큰을 확인하는 잠금 해제 스크립트 호출인지 판별한다. */
+function isRelease(command: Command): boolean {
+  return command[0] === 'eval' && command[2] === 1 && String(command[3]).endsWith(':top:lock');
+}
+
+/** 순위 저장소가 보낸 명령을 조회·잠금, 게시, 해제 또는 Redis 명령 이름으로 분류한다. */
+function describeCommand(command: Command): string {
+  if (isReadOrLock(command)) return `read-or-lock:${String(readOrLockMode(command))}`;
+  if (isPublish(command)) return 'publish';
+  if (isRelease(command)) return 'release';
+  return String(command[0]);
+}
 
 function makeStore(replies: unknown[], calls: Call[]) {
   const fetchImpl = (async (url: string | URL | Request, init?: RequestInit) => {
     calls.push({ url: String(url), init: init ?? {} });
     const body = init?.body ? JSON.parse(String(init.body)) : [];
-    if (body[0] === 'set' && String(body[1]).includes(':lock')) {
-      return Response.json({ result: 'OK' });
+    if (isReadOrLock(body)) {
+      // 조회 방식은 다음 응답을 캐시 값으로 쓰고, 캐시가 없거나 잠금 방식이면 잠금 획득을 응답한다.
+      if (readOrLockMode(body) === 'lock') return Response.json({ result: 1 });
+      const cached = replies.shift() ?? null;
+      return Response.json({ result: cached === null ? 1 : cached });
     }
     if (body[0] === 'eval' && body.some((arg: unknown) => String(arg).includes(':lock'))) {
       return Response.json({ result: 1 });
@@ -25,8 +62,7 @@ describe('createRankStore', () => {
     const fetchImpl = (async (_url: unknown, init?: RequestInit) => {
       const command = JSON.parse(String(init?.body));
       commands.push(command);
-      if (command[0] === 'get') return Response.json({ result: cached });
-      if (command[0] === 'set') return Response.json({ result: 'OK' });
+      if (isReadOrLock(command)) return Response.json({ result: cached ?? 1 });
       if (command[0] === 'eval' && command[2] === 3) {
         cached = command[9];
         return Response.json({ result: 1 });
@@ -51,8 +87,7 @@ describe('createRankStore', () => {
   it('원장 조회 중 잠금이 만료되면 이전 갱신자가 캐시를 게시하지 않는다', async () => {
     const fetchImpl = (async (_url: unknown, init?: RequestInit) => {
       const command = JSON.parse(String(init?.body));
-      if (command[0] === 'get') return Response.json({ result: null });
-      if (command[0] === 'set') return Response.json({ result: 'OK' });
+      if (isReadOrLock(command)) return Response.json({ result: 1 });
       return Response.json({ result: command[0] === 'zrevrange' ? [] : 0 });
     }) as typeof fetch;
     const store = createRankStore({ url: 'https://example.invalid', token: 'test', fetchImpl });
@@ -64,13 +99,16 @@ describe('createRankStore', () => {
     const fetchImpl = (async (_url: unknown, init?: RequestInit) => {
       const command = JSON.parse(String(init?.body));
       commands.push(command);
+      if (isReadOrLock(command)) return Response.json({ result: 0 });
       if (command[0] === 'zrevrange') return Response.json({ result: ['u1', 3] });
       return Response.json({ result: null });
     }) as typeof fetch;
     const store = createRankStore({ url: 'https://example.invalid', token: 'test', fetchImpl });
     await expect(store.top('2026-W41', 50)).rejects.toThrow('Ranking refresh is in progress');
+    expect(commands.map(describeCommand)).toEqual(['read-or-lock:read', 'get', 'get', 'get', 'get', 'get']);
     expect(commands.some((command) => command[0] === 'zrevrange')).toBe(false);
     expect(commands.some((command) => command[0] === 'set' && command[1] === 'rank:2026-W41:top')).toBe(false);
+    expect(commands.some(isRelease)).toBe(false);
   });
   it('increment는 ZINCRBY를 보낸다', async () => {
     const calls: Call[] = [];
@@ -104,6 +142,7 @@ describe('createRankStore', () => {
     const store = makeStore([JSON.stringify(snap)], calls);
     expect(await store.top('2026-W41', 50)).toEqual(snap);
     expect(calls).toHaveLength(1);
+    expect(describeCommand(JSON.parse(String(calls[0].init.body)))).toBe('read-or-lock:read');
   });
 
 
@@ -247,15 +286,16 @@ describe('Redis RankStore 결함 3 보강 (TDD RED)', () => {
       calls.push({ url: 'https://example.upstash.io', init: init ?? {} });
       const body = JSON.parse(String(init?.body));
       const [cmd, ...args] = body;
-      if (cmd === 'get' && args[0] === 'rank:2026-W41:top') {
-        return Response.json({ result: savedTop });
-      }
-      if (cmd === 'set' && args[0] === 'rank:2026-W41:top:lock') {
+      if (isReadOrLock(body)) {
+        if (readOrLockMode(body) === 'read' && savedTop) return Response.json({ result: savedTop });
         if (!lockSet) {
           lockSet = true;
-          return Response.json({ result: 'OK' });
+          return Response.json({ result: 1 });
         }
-        return Response.json({ result: null }); // lock fail
+        return Response.json({ result: 0 }); // lock fail
+      }
+      if (cmd === 'get' && args[0] === 'rank:2026-W41:top') {
+        return Response.json({ result: savedTop });
       }
       if (cmd === 'zrevrange') {
         return Response.json({ result: ['u1', 99] });
@@ -264,7 +304,7 @@ describe('Redis RankStore 결함 3 보강 (TDD RED)', () => {
         savedTop = args[1];
         return Response.json({ result: 'OK' });
       }
-      if (cmd === 'eval' || cmd === 'del') {
+      if (isRelease(body)) {
         lockSet = false;
         return Response.json({ result: 1 });
       }
@@ -279,10 +319,11 @@ describe('Redis RankStore 결함 3 보강 (TDD RED)', () => {
     // zrevrange는 1번만 실행되어야 한다
     const zrevrangeCalls = calls.filter((c) => String(c.init.body).includes('zrevrange'));
     expect(zrevrangeCalls).toHaveLength(1);
-    // split SET/EXPIRE가 아닌 atomic SET with EX/PX NX여야 한다
-    const lockCalls = calls.filter((c) => String(c.init.body).includes('rank:2026-W41:top:lock'));
+    // split SET/EXPIRE가 아닌 atomic SET with NX EX여야 한다
+    const lockCalls = calls.map((c) => JSON.parse(String(c.init.body))).filter(isReadOrLock);
     expect(lockCalls.length).toBeGreaterThanOrEqual(1);
-    expect(JSON.parse(String(lockCalls[0].init.body))).toContain('nx');
+    expect(String(lockCalls[0][1])).toMatch(/'NX', 'EX'/);
+    expect(String(lockCalls[0][1])).not.toMatch(/expire/i);
   });
 
   it('lock holder가 오류로 실패하더라도 NX 잠금에는 TTL이 걸려 있어 영구 교착되지 않는다', async () => {
@@ -290,11 +331,8 @@ describe('Redis RankStore 결함 3 보강 (TDD RED)', () => {
     const fetchImpl = (async (_url: string | URL | Request, init?: RequestInit) => {
       calls.push({ url: 'https://example.upstash.io', init: init ?? {} });
       const body = JSON.parse(String(init?.body));
-      const [cmd, ...args] = body;
-      if (cmd === 'get') return Response.json({ result: null });
-      if (cmd === 'set' && args[0] === 'rank:2026-W41:top:lock') {
-        return Response.json({ result: 'OK' });
-      }
+      const [cmd] = body;
+      if (isReadOrLock(body)) return Response.json({ result: 1 });
       if (cmd === 'zrevrange') {
         throw new Error('Redis network drop');
       }
@@ -304,21 +342,112 @@ describe('Redis RankStore 결함 3 보강 (TDD RED)', () => {
     const store = createRankStore({ url: 'https://example.upstash.io', token: 'tok', fetchImpl });
     await expect(store.top('2026-W41', 50)).rejects.toThrow('Redis network drop');
 
-    const setLockCalls = calls.filter((c) => {
-      const b = JSON.parse(String(c.init.body));
-      return b[0] === 'set' && b[1] === 'rank:2026-W41:top:lock';
-    });
+    const setLockCalls = calls.map((c) => JSON.parse(String(c.init.body))).filter(isReadOrLock);
     expect(setLockCalls).toHaveLength(1);
-    const lockCmd = JSON.parse(String(setLockCalls[0].init.body));
-    expect(lockCmd).toContain('nx');
-    expect(lockCmd.includes('ex') || lockCmd.includes('px')).toBe(true);
+    const lockCmd = setLockCalls[0];
+    expect(String(lockCmd[1])).toMatch(/'NX', 'EX'/);
+    expect(lockCmd[6]).toBe(5);
 
     // finally 블록에서 eval을 통한 안전한 해제가 시도되었음을 확인
-    const unlockCalls = calls.filter((c) => {
-      const b = JSON.parse(String(c.init.body));
-      return b[0] === 'eval' && b.some((arg: unknown) => arg === 'rank:2026-W41:top:lock');
-    });
+    const unlockCalls = calls.map((c) => JSON.parse(String(c.init.body))).filter(isRelease);
     expect(unlockCalls).toHaveLength(1);
+    expect(unlockCalls[0][4]).toBe(lockCmd[5]);
+  });
+});
+
+describe('top 스냅샷 조회와 갱신 잠금의 단일 왕복', () => {
+  const season = '2026-W41';
+  const freshSnapshot = () => ({ at: new Date().toISOString(), season, entries: [{ userId: 'u-cached', score: 7 }] });
+  const staleSnapshot = () => ({ ...freshSnapshot(), at: new Date(Date.now() - 70_000).toISOString() });
+
+  /** 조회·잠금 스크립트 응답을 지정하고 게시·해제 스크립트는 성공으로 응답하는 가짜 Redis를 만든다. */
+  function scriptedStore(readOrLock: (mode: unknown) => unknown, getReplies: unknown[] = []) {
+    const commands: Command[] = [];
+    const fetchImpl = (async (_url: unknown, init?: RequestInit) => {
+      const command = JSON.parse(String(init?.body)) as Command;
+      commands.push(command);
+      if (isReadOrLock(command)) return Response.json({ result: readOrLock(readOrLockMode(command)) });
+      if (isPublish(command) || isRelease(command)) return Response.json({ result: 1 });
+      if (command[0] === 'get') return Response.json({ result: getReplies.shift() ?? null });
+      return Response.json({ result: null });
+    }) as typeof fetch;
+    const store = createRankStore({ url: 'https://example.invalid', token: 'test', fetchImpl });
+    return { store, commands };
+  }
+
+  it('유효한 캐시 적중은 조회·잠금 스크립트 1회 왕복으로 끝난다', async () => {
+    const snap = freshSnapshot();
+    const { store, commands } = scriptedStore(() => JSON.stringify(snap));
+    let ledgerReads = 0;
+    const loadScores = async () => {
+      ledgerReads += 1;
+      return [];
+    };
+    expect(await store.top(season, 50, loadScores)).toEqual(snap);
+    expect(commands.map(describeCommand)).toEqual(['read-or-lock:read']);
+    expect(commands[0].slice(3, 5)).toEqual(['rank:2026-W41:top', 'rank:2026-W41:top:lock']);
+    expect(ledgerReads).toBe(0);
+  });
+
+  it('캐시가 없고 잠금을 얻으면 스크립트·게시·해제만 보내고 GET·SET을 따로 보내지 않는다', async () => {
+    const { store, commands } = scriptedStore(() => 1);
+    const result = await store.top(season, 50, async () => [{ userId: 'u1', score: 3 }]);
+    expect(result.entries).toEqual([{ userId: 'u1', score: 3 }]);
+    expect(commands.map(describeCommand)).toEqual(['read-or-lock:read', 'publish', 'release']);
+    const token = commands[0][5];
+    expect(typeof token).toBe('string');
+    expect(commands[1][6]).toBe(token);
+    expect(commands[2][4]).toBe(token);
+  });
+
+  it('캐시가 유효하지 않으면 잠금 방식으로 스크립트를 다시 호출하여 잠금을 얻고 갱신한다', async () => {
+    const stale = staleSnapshot();
+    const { store, commands } = scriptedStore((mode) => (mode === 'lock' ? 1 : JSON.stringify(stale)));
+    let ledgerReads = 0;
+    const result = await store.top(season, 50, async () => {
+      ledgerReads += 1;
+      return [{ userId: 'u-fresh', score: 11 }];
+    });
+    expect(result.entries).toEqual([{ userId: 'u-fresh', score: 11 }]);
+    expect(ledgerReads).toBe(1);
+    expect(commands.map(describeCommand)).toEqual(['read-or-lock:read', 'read-or-lock:lock', 'publish', 'release']);
+    expect(commands[1][5]).toBe(commands[0][5]);
+    expect(commands[2][6]).toBe(commands[0][5]);
+  });
+
+  it('캐시가 유효하지 않고 다른 요청이 잠금을 쥐면 대기 후 게시된 캐시를 돌려준다', async () => {
+    const stale = staleSnapshot();
+    const published = freshSnapshot();
+    const { store, commands } = scriptedStore(
+      (mode) => (mode === 'lock' ? 0 : JSON.stringify(stale)),
+      [null, JSON.stringify(published)],
+    );
+    expect(await store.top(season, 50, async () => [])).toEqual(published);
+    expect(commands.map(describeCommand)).toEqual(['read-or-lock:read', 'read-or-lock:lock', 'get', 'get']);
+  });
+
+  it('캐시가 없고 다른 요청이 잠금을 쥐면 원장 조회 없이 GET 재시도로 게시된 캐시를 돌려준다', async () => {
+    const published = freshSnapshot();
+    const { store, commands } = scriptedStore(() => 0, [null, JSON.stringify(published)]);
+    let ledgerReads = 0;
+    const loadScores = async () => {
+      ledgerReads += 1;
+      return [];
+    };
+    expect(await store.top(season, 50, loadScores)).toEqual(published);
+    expect(ledgerReads).toBe(0);
+    expect(commands.map(describeCommand)).toEqual(['read-or-lock:read', 'get', 'get']);
+  });
+
+  it('조회·잠금 스크립트는 캐시 조회 후 단일 SET NX EX로만 잠금을 건다', async () => {
+    const { store, commands } = scriptedStore(() => 1);
+    await store.top(season, 50, async () => []);
+    const script = String(commands[0][1]);
+    expect(script).toMatch(/redis\.call\('get', KEYS\[1\]\)/);
+    expect(script).toMatch(/redis\.call\('set', KEYS\[2\], ARGV\[1\], 'NX', 'EX', ARGV\[2\]\)/);
+    expect(script).not.toMatch(/expire/i);
+    expect(commands[0][6]).toBe(5);
+    expect(commands[0][7]).toBe('read');
   });
 });
 
