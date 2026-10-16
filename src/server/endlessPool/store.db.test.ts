@@ -3,6 +3,7 @@ import { useStoreDatabase } from '../../../tools/dbTest/storeHarness';
 import { findStage } from './queries';
 import {
   claimSupplyChunk,
+  insertStages,
   failSupplyChunk,
   insertSupplyBatch,
   markSupplyJobPublishFailed,
@@ -310,5 +311,14 @@ describe('endlessPool 공급 청크 처리', () => {
     await store.withTransaction((tx) => failSupplyChunk(tx, { jobId: 'job-1', chunkIndex: 0, now: NOW, claimToken: claimed.claimToken }));
     expect(await store.query(`select status from "EndlessSupplyChunk"`)).toEqual([{ status: 'failed' }]);
     expect(await store.query(`select status, "leaseExpiresAt" from "EndlessSupplyJob"`)).toEqual([{ status: 'failed', leaseExpiresAt: null }]);
+  });
+});
+
+describe('endlessPool 판 일괄 적재', () => {
+  it('없는 판만 적재하고 적재한 수를 반환한다', async () => {
+    await seedStage('e-7-0');
+    const rows = ['e-7-0', 'e-7-1', 'e-7-2'].map((id) => ({ id, size: 7, regions: id.padStart(49, '0'), solution: '0,0', tier: 1, seed: 7 }));
+    expect(await insertStages(store.db, rows)).toBe(2);
+    expect(await store.query(`select count(*)::int as n from "EndlessStage"`)).toEqual([{ n: 3 }]);
   });
 });

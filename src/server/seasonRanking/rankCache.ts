@@ -1,6 +1,8 @@
-import { rankingFrozen } from '../../shared/season';
+import { rankingFrozen, seasonWindow } from '../../shared/season';
+import { db } from '../db/client';
 import type { Defer } from '../defer';
-import { rankStoreFromEnv } from '../rank';
+import { rankStoreFromEnv, type RankStore } from '../rank';
+import { listSeasonEarnings } from './queries';
 
 /**
  * Redis 순위 표시 캐시에 적립을 응답 뒤에 더한다. 집계 마감 창에는 더하지 않는다.
@@ -13,4 +15,11 @@ export function deferRankEarning(defer: Defer, input: { season: string; userId: 
   defer(async () => {
     await store.increment(input.season, input.userId, input.amount).catch(() => {});
   });
+}
+
+/** 시즌 원장의 랭킹 대상 합계로 순위 저장소의 사용자 점수를 다시 쓴다. 기록한 사용자 수를 반환한다. */
+export async function rebuildRankCache(store: RankStore, season: string): Promise<number> {
+  const rows = await listSeasonEarnings(db, season, seasonWindow(season));
+  for (const row of rows) await store.setScore(season, row.userId, row.amount);
+  return rows.length;
 }
