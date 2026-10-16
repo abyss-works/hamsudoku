@@ -2,6 +2,7 @@ import type { ClearResponse } from '../../shared/endless';
 import { seasonId } from '../../shared/season';
 import { consumeAttempt, issueAttempt, releaseAttempt } from '../attempt/store';
 import { db, withTransaction } from '../db/client';
+import { describeDbError } from '../db/errors';
 import type { Defer } from '../defer';
 import { findStage } from '../endlessPool/queries';
 import { recordStagePlay } from '../endlessPool/store';
@@ -30,7 +31,7 @@ export async function startEndlessStage(
       const decision = await requestSupply(now, enqueuer);
       if (decision.enqueueError) console.warn('Supply enqueue warning (non-fatal):', decision.enqueueError);
     } catch (error) {
-      console.error('Failed to trigger supply:', error);
+      console.error('Failed to trigger supply', describeDbError(error));
     }
   });
   const stage = await pickUnclearedStage(db, uid);
