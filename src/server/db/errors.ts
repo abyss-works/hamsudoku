@@ -42,3 +42,25 @@ export function describeDbError(error: unknown): DbErrorSummary {
     table: pick(fields?.table),
   };
 }
+
+// 쿼리 빌더 오류 메시지는 `Failed query: <SQL>\nparams: <인자 목록>` 형식이다.
+const QUERY_PARAMS = /\nparams: [\s\S]*$/;
+
+/** 오류 메시지에서 쿼리 인자 목록을 가린다. SQL 문장은 남긴다. */
+export function redactQueryParams(message: string): string {
+  return message.replace(QUERY_PARAMS, '\nparams: [redacted]');
+}
+
+interface ScrubbableEvent {
+  message?: string;
+  exception?: { values?: { value?: string }[] };
+}
+
+/** 오류 추적 이벤트의 메시지와 예외 값에서 쿼리 인자를 가린다. */
+export function scrubDatabaseErrorEvent<T extends ScrubbableEvent>(event: T): T {
+  if (event.message) event.message = redactQueryParams(event.message);
+  for (const exception of event.exception?.values ?? []) {
+    if (exception.value) exception.value = redactQueryParams(exception.value);
+  }
+  return event;
+}
