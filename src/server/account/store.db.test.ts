@@ -89,3 +89,16 @@ describe('account store 시간대', () => {
     ]);
   });
 });
+
+describe('account store 불필요한 갱신', () => {
+  it('값이 바뀌지 않는 계정 기록은 사용자 행을 다시 쓰지 않는다', async () => {
+    await upsertAccount(store.db, { userId: 'user-a', email: 'a@example.com', at: AT });
+    const [before] = await store.query<{ xmin: string }>(`select xmin::text from "User" where id = 'user-a'`);
+
+    await upsertAccount(store.db, { userId: 'user-a', email: null, at: LATER });
+    await upsertAccount(store.db, { userId: 'user-a', email: 'a@example.com', at: LATER });
+
+    const [after] = await store.query<{ xmin: string }>(`select xmin::text from "User" where id = 'user-a'`);
+    expect(after.xmin).toBe(before.xmin);
+  });
+});
