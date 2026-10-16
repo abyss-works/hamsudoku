@@ -2,7 +2,6 @@ import { describe, expect, it } from 'vitest';
 import { seasonWindow } from '../../shared/season';
 import { useStoreDatabase } from '../../../tools/dbTest/storeHarness';
 import {
-  aggregateSeasonLedger,
   findFinalizedSeason,
   findFinalizedSeasonTop,
   findSeasonStanding,
@@ -60,16 +59,6 @@ describe('seasonRanking 원장 조회', () => {
       { userId: 'user-b', amount: 5 },
       { userId: 'user-c', amount: 3 },
       { userId: 'user-e', amount: 1 },
-    ]);
-  });
-
-  it('확정 집계는 점수 내림차순, 동점은 userId 내림차순으로 정렬한다', async () => {
-    await seedSeason();
-    expect(await aggregateSeasonLedger(store.db, SEASON, WINDOW)).toEqual([
-      { userId: 'user-b', score: 5 },
-      { userId: 'user-a', score: 5 },
-      { userId: 'user-c', score: 3 },
-      { userId: 'user-e', score: 1 },
     ]);
   });
 

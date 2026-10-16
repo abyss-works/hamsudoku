@@ -1,8 +1,8 @@
 import { sql } from 'drizzle-orm';
 import type { Executor } from '../db/client';
 import { utcTimestamp } from '../db/sql';
-import type { SeasonFinalizationHeader, SeasonRankResult } from './queries';
-import { seasonFinalizations, seasonRankResults } from './schema';
+import type { SeasonFinalizationHeader, SeasonRankResult, SeasonWindow } from './queries';
+import { seasonFinalizations } from './schema';
 
 // 시즌 잠금 키. 클리어 적립과 시즌 확정이 같은 키를 쓴다.
 function seasonLockKey(season: string) {
@@ -41,12 +41,8 @@ export async function appendEarning(executor: Executor, input: EarningInput): Pr
   return { rankingEligible: result.rows[0].rankingEligible };
 }
 
-/** 확정 머리 행과 전체 참여자 결과를 저장한다. 시즌 배타 잠금 안에서 한 번만 호출한다. */
-export async function saveSeasonFinalization(
-  tx: Executor,
-  header: SeasonFinalizationHeader,
-  results: SeasonRankResult[],
-): Promise<void> {
+/** 확정 머리 행을 저장한다. 시즌 배타 잠금 안에서 한 번만 호출한다. */
+export async function saveSeasonFinalizationHeader(tx: Executor, header: SeasonFinalizationHeader): Promise<void> {
   await tx.insert(seasonFinalizations).values({
     season: header.season,
     startAt: new Date(header.startAt),
@@ -54,5 +50,28 @@ export async function saveSeasonFinalization(
     finalizedAt: new Date(header.finalizedAt),
     status: header.status,
   });
-  if (results.length > 0) await tx.insert(seasonRankResults).values(results);
+}
+
+/**
+ * 시즌 구간의 랭킹 대상 원장 합계로 전체 참여자의 순위를 DB 안에서 매겨 저장하고 순위 순서로 반환한다.
+ * 점수 내림차순, 동점은 userId 바이트 순서 내림차순이다. 참여자 수와 무관하게 한 문장이다.
+ */
+export async function insertSeasonResultsFromLedger(
+  tx: Executor,
+  season: string,
+  window: SeasonWindow,
+): Promise<SeasonRankResult[]> {
+  const result = await tx.execute<SeasonRankResult>(sql`
+    insert into "SeasonRankResult" ("season", "userId", "score", "rank")
+    select ${season}, "userId", "score",
+      (row_number() over (order by "score" desc, "userId" collate "C" desc))::int
+    from (
+      select "userId", sum("amount")::int as "score" from "SeedLedger"
+      where "season" = ${season} and "kind" = 'earn' and "rankingEligible"
+        and "createdAt" >= ${utcTimestamp(window.startAt)} and "createdAt" < ${utcTimestamp(window.endAt)}
+      group by "userId"
+    ) totals
+    returning "season", "userId", "score", "rank"
+  `);
+  return [...result.rows].sort((a, b) => a.rank - b.rank);
 }
