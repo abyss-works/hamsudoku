@@ -2,8 +2,7 @@ import { NextResponse } from 'next/server';
 import { z } from 'zod';
 import { seasonIdSchema } from '../../../../shared/endless';
 import { verifyInternalRequest } from '../../../../server/qstash';
-import { describeDbError } from '../../../../server/db/errors';
-import { finalizeSeason, recoverUnfinalizedSeasons, SeasonNotEndedError } from '../../../../server/seasonRanking/finalization';
+import { finalizationFailureMessage, finalizeSeason, recoverUnfinalizedSeasons } from '../../../../server/seasonRanking/finalization';
 
 const finalizeBodySchema = z
   .object({
@@ -64,10 +63,7 @@ export async function POST(req: Request) {
       recoveredSeasons: recovered.map((r) => r.header.season),
     });
   } catch (err: unknown) {
-    if (err instanceof SeasonNotEndedError) return NextResponse.json({ ok: false, msg: err.message }, { status: 500 });
-    // DB 오류 메시지에는 쿼리 인자가 담기므로 응답과 로그에는 코드와 대상 이름만 남긴다.
-    console.error('Ranking finalization failed', describeDbError(err));
-    return NextResponse.json({ ok: false, msg: '시즌 확정에 실패했어요.' }, { status: 500 });
+    return NextResponse.json({ ok: false, msg: finalizationFailureMessage(err) }, { status: 500 });
   }
 }
 

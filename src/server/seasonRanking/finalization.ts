@@ -1,5 +1,6 @@
 import { rankedSeasonId, seasonWindow } from '../../shared/season';
 import { db, withTransaction } from '../db/client';
+import { describeDbError } from '../db/errors';
 import { findFinalizedSeason, isSeasonFinalized, listUnfinalizedLedgerSeasons, type FinalizedSeason } from './queries';
 import { insertSeasonResultsFromLedger, lockSeasonForFinalization, saveSeasonFinalizationHeader } from './store';
 
@@ -9,6 +10,16 @@ export class SeasonNotEndedError extends Error {
     super(`Season ${season} has not ended yet (ends at ${endAt.toISOString()})`);
     this.name = 'SeasonNotEndedError';
   }
+}
+
+/**
+ * 확정 실패 응답 문구. 끝나지 않은 시즌은 사유를 그대로 쓰고, 그 외 오류는 메시지에 쿼리 인자가 담길 수 있어
+ * 코드와 대상 이름만 기록하고 일반 문구를 쓴다.
+ */
+export function finalizationFailureMessage(error: unknown): string {
+  if (error instanceof SeasonNotEndedError) return error.message;
+  console.error('Ranking finalization failed', describeDbError(error));
+  return '시즌 확정에 실패했어요.';
 }
 
 /**
