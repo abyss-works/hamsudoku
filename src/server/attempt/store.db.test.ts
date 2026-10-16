@@ -108,3 +108,20 @@ describe('attempt store 시간대', () => {
     ]);
   });
 });
+
+describe('attempt store 무한모드 판 조건', () => {
+  it('무한모드 판이 있는 키만 소모한다', async () => {
+    await store.query(`insert into "EndlessStage" (id, size, regions, solution, tier, seed) values ('e-1-0', 7, 'r', 's', 1, 1)`);
+    await seed({ id: 'key-1', stageCode: 'e-1-0' });
+    await seed({ id: 'key-2', stageCode: 'e-9-9' });
+    await seed({ id: 'key-3', stageCode: '1-1' });
+
+    const consumeEndless = (key: string) =>
+      consume({ key, stageCodePattern: undefined, requireEndlessStage: true });
+
+    expect(await consumeEndless('key-2')).toBeNull();
+    expect(await consumeEndless('key-3')).toBeNull();
+    expect(await consumeEndless('key-1')).toMatchObject({ stageCode: 'e-1-0' });
+    expect(await store.query(`select id from "Attempt" where "usedAt" is not null`)).toEqual([{ id: 'key-1' }]);
+  });
+});
