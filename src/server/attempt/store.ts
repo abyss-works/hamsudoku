@@ -2,10 +2,14 @@ import { and, eq, gte, isNull, sql, type SQL } from 'drizzle-orm';
 import type { Executor } from '../db/client';
 import { attempts } from './schema';
 
-export async function issueAttempt(executor: Executor, input: { userId: string; stageCode: string }): Promise<{ id: string }> {
+/** 입장 키를 발급한다. 발급 시각은 소모 시 경과 시간과 만료를 계산하는 애플리케이션 시각과 같은 기준으로 기록한다. */
+export async function issueAttempt(
+  executor: Executor,
+  input: { userId: string; stageCode: string; issuedAt: Date },
+): Promise<{ id: string }> {
   const [row] = await executor
     .insert(attempts)
-    .values({ userId: input.userId, stageCode: input.stageCode })
+    .values({ userId: input.userId, stageCode: input.stageCode, issuedAt: input.issuedAt })
     .returning({ id: attempts.id });
   return row;
 }

@@ -9,7 +9,7 @@ export async function POST(req: Request) {
   const { uid } = await getSessionUser();
   const parsed = Body.safeParse(await req.json().catch(() => null));
   if (!parsed.success) return NextResponse.json({ ok: false, msg: '스테이지 코드를 확인하세요.' }, { status: 400 });
-  const result = await issueStageEntry(uid, parsed.data.stageCode);
+  const result = await issueStageEntry(uid, parsed.data.stageCode, new Date());
   if (result.status === 401) return NextResponse.json({ ok: false, msg: '로그인이 필요해요.' }, { status: 401 });
   if (result.status === 400) return NextResponse.json({ ok: false, msg: '스테이지 코드를 확인하세요.' }, { status: 400 });
   return NextResponse.json({ attemptKey: result.key });

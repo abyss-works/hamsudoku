@@ -35,7 +35,7 @@ export async function startEndlessStage(
   });
   const stage = await pickUnclearedStage(db, uid);
   if (!stage) return null;
-  const attempt = await issueAttempt(db, { userId: uid, stageCode: stage.id });
+  const attempt = await issueAttempt(db, { userId: uid, stageCode: stage.id, issuedAt: now });
   return { stage, attemptKey: attempt.id };
 }
 

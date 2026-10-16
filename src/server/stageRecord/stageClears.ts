@@ -11,10 +11,11 @@ const ATTEMPT_TTL_MS = 2 * 60 * 60 * 1000;
 export async function issueStageEntry(
   uid: string | null,
   stageCode: string,
+  now: Date,
 ): Promise<{ status: 200 | 400 | 401; key?: string }> {
   if (!uid) return { status: 401 };
   if (!isStageCode(stageCode)) return { status: 400 };
-  const attempt = await issueAttempt(db, { userId: uid, stageCode });
+  const attempt = await issueAttempt(db, { userId: uid, stageCode, issuedAt: now });
   return { status: 200, key: attempt.id };
 }
 
