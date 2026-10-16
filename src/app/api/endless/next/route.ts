@@ -1,19 +1,17 @@
 import * as Sentry from '@sentry/nextjs';
-import { NextResponse } from 'next/server';
+import { after, NextResponse } from 'next/server';
 import { nextRequestSchema, nextResponseSchema } from '../../../../shared/endless';
 import { getSessionUser } from '../../../../server/auth';
 import { encryptSolution } from '../../../../server/crypto';
-import { createPrismaDb } from '../../../../server/db/prisma';
-import type { DbPort } from '../../../../server/db/port';
-import { requestSupply } from '../../../../server/endlessPool/supply';
+import type { SupplyEnqueuer } from '../../../../server/endlessPool/supply';
+import { startEndlessStage } from '../../../../server/endlessPlay/play';
 import { publishQStashChunk } from '../../../../server/qstash';
 
 export interface NextRouteDeps {
-  db?: DbPort;
-  enqueuer?: { enqueueChunk: (jobId: string, chunkIndex: number) => Promise<void> };
+  enqueuer?: SupplyEnqueuer;
 }
 
-export const defaultQStashEnqueuer = {
+export const defaultQStashEnqueuer: SupplyEnqueuer = {
   enqueueChunk: async (jobId: string, chunkIndex: number): Promise<void> => {
     await publishQStashChunk(jobId, chunkIndex);
   },
@@ -25,32 +23,19 @@ export async function handleNext(req: Request, deps?: NextRouteDeps) {
   const body = nextRequestSchema.safeParse(await req.json().catch(() => null));
   if (!body.success) return NextResponse.json({ ok: false, msg: '요청이 올바르지 않아요.' }, { status: 400 });
 
-  const db = deps?.db ?? createPrismaDb();
-  const enqueuer = deps?.enqueuer ?? defaultQStashEnqueuer;
-
-  try {
-    const decision = await requestSupply(new Date(), enqueuer);
-    if (decision.enqueueError) {
-      console.warn('Supply enqueue warning (non-fatal):', decision.enqueueError);
-    }
-  } catch (err) {
-    console.error('Failed to trigger supply:', err);
-  }
-
-  const stage = await db.pickUnclearedStage(uid);
-  if (!stage) {
+  const started = await startEndlessStage(uid, new Date(), after, deps?.enqueuer ?? defaultQStashEnqueuer);
+  if (!started) {
     Sentry.logger.warn('Endless pool empty', {});
     return NextResponse.json({ ok: false, msg: '새 판을 준비 중이에요.' }, { status: 503 });
   }
-  const attempt = await db.issueAttempt(uid, stage.id);
-  const encrypted = await encryptSolution(body.data.clientPublicKey, stage.solution);
+  const encrypted = await encryptSolution(body.data.clientPublicKey, started.stage.solution);
   return NextResponse.json(
     nextResponseSchema.parse({
-      stage: { id: stage.id, size: stage.size, regions: stage.regions },
+      stage: { id: started.stage.id, size: started.stage.size, regions: started.stage.regions },
       solutionCipher: encrypted.solutionCipher,
       serverPublicKey: encrypted.serverPublicKey,
       iv: encrypted.iv,
-      attemptKey: attempt.id,
+      attemptKey: started.attemptKey,
     }),
   );
 }
@@ -58,4 +43,3 @@ export async function handleNext(req: Request, deps?: NextRouteDeps) {
 export async function POST(req: Request) {
   return handleNext(req);
 }
-
