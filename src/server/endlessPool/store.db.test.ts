@@ -1,3 +1,4 @@
+import { sql } from 'drizzle-orm';
 import { describe, expect, it } from 'vitest';
 import { useStoreDatabase } from '../../../tools/dbTest/storeHarness';
 import { findStage } from './queries';
@@ -173,7 +174,7 @@ describe('endlessPool 공급 작업 예약', () => {
 
   it('발행 실패로 기록하면 작업과 청크가 publish_failed가 되고 임대를 비운다', async () => {
     await seedJob({ status: 'pending', leaseExpiresAt: new Date(NOW.getTime() + 60_000) });
-    await markSupplyJobPublishFailed(store.db, 'job-1', NOW);
+    await store.withTransaction((tx) => markSupplyJobPublishFailed(tx, 'job-1', NOW));
     expect(await store.query(`select status, "leaseExpiresAt", "updatedAt" from "EndlessSupplyJob"`)).toEqual([
       { status: 'publish_failed', leaseExpiresAt: null, updatedAt: NOW },
     ]);
@@ -320,5 +321,31 @@ describe('endlessPool 판 일괄 적재', () => {
     const rows = ['e-7-0', 'e-7-1', 'e-7-2'].map((id) => ({ id, size: 7, regions: id.padStart(49, '0'), solution: '0,0', tier: 1, seed: 7 }));
     expect(await insertStages(store.db, rows)).toBe(2);
     expect(await store.query(`select count(*)::int as n from "EndlessStage"`)).toEqual([{ n: 3 }]);
+  });
+});
+
+describe('endlessPool 공급 잠금 전 재고 확인', () => {
+  it('재고가 충분하면 공급 잠금을 기다리지 않고 판정한다', async () => {
+    for (let i = 0; i < 20; i += 1) await seedStage(`e-${20000 + i}-0`, { seed: 20000 + i });
+    let release!: () => void;
+    const released = new Promise<void>((resolve) => (release = resolve));
+    let held!: () => void;
+    const acquired = new Promise<void>((resolve) => (held = resolve));
+    const holder = store.withTransaction(async (tx) => {
+      await tx.execute(sql`select pg_advisory_xact_lock(hashtext('endless_supply_lock'))`);
+      held();
+      await released;
+    });
+    await acquired;
+    try {
+      const decision = await store.withTransaction(async (tx) => {
+        await tx.execute(sql`set local lock_timeout = '300ms'`);
+        return reserveSupplyJob(tx, NOW, POLICY);
+      });
+      expect(decision).toEqual({ shouldEnqueue: false, action: 'sufficient_stock' });
+    } finally {
+      release();
+      await holder;
+    }
   });
 });

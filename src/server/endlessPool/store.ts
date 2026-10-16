@@ -72,15 +72,23 @@ export interface SupplyDecision {
   seedEnd?: number;
 }
 
+/** 미클리어 판이 기준 수 이상인지 기준 수까지만 세어 판정한다. */
+async function hasSufficientStock(tx: Executor, threshold: number): Promise<boolean> {
+  const stock = await tx.execute<{ count: number }>(sql`
+    select count(*)::int as "count" from (select 1 from "EndlessStage" where "clears" = 0 limit ${threshold}) as stock
+  `);
+  return stock.rows[0].count >= threshold;
+}
+
 /**
- * 공급 잠금 안에서 보충 필요 여부를 판정하고 필요하면 다음 시드 구간의 작업과 청크를 예약한다.
+ * 보충 필요 여부를 판정하고 필요하면 다음 시드 구간의 작업과 청크를 예약한다. 재고가 충분하면 공급 잠금 없이 끝내고,
+ * 부족하면 공급 잠금 안에서 재고를 다시 확인한다.
  * 판정 순서: 재고 충분 → 만료 임대 정리 → 진행 작업 합류 → 최근 성공 쿨다운 → 예약.
  */
 export async function reserveSupplyJob(tx: Executor, now: Date, policy: SupplyPolicy): Promise<SupplyDecision> {
+  if (await hasSufficientStock(tx, policy.stockThreshold)) return { shouldEnqueue: false, action: 'sufficient_stock' };
   await tx.execute(sql`select pg_advisory_xact_lock(hashtext('endless_supply_lock'))`);
-
-  const stock = await tx.execute<{ count: number }>(sql`select count(*)::int as "count" from "EndlessStage" where "clears" = 0`);
-  if (stock.rows[0].count >= policy.stockThreshold) return { shouldEnqueue: false, action: 'sufficient_stock' };
+  if (await hasSufficientStock(tx, policy.stockThreshold)) return { shouldEnqueue: false, action: 'sufficient_stock' };
 
   await tx
     .update(endlessSupplyJobs)
@@ -120,15 +128,16 @@ export async function reserveSupplyJob(tx: Executor, now: Date, policy: SupplyPo
   return { shouldEnqueue: true, action: 'enqueued', jobId, seedStart, seedEnd };
 }
 
-/** 큐 발행이 실패한 작업과 청크를 publish_failed로 기록해 임대 동안 막히지 않게 한다. */
-export async function markSupplyJobPublishFailed(executor: Executor, jobId: string, now: Date): Promise<void> {
-  await executor.execute(sql`
-    with job as (
-      update "EndlessSupplyJob" set "status" = 'publish_failed', "leaseExpiresAt" = null, "updatedAt" = ${utcTimestamp(now)}
-      where "id" = ${jobId}
-    )
-    update "EndlessSupplyChunk" set "status" = 'publish_failed' where "jobId" = ${jobId}
-  `);
+/**
+ * 큐 발행이 실패한 작업과 청크를 publish_failed로 기록해 임대 동안 막히지 않게 한다.
+ * 청크 처리와 같은 작업 → 청크 순서로 행을 잠그도록 트랜잭션 안에서 두 문장으로 갱신한다.
+ */
+export async function markSupplyJobPublishFailed(tx: Executor, jobId: string, now: Date): Promise<void> {
+  await tx
+    .update(endlessSupplyJobs)
+    .set({ status: 'publish_failed', leaseExpiresAt: null, updatedAt: now })
+    .where(eq(endlessSupplyJobs.id, jobId));
+  await tx.update(endlessSupplyChunks).set({ status: 'publish_failed' }).where(eq(endlessSupplyChunks.jobId, jobId));
 }
 
 // ---- 공급 청크 ----
@@ -142,29 +151,32 @@ interface LockedChunk {
   stageCount: number;
 }
 
-/** 작업 행과 청크 행을 함께 잠그고 상태를 읽는다. 둘 중 하나라도 없으면 null이다. */
+function chunkWhere(jobId: string, chunkIndex: number) {
+  return and(eq(endlessSupplyChunks.jobId, jobId), eq(endlessSupplyChunks.chunkIndex, chunkIndex));
+}
+
+/**
+ * 작업 행과 청크 행을 작업 → 청크 순서로 잠그고 상태를 읽는다. 둘 중 하나라도 없으면 null이다.
+ * 공급 작업을 갱신하는 모든 트랜잭션이 같은 순서로 잠가 교착을 피한다.
+ */
 async function lockChunk(tx: Executor, jobId: string, chunkIndex: number): Promise<LockedChunk | null> {
-  const [row] = await tx
+  const [job] = await tx
     .select({
       jobStatus: endlessSupplyJobs.status,
       leaseExpiresAt: endlessSupplyJobs.leaseExpiresAt,
       seedStart: endlessSupplyJobs.seedStart,
       targetCount: endlessSupplyJobs.targetCount,
-      chunkStatus: endlessSupplyChunks.status,
-      stageCount: endlessSupplyChunks.stageCount,
     })
     .from(endlessSupplyJobs)
-    .innerJoin(
-      endlessSupplyChunks,
-      and(eq(endlessSupplyChunks.jobId, endlessSupplyJobs.id), eq(endlessSupplyChunks.chunkIndex, chunkIndex)),
-    )
     .where(eq(endlessSupplyJobs.id, jobId))
     .for('update');
-  return row ?? null;
-}
-
-function chunkWhere(jobId: string, chunkIndex: number) {
-  return and(eq(endlessSupplyChunks.jobId, jobId), eq(endlessSupplyChunks.chunkIndex, chunkIndex));
+  if (!job) return null;
+  const [chunk] = await tx
+    .select({ chunkStatus: endlessSupplyChunks.status, stageCount: endlessSupplyChunks.stageCount })
+    .from(endlessSupplyChunks)
+    .where(chunkWhere(jobId, chunkIndex))
+    .for('update');
+  return chunk ? { ...job, ...chunk } : null;
 }
 
 export type ClaimResult =
