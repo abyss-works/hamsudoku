@@ -1,9 +1,8 @@
-import { readdirSync, readFileSync } from 'node:fs';
-import { join } from 'node:path';
 import { Client } from 'pg';
 import { GenericContainer, Wait, type StartedTestContainer } from 'testcontainers';
 import type { TestProject } from 'vitest/node';
 import { DB_TEST_IMAGE, TEMPLATE_DATABASE } from './config';
+import { applyDrizzleMigrations } from './schemaPaths';
 
 declare module 'vitest' {
   export interface ProvidedContext {
@@ -33,15 +32,6 @@ async function waitForDatabase(url: string): Promise<void> {
   throw new Error(`테스트 데이터베이스가 준비되지 않았습니다: ${String(lastError)}`);
 }
 
-function migrationSql(): string[] {
-  const root = join(process.cwd(), 'prisma', 'migrations');
-  return readdirSync(root, { withFileTypes: true })
-    .filter((entry) => entry.isDirectory())
-    .map((entry) => entry.name)
-    .sort()
-    .map((name) => readFileSync(join(root, name, 'migration.sql'), 'utf-8'));
-}
-
 async function buildTemplate(adminUrl: string): Promise<void> {
   const admin = new Client({ connectionString: adminUrl });
   await admin.connect();
@@ -56,17 +46,8 @@ async function buildTemplate(adminUrl: string): Promise<void> {
   const template = new Client({ connectionString: url.toString() });
   await template.connect();
   try {
-    for (const sql of migrationSql()) await template.query(sql);
-    // 호스팅 환경은 운영 절차로 모든 public 테이블의 RLS를 정책 없이 활성화한다.
-    await template.query(`
-      do $$
-      declare t record;
-      begin
-        for t in select tablename from pg_tables where schemaname = 'public' loop
-          execute format('alter table public.%I enable row level security', t.tablename);
-        end loop;
-      end $$;
-    `);
+    // 배포 환경과 같은 마이그레이션 파일과 migrator로 스키마를 만든다. RLS 활성화는 마이그레이션에 포함된다.
+    await applyDrizzleMigrations(template);
   } finally {
     await template.end();
   }
