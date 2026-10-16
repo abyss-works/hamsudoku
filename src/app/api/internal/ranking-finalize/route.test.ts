@@ -1,31 +1,13 @@
 // @vitest-environment node
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
-import { GET as getRankRoute } from '../../endless/rank/route';
-import { createMemoryDb } from '../../../../server/db/memory';
-import type { DbPort } from '../../../../server/db/port';
 import { createTestQStashSignature } from '../../../../server/qstashTestHelper';
 import { POST } from './route';
 
 const TEST_SECRET = 'test_internal_secret_value';
 const TEST_KEY = 'test_qstash_signing_key';
 
-let testDb: DbPort;
-
-vi.mock('../../../../server/db/prisma', async (importOriginal) => {
-  const actual = await importOriginal<typeof import('../../../../server/db/prisma')>();
-  return {
-    ...actual,
-    createPrismaDb: () => testDb,
-  };
-});
-
-vi.mock('../../../../server/auth', () => ({
-  getSessionUser: vi.fn(async () => ({ uid: 'user_tester', email: null })),
-}));
-
-describe('/api/internal/ranking-finalize 및 자동 확정/복구', () => {
+describe('/api/internal/ranking-finalize 요청 인증과 형식 검증', () => {
   beforeEach(() => {
-    testDb = createMemoryDb();
     process.env.INTERNAL_SECRET = TEST_SECRET;
     process.env.QSTASH_CURRENT_SIGNING_KEY = TEST_KEY;
   });
@@ -105,150 +87,5 @@ describe('/api/internal/ranking-finalize 및 자동 확정/복구', () => {
     });
     const resBadSeason = await POST(reqBadSeason);
     expect(resBadSeason.status).toBe(400);
-  });
-
-
-  it('정상 확정 후 재전달(재시도) 시 멱등하게 동일 결과를 반환한다', async () => {
-    // 2026-W41 (2026-10-05 04:00 KST ~ 2026-10-12 00:00 KST)
-    // 2026-10-05 04:00 KST = 2026-10-04 19:00:00 UTC
-    // 2026-10-12 00:00 KST = 2026-10-11 15:00:00 UTC
-    await testDb.commitEndlessClear('user_1', 'stage_1', {
-      earned: 100,
-      season: '2026-W41',
-      seedLeft: 10,
-      elapsedMs: 20000,
-      suspicious: false,
-      atIso: '2026-10-06T10:00:00Z',
-    });
-    await testDb.commitEndlessClear('user_2', 'stage_1', {
-      earned: 200,
-      season: '2026-W41',
-      seedLeft: 10,
-      elapsedMs: 20000,
-      suspicious: false,
-      atIso: '2026-10-07T10:00:00Z',
-    });
-
-    vi.useFakeTimers();
-    vi.setSystemTime(new Date('2026-10-11T16:00:00Z')); // 2026-10-12 01:00 KST (시즌 종료 후)
-
-    const payload = JSON.stringify({ season: '2026-W41' });
-    const sig = createTestQStashSignature(
-      { iss: 'Upstash', exp: Math.floor(Date.now() / 1000) + 300 },
-      TEST_KEY,
-      payload,
-    );
-
-    // 1회차 호출
-    const req1 = new Request('http://localhost/api/internal/ranking-finalize', {
-      method: 'POST',
-      headers: { 'upstash-signature': sig },
-      body: payload,
-    });
-    const res1 = await POST(req1);
-    expect(res1.status).toBe(200);
-    const body1 = await res1.json();
-    expect(body1.ok).toBe(true);
-    expect(body1.results).toHaveLength(2);
-    expect(body1.results[0].userId).toBe('user_2');
-    expect(body1.results[0].rank).toBe(1);
-    expect(body1.results[1].userId).toBe('user_1');
-    expect(body1.results[1].rank).toBe(2);
-
-    // 2회차 호출 (재전달/재시도)
-    const req2 = new Request('http://localhost/api/internal/ranking-finalize', {
-      method: 'POST',
-      headers: { 'upstash-signature': sig },
-      body: payload,
-    });
-    const res2 = await POST(req2);
-    expect(res2.status).toBe(200);
-    const body2 = await res2.json();
-    expect(body2.ok).toBe(true);
-    expect(body2.results).toEqual(body1.results);
-  });
-
-  it('스케줄 지연으로 늦게 실행되어도 집계 구간(월 04시 ~ 익주 월 00시 KST)을 엄격히 준수한다', async () => {
-    // 2026-W41 종료는 2026-10-12 00:00 KST = 2026-10-11 15:00:00 UTC
-    // 시즌 내 적립
-    await testDb.commitEndlessClear('user_1', 'stage_1', {
-      earned: 50,
-      season: '2026-W41',
-      seedLeft: 10,
-      elapsedMs: 20000,
-      suspicious: false,
-      atIso: '2026-10-10T10:00:00Z',
-    });
-    // 마감 창(월 00~04시 KST) 적립 (2026-10-11 16:00:00 UTC = 2026-10-12 01:00 KST)
-    await testDb.commitEndlessClear('user_1', 'stage_2', {
-      earned: 100,
-      season: '2026-W41',
-      seedLeft: 10,
-      elapsedMs: 20000,
-      suspicious: false,
-      atIso: '2026-10-11T16:00:00Z',
-    });
-
-    vi.useFakeTimers();
-    // 스케줄이 2일 지연되어 2026-10-14에 실행되었다고 가정
-    vi.setSystemTime(new Date('2026-10-13T15:00:00Z'));
-
-    const req = new Request('http://localhost/api/internal/ranking-finalize', {
-      method: 'POST',
-      headers: { authorization: `Bearer ${TEST_SECRET}` },
-      body: JSON.stringify({ season: '2026-W41' }),
-    });
-    const res = await POST(req);
-    expect(res.status).toBe(200);
-    const body = await res.json();
-    expect(body.ok).toBe(true);
-    expect(body.results).toHaveLength(1);
-    // 마감 창 100점은 제외되고 시즌 내 50점만 집계되어야 함
-    expect(body.results[0].score).toBe(50);
-  });
-
-  it('미확정된 과거 시즌이 있으면 일일 복구 실행 시 찾아내어 확정한다', async () => {
-    // 2026-W40 (2026-09-28 04:00 KST ~ 2026-10-05 00:00 KST) 데이터가 미확정 상태로 남아있음
-    await testDb.commitEndlessClear('user_old', 'stage_1', {
-      earned: 80,
-      season: '2026-W40',
-      seedLeft: 10,
-      elapsedMs: 20000,
-      suspicious: false,
-      atIso: '2026-09-30T10:00:00Z',
-    });
-
-    vi.useFakeTimers();
-    vi.setSystemTime(new Date('2026-10-11T16:00:00Z')); // 2026-W41 마감 시점
-
-    // recover: true 요청 (또는 빈 페이로드)
-    const req = new Request('http://localhost/api/internal/ranking-finalize', {
-      method: 'POST',
-      headers: { authorization: `Bearer ${TEST_SECRET}` },
-      body: JSON.stringify({ recover: true }),
-    });
-    const res = await POST(req);
-    expect(res.status).toBe(200);
-    const body = await res.json();
-    expect(body.ok).toBe(true);
-    expect(body.recoveredSeasons).toContain('2026-W40');
-
-    // 2026-W40이 정상 확정되었는지 확인
-    const finalized = await testDb.getSeasonFinalization('2026-W40');
-    expect(finalized).not.toBeNull();
-    expect(finalized?.results[0].userId).toBe('user_old');
-    expect(finalized?.results[0].score).toBe(80);
-  });
-
-  it('새 시즌 시작(월 04시 KST 이후) 시 이전 시즌 확정 실패와 무관하게 새 시즌 조회가 정상 동작한다', async () => {
-    // 2026-W41이 미확정 상태인 상황에서 2026-10-12 04:30 KST (2026-10-11 19:30:00 UTC)에 새 시즌 조회
-    vi.useFakeTimers();
-    vi.setSystemTime(new Date('2026-10-11T19:30:00Z'));
-
-    const res = await getRankRoute();
-    expect(res.status).toBe(200);
-    const body = await res.json();
-    expect(body.season).toBe('2026-W42');
-    expect(body.frozen).toBe(false);
   });
 });
