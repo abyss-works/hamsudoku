@@ -1,5 +1,3 @@
-import type { DbPort } from './db/port';
-
 export interface RankEntry {
   userId: string;
   score: number;
@@ -181,14 +179,6 @@ export function createRankStore(opts: { url: string; token: string; fetchImpl?: 
       await cmd(['expire', key(season), SEASON_TTL_SEC]);
     },
   };
-}
-
-export async function rebuildFromLedger(db: DbPort, store: RankStore, season: string): Promise<number> {
-  const rows = await db.listSeasonEarnings(season);
-  for (const row of rows) {
-    await store.setScore(season, row.userId, row.amount);
-  }
-  return rows.length;
 }
 
 export function rankStoreFromEnv(env: Record<string, string | undefined> = process.env): RankStore | null {

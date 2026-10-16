@@ -1,7 +1,4 @@
 import fs from 'node:fs';
-import { PrismaPg } from '@prisma/adapter-pg';
-import { Pool } from 'pg';
-import { PrismaClient } from '../prisma/generated/prisma/client';
 import { generateEndlessPool } from '../src/shared/sudoku/endlessPoolGenerator';
 
 function loadEnvLocal() {
@@ -31,8 +28,6 @@ async function main() {
   // 관리 스크립트이므로 직접 연결을 쓴다. 없으면 즉시 실패한다.
   const connectionString = process.env.DIRECT_URL;
   if (!connectionString) throw new Error('DIRECT_URL이 필요하다');
-  const pool = new Pool({ connectionString });
-  const prisma = new PrismaClient({ adapter: new PrismaPg(pool) });
   const rows = candidates.map((c, i) => ({
     id: stageId(seed, i),
     size: c.islands.length,
@@ -41,10 +36,16 @@ async function main() {
     tier: c.tier,
     seed,
   }));
-  const created = await prisma.endlessStage.createMany({ data: rows, skipDuplicates: true });
-  const total = await prisma.endlessStage.count();
-  await prisma.$disconnect();
-  console.log(`적재 ${created.count}개, 전체 ${total}개`);
+  const { createDatabase } = await import('../src/server/db/client');
+  const { insertStages } = await import('../src/server/endlessPool/store');
+  const database = createDatabase({ connectionString, max: 1 });
+  try {
+    const created = await insertStages(database.db, rows);
+    const { rows: totals } = await database.pool.query<{ n: number }>('select count(*)::int as n from "EndlessStage"');
+    console.log(`적재 ${created}개, 전체 ${totals[0].n}개`);
+  } finally {
+    await database.pool.end();
+  }
 }
 
 if (process.argv[1]?.includes('load-pool')) {

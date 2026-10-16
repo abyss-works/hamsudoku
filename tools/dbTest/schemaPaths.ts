@@ -8,7 +8,8 @@ import { Client } from 'pg';
 // 운영 DB는 Prisma 마이그레이션으로 만들어졌고, 이후에는 Drizzle 마이그레이션이 정본이다.
 
 export const DRIZZLE_MIGRATIONS = join(process.cwd(), 'drizzle');
-const PRISMA_MIGRATIONS = join(process.cwd(), 'prisma', 'migrations');
+// 전환 전 Prisma 마이그레이션 SQL. 운영 DB의 기존 스키마를 재현하는 고정 자료다.
+const PRISMA_MIGRATIONS = join(process.cwd(), 'tools', 'dbTest', 'fixtures', 'prisma-migrations');
 
 interface JournalEntry {
   tag: string;
@@ -29,6 +30,14 @@ export async function applyPrismaMigrations(client: Client): Promise<void> {
     .map((entry) => entry.name)
     .sort();
   for (const name of names) await client.query(readFileSync(join(PRISMA_MIGRATIONS, name, 'migration.sql'), 'utf-8'));
+  // Prisma migrate가 만드는 기록 테이블. 운영 DB에 있고 RLS 활성화 대상이다.
+  await client.query(`
+    create table if not exists "_prisma_migrations" (
+      "id" varchar(36) primary key, "checksum" varchar(64) not null, "finished_at" timestamptz,
+      "migration_name" varchar(255) not null, "logs" text, "rolled_back_at" timestamptz,
+      "started_at" timestamptz not null default now(), "applied_steps_count" integer not null default 0
+    )
+  `);
   await client.query(`
     do $$
     declare t record;
@@ -93,7 +102,7 @@ export async function catalogSnapshot(client: Client): Promise<unknown> {
         select json_agg(json_build_object('table', conrelid::regclass::text, 'name', conname, 'definition', pg_get_constraintdef(oid))
           order by conrelid::regclass::text, conname)
         from pg_constraint
-        where connamespace = 'public'::regnamespace and conrelid::regclass::text <> '"_prisma_migrations"'
+        where connamespace = 'public'::regnamespace and conrelid <> coalesce(to_regclass('public._prisma_migrations'), 0::regclass)
       ),
       'indexes', (
         select json_agg(json_build_object('table', tablename, 'name', indexname, 'definition', indexdef) order by tablename, indexname)

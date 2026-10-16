@@ -35,8 +35,7 @@ jobs:
       # 실제 Postgres 컨테이너를 러너의 Docker로 실행한다.
       - run: pnpm test:db
 
-      # prisma generate는 DIRECT_URL을 읽기만 하고 접속하지 않는다. 소스맵 업로드는 하지 않는다.
+      # 소스맵 업로드는 하지 않는다.
       - run: pnpm build
         env:
-          DIRECT_URL: postgresql://build:build@localhost:5432/build
           SENTRY_AUTH_TOKEN: ''

@@ -1,6 +1,5 @@
 import { describe, expect, it } from 'vitest';
-import { createMemoryDb } from './db/memory';
-import { createRankStore, rankStoreFromEnv, rebuildFromLedger } from './rank';
+import { createRankStore, rankStoreFromEnv } from './rank';
 
 type Call = { url: string; init: RequestInit };
 
@@ -171,19 +170,6 @@ describe('createRankStore', () => {
   });
 });
 
-
-describe('rebuildFromLedger', () => {
-  it('원장 합계를 ZADD로 재구성한다', async () => {
-    const db = createMemoryDb();
-    await db.insertStage({ id: 'e-1', size: 7, regions: '0'.repeat(49), solution: '0,0', tier: 2, seed: 1 });
-    await db.commitEndlessClear('u1', 'e-1', { earned: 3, season: '2026-W41', seedLeft: 3, elapsedMs: 30000, suspicious: false, atIso: '2026-10-07T00:00:00.000Z' });
-    const calls: Call[] = [];
-    const store = makeStore(['OK', 'OK'], calls);
-    expect(await rebuildFromLedger(db, store, '2026-W41')).toBe(1);
-    expect(JSON.parse(String(calls[0].init.body))).toEqual(['zadd', 'rank:2026-W41', 3, 'u1']);
-    expect(JSON.parse(String(calls[1].init.body))).toEqual(['expire', 'rank:2026-W41', 1209600]);
-  });
-});
 
 describe('rankStoreFromEnv', () => {
   it('env가 없으면 null이다', () => {

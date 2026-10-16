@@ -276,3 +276,14 @@ export async function lockStage(tx: Executor, stageId: string): Promise<boolean>
   const result = await tx.execute(sql`select 1 from "EndlessStage" where "id" = ${stageId} for update`);
   return result.rows.length > 0;
 }
+
+/** 운영 도구의 판 일괄 적재. 이미 있는 id는 건너뛰고 새로 적재한 수를 반환한다. */
+export async function insertStages(executor: Executor, rows: SupplyStageRow[]): Promise<number> {
+  if (rows.length === 0) return 0;
+  const inserted = await executor
+    .insert(endlessStages)
+    .values(rows)
+    .onConflictDoNothing({ target: endlessStages.id })
+    .returning({ id: endlessStages.id });
+  return inserted.length;
+}

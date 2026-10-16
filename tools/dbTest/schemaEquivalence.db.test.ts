@@ -64,3 +64,16 @@ describe('Drizzle 마이그레이션과 운영 스키마의 동등성', () => {
     for (const row of inserted.rows) expect(row.id).toMatch(/^[0-9a-f]{8}-[0-9a-f]{4}-4[0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/);
   });
 });
+
+describe('Prisma 기록 테이블 정리', () => {
+  it('기준선 기록 뒤 migrate하면 Prisma 마이그레이션 기록 테이블을 삭제한다', async () => {
+    const existing = await emptyDatabase();
+    await applyPrismaMigrations(existing);
+    expect((await existing.query(`select to_regclass('public._prisma_migrations') as t`)).rows).toEqual([{ t: '_prisma_migrations' }]);
+
+    await recordDrizzleBaseline(existing);
+    await applyDrizzleMigrations(existing);
+
+    expect((await existing.query(`select to_regclass('public._prisma_migrations') as t`)).rows).toEqual([{ t: null }]);
+  });
+});
