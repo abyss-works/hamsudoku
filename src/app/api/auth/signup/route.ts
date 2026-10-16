@@ -1,8 +1,8 @@
 import * as Sentry from '@sentry/nextjs';
-import { NextResponse } from 'next/server';
+import { after, NextResponse } from 'next/server';
 import { z } from 'zod';
+import { rememberAccount } from '../../../../server/account/rememberAccount';
 import { getSessionUser, signUpWithEmail } from '../../../../server/auth';
-import { createPrismaDb } from '../../../../server/db/prisma';
 
 const Body = z.object({ email: z.string().email(), password: z.string().min(6) });
 
@@ -12,7 +12,7 @@ export async function POST(req: Request) {
   const result = await signUpWithEmail(parsed.data.email, parsed.data.password);
   if (result.ok) {
     const { uid } = await getSessionUser();
-    if (uid) await createPrismaDb().ensureUser(uid, parsed.data.email);
+    if (uid) rememberAccount({ uid, email: parsed.data.email }, after);
     return NextResponse.json(result, { status: 200 });
   }
   // 식별자(이메일·비밀번호)를 싣지 않고 실패 코드만 남긴다.
