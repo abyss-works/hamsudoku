@@ -3,10 +3,11 @@ import { after, NextResponse } from 'next/server';
 import { z } from 'zod';
 import { rememberAccount } from '../../../../server/account/rememberAccount';
 import { getSessionUser, signInWithEmail } from '../../../../server/auth';
+import { withServerTiming } from '../../../../server/serverTiming';
 
 const Body = z.object({ email: z.string().email(), password: z.string().min(6) });
 
-export async function POST(req: Request) {
+async function handlePost(req: Request) {
   const parsed = Body.safeParse(await req.json().catch(() => null));
   if (!parsed.success) return NextResponse.json({ ok: false, msg: '이메일과 비밀번호를 확인하세요.' }, { status: 400 });
   const result = await signInWithEmail(parsed.data.email, parsed.data.password);
@@ -19,3 +20,5 @@ export async function POST(req: Request) {
   }
   return NextResponse.json(result, { status: result.ok ? 200 : 401 });
 }
+
+export const POST = withServerTiming(handlePost);

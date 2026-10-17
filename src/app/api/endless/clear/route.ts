@@ -4,8 +4,9 @@ import { clearRequestSchema } from '../../../../shared/endless';
 import { rankedSeasonId } from '../../../../shared/season';
 import { getSessionUser } from '../../../../server/auth';
 import { submitEndlessClear } from '../../../../server/endlessPlay/play';
+import { withServerTiming } from '../../../../server/serverTiming';
 
-export async function POST(req: Request) {
+async function handlePost(req: Request) {
   const { uid } = await getSessionUser();
   if (!uid) return NextResponse.json({ ok: false, msg: '로그인이 필요해요.' }, { status: 401 });
   const body = clearRequestSchema.safeParse(await req.json().catch(() => null));
@@ -27,3 +28,5 @@ export async function POST(req: Request) {
   }
   return NextResponse.json(result.body);
 }
+
+export const POST = withServerTiming(handlePost);

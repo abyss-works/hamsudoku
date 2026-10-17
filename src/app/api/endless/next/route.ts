@@ -6,6 +6,7 @@ import { encryptSolution } from '../../../../server/crypto';
 import type { SupplyEnqueuer } from '../../../../server/endlessPool/supply';
 import { startEndlessStage } from '../../../../server/endlessPlay/play';
 import { publishQStashChunk } from '../../../../server/qstash';
+import { withServerTiming } from '../../../../server/serverTiming';
 
 export interface NextRouteDeps {
   enqueuer?: SupplyEnqueuer;
@@ -40,6 +41,8 @@ export async function handleNext(req: Request, deps?: NextRouteDeps) {
   );
 }
 
-export async function POST(req: Request) {
+async function handlePost(req: Request) {
   return handleNext(req);
 }
+
+export const POST = withServerTiming(handlePost);

@@ -6,6 +6,7 @@ Sentry.init({
   dsn: process.env.NEXT_PUBLIC_SENTRY_DSN,
   // 트래픽이 적어 전수 수집한다. 무료 한도(월 5M spans)에 닿으면 낮춘다.
   tracesSampleRate: 1.0,
+  initialScope: { tags: { 'app.version': process.env.APP_VERSION ?? 'unknown' } },
 });
 
 export const onRouterTransitionStart = Sentry.captureRouterTransitionStart;
