@@ -10,7 +10,7 @@ import { requestSupply, type SupplyEnqueuer } from '../endlessPool/supply';
 import { deferRankEarning } from '../seasonRanking/rankCache';
 import { countsForRanking } from '../seasonRanking/rules';
 import { appendEarning, lockSeasonForEarning } from '../seasonRanking/store';
-import { findPlaySummary, findSubmissionHistory, pickPlayableStage, type PlayableStage, type PlaySummary } from './queries';
+import { findPlaySummary, findSubmissionHistory, findRetryableStage, pickPlayableStage, type PlayableStage, type PlaySummary } from './queries';
 import { assessSubmission, clearRejection, PERFECT_WINDOW, readPlayLog, solutionMatches } from './rules';
 import { appendPlayEvent, commitClear, commitFail, lockPlayer, savePlayLog, type PlayLogRow } from './store';
 
@@ -33,15 +33,22 @@ function deferPlayLog(defer: Defer, { rawLog, ...row }: PlayLogSubmission): void
   });
 }
 
+export type StartResult =
+  | { ok: true; stage: PlayableStage; attemptKey: string }
+  | { ok: false; reason: 'pool_empty' | 'not_retryable' };
+
 /**
- * 씨앗 3개로 클리어하지 않은 판과 입장 키를 발급한다. 판 재고 판정과 생성 요청 발행은 응답 뒤에 수행하며 실패는 응답에 영향을 주지 않는다.
+ * 판과 입장 키를 발급한다. 다시 도전할 판을 지정하면 사용자가 입장 키를 받은 적 있는 판만 발급하고,
+ * 지정하지 않으면 씨앗 3개로 클리어하지 않은 판을 고른다. 판 재고 판정과 생성 요청 발행은 응답 뒤에 수행하며
+ * 실패는 응답에 영향을 주지 않는다.
  */
 export async function startEndlessStage(
   uid: string,
   now: Date,
   defer: Defer,
   enqueuer: SupplyEnqueuer,
-): Promise<{ stage: PlayableStage; attemptKey: string } | null> {
+  retryStageId?: string,
+): Promise<StartResult> {
   defer(async () => {
     try {
       const decision = await requestSupply(now, enqueuer);
@@ -50,10 +57,10 @@ export async function startEndlessStage(
       console.error('Failed to trigger supply', describeDbError(error));
     }
   });
-  const stage = await pickPlayableStage(db, uid);
-  if (!stage) return null;
+  const stage = retryStageId === undefined ? await pickPlayableStage(db, uid) : await findRetryableStage(db, uid, retryStageId);
+  if (!stage) return { ok: false, reason: retryStageId === undefined ? 'pool_empty' : 'not_retryable' };
   const attempt = await issueAttempt(db, { userId: uid, stageCode: stage.id, issuedAt: now });
-  return { stage, attemptKey: attempt.id };
+  return { ok: true, stage, attemptKey: attempt.id };
 }
 
 /**
