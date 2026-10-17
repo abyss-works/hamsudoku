@@ -27,7 +27,8 @@ export interface EndlessSession {
   finishResult: { ok: boolean; earned: number } | null;
   submitting: boolean;
   starting: boolean;
-  start(): Promise<boolean>;
+  /** 새 판을 시작한다. stageId를 주면 그 판에 다시 도전한다. */
+  start(stageId?: string): Promise<boolean>;
   /** 오답을 반영한다. 판 기록은 게임오버 실패 보고에 싣는다. */
   reportWrong(log?: PlayLog): void;
   /** 클리어를 제출한다. 판 기록은 클리어 제출에 싣는다. */
@@ -92,7 +93,7 @@ export function useEndlessSession(options: EndlessSessionOptions = {}): EndlessS
     storeMirror(next, ownerRef.current);
   }, []);
 
-  const start = useCallback(async () => {
+  const start = useCallback(async (stageId?: string) => {
     return await runStartWorkflow({
       startingRef,
       genRef,
@@ -105,7 +106,7 @@ export function useEndlessSession(options: EndlessSessionOptions = {}): EndlessS
       finishedRef,
       cancelRetry,
       updateState: setState,
-    });
+    }, stageId);
   }, [cancelRetry]);
 
   const boundStageId = state.stageId;
