@@ -3,6 +3,8 @@ export interface EndlessClearModel {
   title: string;
   note: string | null;
   actionsDisabled: boolean;
+  /** 같은 판 다시 하기 표시 여부. 씨앗 3개로 깼으면 숨기고 저장에 실패하면 보인다. */
+  showRetry: boolean;
 }
 
 export function endlessClearModel({
@@ -10,11 +12,14 @@ export function endlessClearModel({
   error,
   submitting,
   starting,
+  seedLeft,
 }: {
   result: { ok: boolean; earned: number } | null;
   error: string | null;
   submitting: boolean;
   starting: boolean;
+  /** 클리어 시점의 남은 씨앗. */
+  seedLeft: number;
 }): EndlessClearModel {
   const pending = submitting || starting;
   const showPending = pending || result === null;
@@ -37,6 +42,7 @@ export function endlessClearModel({
     title,
     note,
     actionsDisabled: showPending,
+    showRetry: seedLeft !== 3 || failed,
   };
 }
 

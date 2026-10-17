@@ -27,9 +27,11 @@ export function EndlessClearDialog({
         <Button variant="sticker" className="btn-primary" onClick={onNext} disabled={model.actionsDisabled}>
           다음 판
         </Button>
-        <Button variant="sticker" onClick={onRetry} disabled={model.actionsDisabled}>
-          다시 하기
-        </Button>
+        {model.showRetry && (
+          <Button variant="sticker" onClick={onRetry} disabled={model.actionsDisabled}>
+            다시 하기
+          </Button>
+        )}
         <Button variant="sticker" onClick={onExit} disabled={model.actionsDisabled}>
           나가기
         </Button>
