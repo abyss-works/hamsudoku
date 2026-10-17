@@ -2,7 +2,7 @@ import { sql } from 'drizzle-orm';
 import type { Executor } from '../db/client';
 import { utcTimestamp } from '../db/sql';
 import type { PlayEvent } from '../../shared/endless';
-import type { PlayLogError } from './rules';
+import type { PlayAudit, PlayLogError } from './rules';
 import { endlessEvents, endlessPlayLogs } from './schema';
 
 /**
@@ -131,4 +131,23 @@ export async function savePlayLog(executor: Executor, row: PlayLogRow): Promise<
       createdAt: row.at,
     })
     .onConflictDoNothing({ target: endlessPlayLogs.attemptId });
+}
+
+/**
+ * 감사 결과와 감사 시각을 한 문장으로 저장하고 저장한 기록의 attemptId를 반환한다.
+ * 이미 감사 시각이 있는 기록은 바꾸지 않는다.
+ */
+export async function saveAudits(
+  executor: Executor,
+  audits: { attemptId: string; audit: PlayAudit }[],
+  at: Date,
+): Promise<string[]> {
+  if (audits.length === 0) return [];
+  const result = await executor.execute<{ attemptId: string }>(sql`
+    update "EndlessPlayLog" as l set "audit" = v."audit", "auditedAt" = ${utcTimestamp(at)}
+    from jsonb_to_recordset(${JSON.stringify(audits)}::jsonb) as v("attemptId" text, "audit" jsonb)
+    where l."attemptId" = v."attemptId" and l."auditedAt" is null
+    returning l."attemptId"
+  `);
+  return result.rows.map((row) => row.attemptId);
 }

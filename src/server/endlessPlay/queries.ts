@@ -1,4 +1,5 @@
 import { sql } from 'drizzle-orm';
+import type { PlayEvent as PlayLogEvent } from '../../shared/endless';
 import type { Executor } from '../db/client';
 
 export interface PlayEvent {
@@ -81,4 +82,26 @@ export async function findPlaySummary(executor: Executor, userId: string): Promi
   `);
   const row = result.rows[0];
   return { balance: row.balance, clearedCount: row.clearedCount, streak: { current: row.current, best: row.best } };
+}
+
+export interface UnauditedPlayLog {
+  attemptId: string;
+  outcome: 'clear' | 'fail';
+  claimedSeedLeft: number | null;
+  serverElapsedMs: number;
+  events: PlayLogEvent[] | null;
+  solution: string;
+}
+
+/** 감사하지 않은 플레이 기록을 판 정답과 함께 저장 시각 순으로 지정한 개수까지 조회한다. */
+export async function findUnauditedPlayLogs(executor: Executor, limit: number): Promise<UnauditedPlayLog[]> {
+  const result = await executor.execute<UnauditedPlayLog & Record<string, unknown>>(sql`
+    select l."attemptId", l."outcome", l."claimedSeedLeft", l."serverElapsedMs", l."events", s."solution"
+    from "EndlessPlayLog" l
+    join "EndlessStage" s on s."id" = l."stageId"
+    where l."auditedAt" is null
+    order by l."createdAt", l."attemptId"
+    limit ${limit}
+  `);
+  return result.rows;
 }
