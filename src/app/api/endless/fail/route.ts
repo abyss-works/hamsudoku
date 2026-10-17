@@ -3,8 +3,9 @@ import { after, NextResponse } from 'next/server';
 import { failRequestSchema } from '../../../../shared/endless';
 import { getSessionUser } from '../../../../server/auth';
 import { submitEndlessFail } from '../../../../server/endlessPlay/play';
+import { withServerTiming } from '../../../../server/serverTiming';
 
-export async function POST(req: Request) {
+async function handlePost(req: Request) {
   const { uid } = await getSessionUser();
   if (!uid) return NextResponse.json({ ok: false, msg: '로그인이 필요해요.' }, { status: 401 });
   const body = failRequestSchema.safeParse(await req.json().catch(() => null));
@@ -16,3 +17,5 @@ export async function POST(req: Request) {
   Sentry.logger.warn('Endless fail rejected', { status: result.status });
   return NextResponse.json({ ok: false, msg: '입장 키가 유효하지 않아요.' }, { status: 403 });
 }
+
+export const POST = withServerTiming(handlePost);

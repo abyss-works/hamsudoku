@@ -2,6 +2,7 @@ import { NextResponse } from 'next/server';
 import { z } from 'zod';
 import { getSessionUser } from '../../../server/auth';
 import { submitStageClear } from '../../../server/stageRecord/stageClears';
+import { withServerTiming } from '../../../server/serverTiming';
 
 const Body = z.object({
   attemptKey: z.string().optional(),
@@ -9,7 +10,7 @@ const Body = z.object({
   stageCode: z.string().optional(),
 });
 
-export async function POST(req: Request) {
+async function handlePost(req: Request) {
   const { uid } = await getSessionUser();
   const parsed = Body.safeParse(await req.json().catch(() => null));
   if (!parsed.success) return NextResponse.json({ ok: false, msg: '요청을 확인하세요.' }, { status: 400 });
@@ -19,3 +20,5 @@ export async function POST(req: Request) {
   if (result.status === 400) return NextResponse.json({ ok: false, msg: '요청을 확인하세요.' }, { status: 400 });
   return NextResponse.json({ ok: true, bestElapsedSec: result.bestElapsedSec });
 }
+
+export const POST = withServerTiming(handlePost);
