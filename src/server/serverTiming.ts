@@ -49,7 +49,17 @@ export function formatServerTiming(timings: Timings | undefined, totalMs: number
   return [...parts, `total;dur=${round(totalMs)}`, `app;desc="${version}"`].join(', ');
 }
 
-const timingsByRoot = new WeakMap<object, Timings>();
+const STORE_KEY = Symbol.for('hamsudoku.serverTimings');
+
+/**
+ * 요청 루트 span별 합산 저장소. Sentry 초기화와 route handler가 서로 다른 번들에서 이 모듈을 불러오므로
+ * 프로세스 전역에 하나만 둔다.
+ */
+export function timingsByRoot(): WeakMap<object, Timings> {
+  const holder = globalThis as unknown as Record<symbol, WeakMap<object, Timings> | undefined>;
+  holder[STORE_KEY] ??= new WeakMap();
+  return holder[STORE_KEY];
+}
 
 /** 완료되는 DB·외부 HTTP span의 시간을 요청 루트 span별로 합산한다. 서버 Sentry 초기화 뒤 한 번 호출한다. */
 export function collectSpanTimings(): void {
@@ -60,15 +70,15 @@ export function collectSpanTimings(): void {
     const op = json.attributes['sentry.op'];
     const name = classifySpan({ op: typeof op === 'string' ? op : undefined, host: spanHost(json.attributes, json.name) });
     if (!name || json.end_timestamp === undefined) return;
-    const timings = timingsByRoot.get(root) ?? new Map();
+    const timings = timingsByRoot().get(root) ?? new Map();
     addTiming(timings, name, (json.end_timestamp - json.start_timestamp) * 1000);
-    timingsByRoot.set(root, timings);
+    timingsByRoot().set(root, timings);
   });
 }
 
 function currentTimings(): Timings | undefined {
   const span = Sentry.getActiveSpan();
-  return span ? timingsByRoot.get(Sentry.getRootSpan(span)) : undefined;
+  return span ? timingsByRoot().get(Sentry.getRootSpan(span)) : undefined;
 }
 
 interface ServerTimingOptions {
