@@ -23,26 +23,37 @@ export interface ClearCommitInput {
 }
 
 /**
- * 검증된 클리어의 진행 기록, 지갑 적립, 연속 기록, 검증 이벤트를 한 문장으로 반영하고 갱신 후 잔액과 연속 기록을 반환한다.
- * 적립액은 남은 씨앗 수이고, 씨앗 3개면 연속 기록을 늘리고 아니면 0으로 되돌린다.
+ * 검증된 클리어의 진행 기록, 지갑 적립, 연속 기록, 검증 이벤트를 한 문장으로 반영하고 적립액과 갱신 후 잔액·연속 기록을 반환한다.
+ * 적립액은 남은 씨앗 수에서 이 판의 이전 최고 잔여 씨앗(클리어하지 않았으면 0)을 뺀 값이며 0보다 작지 않다.
+ * 씨앗 3개면 연속 기록을 늘리고 아니면 0으로 되돌린다. 재클리어도 같은 연속 기록 규칙을 따른다.
  */
 export async function commitClear(
   tx: Executor,
   input: ClearCommitInput,
-): Promise<{ balance: number; streak: { current: number; best: number } }> {
+): Promise<{ earned: number; balance: number; streak: { current: number; best: number } }> {
   const at = utcTimestamp(input.at);
   const perfect = input.seedLeft === 3;
-  const result = await tx.execute<{ balance: number; current: number; best: number }>(sql`
-    with progress as (
-      insert into "EndlessProgress" ("userId", "stageId", "cleared", "attempts", "lastPlayedAt")
-      values (${input.userId}, ${input.stageId}, true, 1, ${at})
+  const result = await tx.execute<{ earned: number; balance: number; current: number; best: number }>(sql`
+    with prior as (
+      select coalesce((
+        select "bestSeedLeft" from "EndlessProgress"
+        where "userId" = ${input.userId} and "stageId" = ${input.stageId} and "cleared"
+      ), 0) as "best"
+    ),
+    gain as (
+      select greatest(${input.seedLeft}::int - "best", 0) as "earned" from prior
+    ),
+    progress as (
+      insert into "EndlessProgress" ("userId", "stageId", "cleared", "attempts", "bestSeedLeft", "lastPlayedAt")
+      values (${input.userId}, ${input.stageId}, true, 1, ${input.seedLeft}, ${at})
       on conflict ("userId", "stageId") do update set
         "cleared" = true,
         "attempts" = "EndlessProgress"."attempts" + 1,
+        "bestSeedLeft" = greatest("EndlessProgress"."bestSeedLeft", excluded."bestSeedLeft"),
         "lastPlayedAt" = excluded."lastPlayedAt"
     ),
     wallet as (
-      insert into "SeedWallet" ("userId", "balance") values (${input.userId}, ${input.seedLeft})
+      insert into "SeedWallet" ("userId", "balance") select ${input.userId}, "earned" from gain
       on conflict ("userId") do update set "balance" = "SeedWallet"."balance" + excluded."balance"
       returning "balance"
     ),
@@ -58,10 +69,11 @@ export async function commitClear(
       insert into "EndlessEvent" ("userId", "stageId", "seedLeft", "elapsedMs", "verified", "suspicious", "createdAt")
       values (${input.userId}, ${input.stageId}, ${input.seedLeft}, ${input.elapsedMs}, true, ${input.suspicious}, ${at})
     )
-    select (select "balance" from wallet) as "balance", (select "current" from streak) as "current", (select "best" from streak) as "best"
+    select (select "earned" from gain) as "earned", (select "balance" from wallet) as "balance",
+      (select "current" from streak) as "current", (select "best" from streak) as "best"
   `);
   const row = result.rows[0];
-  return { balance: row.balance, streak: { current: row.current, best: row.best } };
+  return { earned: row.earned, balance: row.balance, streak: { current: row.current, best: row.best } };
 }
 
 /** 실패한 판의 진행 시도 수를 늘리고 연속 기록을 0으로 되돌린다. 이미 클리어한 판의 클리어 상태는 유지한다. */

@@ -10,7 +10,7 @@ import { requestSupply, type SupplyEnqueuer } from '../endlessPool/supply';
 import { deferRankEarning } from '../seasonRanking/rankCache';
 import { countsForRanking } from '../seasonRanking/rules';
 import { appendEarning, lockSeasonForEarning } from '../seasonRanking/store';
-import { findPlaySummary, findSubmissionHistory, pickUnclearedStage, type PlayableStage, type PlaySummary } from './queries';
+import { findPlaySummary, findSubmissionHistory, pickPlayableStage, type PlayableStage, type PlaySummary } from './queries';
 import { assessSubmission, clearRejection, PERFECT_WINDOW, readPlayLog, solutionMatches } from './rules';
 import { appendPlayEvent, commitClear, commitFail, lockPlayer, savePlayLog, type PlayLogRow } from './store';
 
@@ -34,7 +34,7 @@ function deferPlayLog(defer: Defer, { rawLog, ...row }: PlayLogSubmission): void
 }
 
 /**
- * 미클리어 판과 입장 키를 발급한다. 판 재고 판정과 생성 요청 발행은 응답 뒤에 수행하며 실패는 응답에 영향을 주지 않는다.
+ * 씨앗 3개로 클리어하지 않은 판과 입장 키를 발급한다. 판 재고 판정과 생성 요청 발행은 응답 뒤에 수행하며 실패는 응답에 영향을 주지 않는다.
  */
 export async function startEndlessStage(
   uid: string,
@@ -50,7 +50,7 @@ export async function startEndlessStage(
       console.error('Failed to trigger supply', describeDbError(error));
     }
   });
-  const stage = await pickUnclearedStage(db, uid);
+  const stage = await pickPlayableStage(db, uid);
   if (!stage) return null;
   const attempt = await issueAttempt(db, { userId: uid, stageCode: stage.id, issuedAt: now });
   return { stage, attemptKey: attempt.id };
@@ -124,26 +124,30 @@ export async function submitEndlessClear(
         suspicious: verdict.suspicious,
         at: now,
       });
-      await appendEarning(tx, {
-        userId: uid,
-        stageId: input.stageId,
-        season,
-        amount: input.seedLeft,
-        at: now,
-        inRankingWindow: countsForRanking(season, now),
-      });
+      if (summary.earned > 0) {
+        await appendEarning(tx, {
+          userId: uid,
+          stageId: input.stageId,
+          season,
+          amount: summary.earned,
+          at: now,
+          inRankingWindow: countsForRanking(season, now),
+        });
+      }
       await recordStagePlay(tx, input.stageId, { cleared: true, elapsedMs });
       return { summary, suspicious: verdict.suspicious };
     });
     if (!committed) return await reject('제출 간격 하한', '제출이 너무 잦아요.');
 
-    deferRankEarning(defer, { season, userId: uid, amount: input.seedLeft, at: now });
+    if (committed.summary.earned > 0) {
+      deferRankEarning(defer, { season, userId: uid, amount: committed.summary.earned, at: now });
+    }
     deferLog(true, null);
     return {
       status: 200,
       body: {
         ok: true,
-        earned: input.seedLeft,
+        earned: committed.summary.earned,
         balance: committed.summary.balance,
         streak: committed.summary.streak.current,
         suspicious: committed.suspicious,

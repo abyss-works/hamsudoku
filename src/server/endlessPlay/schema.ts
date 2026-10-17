@@ -8,6 +8,8 @@ export const endlessProgress = pgTable(
     stageId: text('stageId').notNull(),
     cleared: boolean('cleared').default(false).notNull(),
     attempts: integer('attempts').default(0).notNull(),
+    /** 검증된 클리어의 최고 잔여 씨앗. 클리어하지 않았으면 0이다. */
+    bestSeedLeft: integer('bestSeedLeft').default(0).notNull(),
     lastPlayedAt: timestamp('lastPlayedAt', { precision: 3, mode: 'date' }).notNull(),
   },
   (table) => [
