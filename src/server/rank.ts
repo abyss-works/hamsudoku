@@ -1,5 +1,3 @@
-import type { DbPort } from './db/port';
-
 export interface RankEntry {
   userId: string;
   score: number;
@@ -25,6 +23,22 @@ export interface RankStore {
 const TOP_TTL_SEC = 60;
 const SEASON_TTL_SEC = 14 * 24 * 60 * 60;
 const LOCK_TTL_SEC = 5;
+
+/**
+ * 표시 스냅샷 조회와 갱신 잠금 획득을 한 번의 왕복으로 수행한다.
+ * KEYS[1]=스냅샷 키, KEYS[2]=잠금 키, ARGV[1]=소유자 토큰, ARGV[2]=잠금 TTL(초), ARGV[3]=동작 방식.
+ * 동작 방식이 'read'이면 스냅샷 문자열이 있을 때 그대로 돌려주고, 없으면 잠금을 시도한다.
+ * 동작 방식이 'lock'이면 조회 없이 잠금만 시도한다(호출자가 캐시 값을 무효로 판정한 경우).
+ * 잠금을 얻으면 1, 다른 요청이 잠금을 쥐고 있으면 0을 돌려준다.
+ */
+const READ_SNAPSHOT_OR_ACQUIRE_LOCK = `
+if ARGV[3] == 'read' then
+  local cached = redis.call('get', KEYS[1])
+  if cached then return cached end
+end
+if redis.call('set', KEYS[2], ARGV[1], 'NX', 'EX', ARGV[2]) then return 1 end
+return 0
+`;
 
 const PUBLISH_LEDGER_SNAPSHOT = `
 if redis.call('get', KEYS[1]) ~= ARGV[1] then return 0 end
@@ -105,16 +119,23 @@ export function createRankStore(opts: { url: string; token: string; fetchImpl?: 
       return cmd<number>(['zrem', key(season), userId]);
     },
     async top(season, limit, loadScores) {
-      const cached = await cmd<string | null>(['get', topKey(season)]);
-      const valid = parseAndValidateSnapshot(cached, season);
-      if (valid) {
-        return valid;
-      }
-
-      // NX 갱신 잠금 획득 시도 (만료 TTL 5초, split SET/EXPIRE 금지)
+      // 캐시 조회와 NX 갱신 잠금 획득 시도를 단일 스크립트로 묶는다 (만료 TTL 5초, split SET/EXPIRE 금지)
       const lockToken = `tok_${Date.now()}_${Math.random().toString(36).slice(2)}`;
-      const lockRes = await cmd<string | null>(['set', lockKey(season), lockToken, 'ex', LOCK_TTL_SEC, 'nx']);
-      const isLockOwner = lockRes === 'OK';
+      const readOrLock = (mode: 'read' | 'lock') =>
+        cmd<string | number | null>([
+          'eval', READ_SNAPSHOT_OR_ACQUIRE_LOCK, 2, topKey(season), lockKey(season),
+          lockToken, LOCK_TTL_SEC, mode,
+        ]);
+      let lockRes = await readOrLock('read');
+      if (typeof lockRes === 'string') {
+        const valid = parseAndValidateSnapshot(lockRes, season);
+        if (valid) {
+          return valid;
+        }
+        // 캐시 값이 무효이므로 조회 없이 잠금 획득만 다시 시도한다
+        lockRes = await readOrLock('lock');
+      }
+      const isLockOwner = lockRes === 1;
 
       if (!isLockOwner) {
         // 다른 요청이 잠금을 쥐고 갱신 중이므로 대기 후 캐시 확인
@@ -181,14 +202,6 @@ export function createRankStore(opts: { url: string; token: string; fetchImpl?: 
       await cmd(['expire', key(season), SEASON_TTL_SEC]);
     },
   };
-}
-
-export async function rebuildFromLedger(db: DbPort, store: RankStore, season: string): Promise<number> {
-  const rows = await db.listSeasonEarnings(season);
-  for (const row of rows) {
-    await store.setScore(season, row.userId, row.amount);
-  }
-  return rows.length;
 }
 
 export function rankStoreFromEnv(env: Record<string, string | undefined> = process.env): RankStore | null {

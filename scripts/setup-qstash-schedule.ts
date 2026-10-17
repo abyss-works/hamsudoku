@@ -13,6 +13,8 @@ import { qstashProtectionHeaders } from '../src/server/qstashHeaders';
 interface ScheduleDefinition {
   name: string;
   description: string;
+  /** APP_URL 뒤에 붙는 내부 작업 경로. */
+  path: string;
   cron: string;
   cronExplanation: string;
   body: Record<string, unknown>;
@@ -22,6 +24,7 @@ export const SCHEDULE_DEFINITIONS: ScheduleDefinition[] = [
   {
     name: 'weekly-ranking-finalize',
     description: '주간 랭킹 자동 마감 및 확정',
+    path: '/api/internal/ranking-finalize',
     cron: '5 15 * * 0',
     cronExplanation: '매주 일요일 15:05 UTC (= 한국 시각 월요일 00:05 KST, 주간 마감 5분 후)',
     body: { recover: true },
@@ -29,9 +32,18 @@ export const SCHEDULE_DEFINITIONS: ScheduleDefinition[] = [
   {
     name: 'daily-ranking-catchup',
     description: '일일 미확정 시즌 복구 및 점검',
+    path: '/api/internal/ranking-finalize',
     cron: '0 19 * * *',
     cronExplanation: '매일 19:00 UTC (= 한국 시각 매일 04:00 KST, 일일 리셋 시점)',
     body: { recover: true },
+  },
+  {
+    name: 'daily-play-audit',
+    description: '무한모드 플레이 기록 일일 사후 감사',
+    path: '/api/internal/play-audit',
+    cron: '30 19 * * *',
+    cronExplanation: '매일 19:30 UTC (= 한국 시각 매일 04:30 KST, 일일 랭킹 점검 30분 후)',
+    body: {},
   },
 ];
 
@@ -42,17 +54,17 @@ export async function run(args: string[]) {
     throw new Error('APP_URL 환경변수가 설정되지 않아 실행할 수 없습니다.');
   }
   const appBase = rawAppUrl.replace(/\/+$/, '');
-  const destinationUrl = `${appBase}/api/internal/ranking-finalize`;
+  const destinationOf = (def: ScheduleDefinition) => `${appBase}${def.path}`;
 
-  console.log('=== QStash Ranking Finalization Schedule Setup ===');
-  console.log(`Endpoint: ${destinationUrl}`);
+  console.log('=== QStash Internal Job Schedule Setup ===');
+  console.log(`App URL: ${appBase}`);
   console.log(`Mode: ${isExecute ? 'EXECUTE (remote provisioning)' : 'DRY RUN (preview only)'}\n`);
 
   for (const def of SCHEDULE_DEFINITIONS) {
     console.log(`- Schedule: ${def.name}`);
     console.log(`  Description: ${def.description}`);
     console.log(`  Cron: "${def.cron}" (${def.cronExplanation})`);
-    console.log(`  Destination: ${destinationUrl}`);
+    console.log(`  Destination: ${destinationOf(def)}`);
     console.log(`  Payload: ${JSON.stringify(def.body)}`);
   }
 
@@ -72,8 +84,10 @@ export async function run(args: string[]) {
 
   for (const def of SCHEDULE_DEFINITIONS) {
     try {
+      // 이름을 scheduleId로 지정해 다시 실행하면 같은 스케줄을 갱신한다.
       const res = await client.schedules.create({
-        destination: destinationUrl,
+        scheduleId: def.name,
+        destination: destinationOf(def),
         cron: def.cron,
         body: JSON.stringify(def.body),
         headers: {

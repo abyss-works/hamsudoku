@@ -2,6 +2,9 @@
 // 무한모드 판 식별자(`e-…`)와 구분하여 입장 키의 용도를 서버에서 판정하는 데 쓴다.
 const STAGE_CODE = /^[1-5]-([1-9]|10)$/;
 
+// 저장소 조건에 같은 규칙을 쓰기 위한 정규식 원문. Postgres 정규식에서도 같은 의미다.
+export const STAGE_CODE_PATTERN = STAGE_CODE.source;
+
 export function isStageCode(code: string): boolean {
   return STAGE_CODE.test(code);
 }

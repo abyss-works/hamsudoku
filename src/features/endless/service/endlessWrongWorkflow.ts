@@ -1,6 +1,6 @@
 import { playGameOverSound } from '../../../platform/audio/sound';
 import { applyFail } from '../../../shared/endlessMirrorRules';
-import type { EndlessMirror } from '../../../shared/endless';
+import type { EndlessMirror, PlayLog } from '../../../shared/endless';
 import { reportFail } from '../api/endlessApi';
 import { onReportWrong, type EndlessSessionState } from '../model/endlessSessionState';
 
@@ -19,6 +19,7 @@ export function runWrongWorkflow(
   ctx: WrongContext,
   boundStageId: string | null,
   boundRoundId?: number,
+  log?: PlayLog,
 ): void {
   if (!ctx.activeRef.current) return;
   if (!boundStageId || boundStageId !== ctx.stageRef.current) return;
@@ -35,7 +36,7 @@ export function runWrongWorkflow(
     ctx.updateState((prev) => onReportWrong(prev, 0, true, nextMirror));
 
     const key = ctx.attemptKeyRef.current;
-    if (key) void reportFail(key);
+    if (key) void reportFail(key, log);
   } else {
     ctx.updateState((prev) => onReportWrong(prev, nextSeeds, false));
   }

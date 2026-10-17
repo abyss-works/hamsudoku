@@ -248,4 +248,35 @@ describe('useEndlessGame overlay integration', () => {
     expect(mockFinish).not.toHaveBeenCalled();
     expect(mockStart).not.toHaveBeenCalled();
   });
+
+  it('현재 판의 reportWrong과 finishBoard는 판 기록을 세션에 전달한다', () => {
+    const mockReportWrong = vi.fn();
+    const mockFinish = vi.fn().mockResolvedValue(undefined);
+    vi.spyOn(endlessSessionModule, 'useEndlessSession').mockReturnValue({
+      puzzle: { name: 'test', size: 1, islands: [[0]], solution: [[0, 0]] },
+      stageId: 'stg-1',
+      roundId: 1,
+      seeds: 3,
+      phase: 'playing',
+      mirror: { wallet: { balance: 10 } } as any,
+      error: null,
+      finishResult: null,
+      submitting: false,
+      starting: false,
+      start: vi.fn().mockResolvedValue(undefined),
+      reportWrong: mockReportWrong,
+      finish: mockFinish,
+    });
+    const { result } = renderHook(() => useEndlessGameWithOverlay(), { wrapper });
+    const wrongLog = { version: 1 as const, events: [[40, 'wrong', 0, 0]] as [number, 'wrong', number, number][] };
+    const clearLog = { version: 1 as const, events: [[90, 'correct', 0, 0]] as [number, 'correct', number, number][] };
+
+    act(() => {
+      result.current.game.reportWrong(wrongLog);
+      result.current.game.finishBoard(clearLog);
+    });
+
+    expect(mockReportWrong).toHaveBeenCalledWith(wrongLog);
+    expect(mockFinish).toHaveBeenCalledWith(clearLog);
+  });
 });

@@ -44,8 +44,9 @@ yarn-error.log*
 *.tsbuildinfo
 next-env.d.ts
 
-# prisma
-prisma/generated/
 
 *storybook.log
 storybook-static
+
+# CI 워크플로는 저장소에서 추적한다.
+!/.github/

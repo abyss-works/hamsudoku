@@ -2,7 +2,7 @@ import { useRef, useState } from 'react';
 import type { Violations } from '../model/rules';
 import type { CellState, Puzzle } from '../model/puzzles';
 import type { TapKind } from '../model/tap';
-import { createGameState, projectGame, transitionGame, type GameAction } from '../model/gameTransition';
+import { createGameState, projectGame, transitionGame, type GameAction, type GameSound } from '../model/gameTransition';
 import { createBoardSounds } from '../../../platform/audio/sound';
 export { PROBE_SLOTS } from '../model/gameTransition';
 
@@ -32,7 +32,14 @@ export interface HamSudoku {
   resetMarks: () => void;
 }
 
-export function useHamSudoku(puzzle: Puzzle, events: { onWrong?: () => void; onClear?: () => void } = {}): HamSudoku {
+export interface HamSudokuEvents {
+  onWrong?: () => void;
+  onClear?: () => void;
+  /** 액션마다 전이 결과의 소리 목록을 받는다. 오답·클리어 보고보다 먼저 호출한다. */
+  onTransition?: (action: GameAction, sounds: readonly GameSound[]) => void;
+}
+
+export function useHamSudoku(puzzle: Puzzle, events: HamSudokuEvents = {}): HamSudoku {
   const [state, setState] = useState(() => createGameState(puzzle.size));
   const latest = useRef(state);
   const audio = useRef<ReturnType<typeof createBoardSounds> | null>(null);
@@ -51,6 +58,7 @@ export function useHamSudoku(puzzle: Puzzle, events: { onWrong?: () => void; onC
         case 'reset': audio.current!.reset(); break;
       }
     }
+    events.onTransition?.(action, result.sounds);
     if (result.sounds.includes('wrong')) events.onWrong?.();
     if (result.completed) events.onClear?.();
     return result.engaged;

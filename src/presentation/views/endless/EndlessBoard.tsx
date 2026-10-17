@@ -3,11 +3,12 @@ import { SudokuBoard } from '../sudoku/SudokuBoard';
 import { ProbeButton } from '../sudoku/ProbeButton';
 import { useEndlessBoard } from '../../../features/endless/service/useEndlessBoard';
 import type { Puzzle } from '../../../features/sudoku/model/puzzles';
+import type { PlayLog } from '../../../shared/endless';
 
 export interface EndlessBoardProps {
   puzzle: Puzzle;
-  onWrong: () => void;
-  onFinish: () => void;
+  onWrong: (log: PlayLog) => void;
+  onFinish: (log: PlayLog) => void;
   clearOverlay: ReactNode;
 }
 

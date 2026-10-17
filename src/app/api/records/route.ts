@@ -1,13 +1,10 @@
 import { NextResponse } from 'next/server';
 import { getSessionUser } from '../../../server/auth';
-import { createPrismaDb } from '../../../server/db/prisma';
-import { fetchRecords } from '../../../server/records';
+import { fetchStageRecords } from '../../../server/stageRecord/stageClears';
 
 export async function GET() {
-  const { uid, email } = await getSessionUser();
-  const db = createPrismaDb();
-  if (uid) await db.ensureUser(uid, email);
-  const result = await fetchRecords(db, uid);
+  const { uid } = await getSessionUser();
+  const result = await fetchStageRecords(uid);
   if (result.status === 401) return NextResponse.json({ ok: false, msg: '로그인이 필요해요.' }, { status: 401 });
   return NextResponse.json({ ok: true, clears: result.clears });
 }

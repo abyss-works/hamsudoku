@@ -12,7 +12,14 @@ vi.mock('howler', () => ({
   Howl: vi.fn(function () { return { play: vi.fn(), rate: vi.fn(), volume: vi.fn() }; }),
   Howler: { ctx: null },
 }));
-afterEach(() => { cleanup(); localStorage.clear(); vi.clearAllMocks(); });
+// clearAllMocks는 소비되지 않은 mock*Once 대기열을 남긴다. 앞 테스트가 중간에 끝나도
+// 다음 테스트가 그 응답을 받지 않도록 API 목은 구현과 대기열까지 초기화한다.
+afterEach(() => {
+  cleanup();
+  localStorage.clear();
+  vi.clearAllMocks();
+  for (const fn of Object.values(api)) fn.mockReset();
+});
 
 it('클리어 후 다음 판 로드가 실패하면 오류와 다시 시도할 액션을 유지한다', async () => {
   api.nextStage

@@ -1,6 +1,5 @@
 import fs from 'node:fs';
-import { createPrismaDb } from '../src/server/db/prisma';
-import { rankStoreFromEnv, rebuildFromLedger } from '../src/server/rank';
+import { rankStoreFromEnv } from '../src/server/rank';
 import { seasonId } from '../src/shared/season';
 
 function loadEnvLocal() {
@@ -18,14 +17,19 @@ function argValue(argv: string[], name: string): string | undefined {
 
 async function main() {
   loadEnvLocal();
+  if (!process.env.DATABASE_URL) {
+    console.error('DATABASE_URL이 없어 재구축할 수 없습니다.');
+    process.exit(1);
+  }
   const season = argValue(process.argv, '--season') ?? seasonId(new Date());
   const store = rankStoreFromEnv();
   if (!store) {
     console.error('UPSTASH env가 없어 재구축할 수 없습니다.');
     process.exit(1);
   }
-  const db = createPrismaDb();
-  const count = await rebuildFromLedger(db, store, season);
+  // DB 연결은 모듈을 불러올 때 DATABASE_URL을 읽으므로 env를 읽은 뒤에 불러온다.
+  const { rebuildRankCache } = await import('../src/server/seasonRanking/rankCache');
+  const count = await rebuildRankCache(store, season);
   console.log(`재구축 ${count}명, 시즌 ${season}`);
   process.exit(0);
 }

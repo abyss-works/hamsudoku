@@ -18,6 +18,26 @@ it('오답과 클리어를 액션 처리 때 한 번만 보고한다', () => {
   expect(onClear).toHaveBeenCalledTimes(1);
 });
 
+it('조작 결과를 오답·클리어 보고보다 먼저 전달한다', () => {
+  const calls: unknown[] = [];
+  const { result } = renderHook(() =>
+    useHamSudoku(PUZZLES[0], {
+      onWrong: () => calls.push('onWrong'),
+      onClear: () => calls.push('onClear'),
+      onTransition: (action, sounds) => calls.push([action, [...sounds]]),
+    }),
+  );
+  act(() => { result.current.tapCell(0, 3, 'double'); });
+  expect(calls).toEqual([[{ type: 'tap', r: 0, c: 3, kind: 'double' }, ['wrong']], 'onWrong']);
+  calls.length = 0;
+  act(() => { result.current.setProbeActive(true); result.current.setProbeActive(false); });
+  expect(calls).toEqual([[{ type: 'probe', on: true }, []], [{ type: 'probe', on: false }, []]]);
+  calls.length = 0;
+  act(() => { for (const [r, c] of PUZZLES[0].solution) result.current.tapCell(r, c, 'double'); });
+  expect(calls.at(-2)).toEqual([{ type: 'tap', r: PUZZLES[0].solution.at(-1)![0], c: PUZZLES[0].solution.at(-1)![1], kind: 'double' }, ['correct']]);
+  expect(calls.at(-1)).toBe('onClear');
+});
+
 it('지연 탭은 최신 핸들러를 사용하고 unmount 뒤에는 실행되지 않는다', async () => {
   const cell = await import('../service/useCellInteraction');
   vi.useFakeTimers();

@@ -1,9 +1,8 @@
 import { NextResponse } from 'next/server';
 import { z } from 'zod';
 import { seasonIdSchema } from '../../../../shared/endless';
-import { createPrismaDb } from '../../../../server/db/prisma';
 import { verifyInternalRequest } from '../../../../server/qstash';
-import { finalizeSeason, recoverUnfinalizedSeasons } from '../../../../server/seasonFinalization';
+import { finalizationFailureMessage, finalizeSeason, recoverUnfinalizedSeasons } from '../../../../server/seasonRanking/finalization';
 
 const finalizeBodySchema = z
   .object({
@@ -40,14 +39,13 @@ export async function POST(req: Request) {
   }
 
   const now = new Date();
-  const db = createPrismaDb();
 
   try {
     if (body.season) {
-      const finalized = await finalizeSeason(db, body.season, now);
+      const finalized = await finalizeSeason(body.season, now);
       let recoveredSeasons: string[] = [];
       if (body.recover) {
-        const recovered = await recoverUnfinalizedSeasons(db, now);
+        const recovered = await recoverUnfinalizedSeasons(now);
         recoveredSeasons = recovered.map((r) => r.header.season);
       }
       return NextResponse.json({
@@ -59,14 +57,13 @@ export async function POST(req: Request) {
     }
 
     // 시즌 지정이 없거나 복구 요청인 경우: 미확정 종료 시즌 일괄 복구
-    const recovered = await recoverUnfinalizedSeasons(db, now);
+    const recovered = await recoverUnfinalizedSeasons(now);
     return NextResponse.json({
       ok: true,
       recoveredSeasons: recovered.map((r) => r.header.season),
     });
   } catch (err: unknown) {
-    const msg = err instanceof Error ? err.message : String(err);
-    return NextResponse.json({ ok: false, msg }, { status: 500 });
+    return NextResponse.json({ ok: false, msg: finalizationFailureMessage(err) }, { status: 500 });
   }
 }
 

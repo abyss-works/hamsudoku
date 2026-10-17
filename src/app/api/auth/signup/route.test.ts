@@ -8,10 +8,6 @@ vi.mock('../../../../server/auth', () => ({
   getSessionUser: vi.fn(async () => ({ uid: null, email: null })),
 }));
 
-vi.mock('../../../../server/db/prisma', () => ({
-  createPrismaDb: vi.fn(),
-}));
-
 afterEach(() => {
   vi.restoreAllMocks();
 });

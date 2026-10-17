@@ -7,6 +7,7 @@ import {
   type ClearResponse,
   type MeResponse,
   type MyRankResponse,
+  type PlayLog,
   type RankResponse,
 } from '../../../shared/endless';
 
@@ -87,14 +88,15 @@ export async function submitClear(input: {
   stageId: string;
   solution: [number, number][];
   seedLeft: number;
+  log?: PlayLog;
 }): Promise<ClearResponse> {
   const res = await postJson('/api/endless/clear', input);
   if (!res.ok) throw new EndlessApiError(res.status);
   return clearResponseSchema.parse(await res.json());
 }
 
-export async function reportFail(attemptKey: string): Promise<void> {
-  await postJson('/api/endless/fail', { attemptKey }).catch(() => {});
+export async function reportFail(attemptKey: string, log?: PlayLog): Promise<void> {
+  await postJson('/api/endless/fail', log === undefined ? { attemptKey } : { attemptKey, log }).catch(() => {});
 }
 
 export async function fetchRank(): Promise<RankResponse> {

@@ -1,7 +1,6 @@
 import fs from 'node:fs';
-import { createPrismaDb } from '../src/server/db/prisma';
-import { createRankStore, rebuildFromLedger } from '../src/server/rank';
-import { seasonId, seasonStartUtc } from '../src/shared/season';
+import { createRankStore } from '../src/server/rank';
+import { seasonId, seasonStartUtc, seasonWindow } from '../src/shared/season';
 
 const DAY_MS = 24 * 60 * 60 * 1000;
 
@@ -27,6 +26,10 @@ async function main() {
   loadEnvLocal();
   const url = process.env.UPSTASH_REDIS_REST_URL;
   const token = process.env.UPSTASH_REDIS_REST_TOKEN;
+  if (!process.env.DATABASE_URL) {
+    console.error('DATABASE_URL이 없어 점검할 수 없습니다.');
+    process.exit(1);
+  }
   if (!url || !token) {
     console.error('UPSTASH env가 없어 점검할 수 없습니다.');
     process.exit(1);
@@ -55,9 +58,12 @@ async function main() {
   const ttlAfter = await redis<number>(url, token, ['ttl', `rank:${scratchSeason}`]);
   console.log(`정리 후 TTL ${ttlAfter}`);
 
-  const db = createPrismaDb();
-  const rows = await db.listSeasonEarnings(current);
-  const count = await rebuildFromLedger(db, store, current);
+  // DB 연결은 모듈을 불러올 때 DATABASE_URL을 읽으므로 env를 읽은 뒤에 불러온다.
+  const { db } = await import('../src/server/db/client');
+  const { listSeasonEarnings } = await import('../src/server/seasonRanking/queries');
+  const { rebuildRankCache } = await import('../src/server/seasonRanking/rankCache');
+  const rows = await listSeasonEarnings(db, current, seasonWindow(current));
+  const count = await rebuildRankCache(store, current);
   const ttlCurrent = await redis<number>(url, token, ['ttl', `rank:${current}`]);
   console.log(`원장 재구축 ${count}명, 현재 시즌 키 TTL ${ttlCurrent}초`);
   for (const row of rows) {
