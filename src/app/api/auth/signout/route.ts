@@ -1,8 +1,10 @@
 import { NextResponse } from 'next/server';
 import { signOutAccount } from '../../../../server/auth';
+import { withServerTiming } from '../../../../server/serverTiming';
 
-export async function POST() {
+async function handlePost() {
   await signOutAccount();
   return NextResponse.json({ ok: true });
 }
 
+export const POST = withServerTiming(handlePost);

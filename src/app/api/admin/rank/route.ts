@@ -5,12 +5,13 @@ import { getSessionUser } from '../../../../server/auth';
 import { displayNicknames } from '../../../../server/seasonRanking/standings';
 import { rankStoreFromEnv } from '../../../../server/rank';
 import { seasonId } from '../../../../shared/season';
+import { withServerTiming } from '../../../../server/serverTiming';
 
 const deleteBodySchema = z.object({
   userIds: z.array(z.string().min(1)).min(1).max(200),
 });
 
-export async function GET() {
+async function handleGet() {
   if (!(await isAdmin())) return NextResponse.json({ ok: false, msg: '권한이 없어요.' }, { status: 403 });
   const store = rankStoreFromEnv();
   if (!store) return NextResponse.json({ ok: false, msg: '랭킹 스토어 미설정.' }, { status: 503 });
@@ -26,7 +27,7 @@ export async function GET() {
   return NextResponse.json({ ok: true, season, entries });
 }
 
-export async function POST(request: Request) {
+async function handlePost(request: Request) {
   if (!(await isAdmin())) return NextResponse.json({ ok: false, msg: '권한이 없어요.' }, { status: 403 });
   const store = rankStoreFromEnv();
   if (!store) return NextResponse.json({ ok: false, msg: '랭킹 스토어 미설정.' }, { status: 503 });
@@ -47,3 +48,6 @@ export async function POST(request: Request) {
   }
   return NextResponse.json({ ok: true, removed });
 }
+
+export const GET = withServerTiming(handleGet);
+export const POST = withServerTiming(handlePost);

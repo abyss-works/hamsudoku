@@ -2,10 +2,11 @@ import { NextResponse } from 'next/server';
 import { z } from 'zod';
 import { getSessionUser } from '../../../server/auth';
 import { issueStageEntry } from '../../../server/stageRecord/stageClears';
+import { withServerTiming } from '../../../server/serverTiming';
 
 const Body = z.object({ stageCode: z.string().min(1) });
 
-export async function POST(req: Request) {
+async function handlePost(req: Request) {
   const { uid } = await getSessionUser();
   const parsed = Body.safeParse(await req.json().catch(() => null));
   if (!parsed.success) return NextResponse.json({ ok: false, msg: '스테이지 코드를 확인하세요.' }, { status: 400 });
@@ -14,3 +15,5 @@ export async function POST(req: Request) {
   if (result.status === 400) return NextResponse.json({ ok: false, msg: '스테이지 코드를 확인하세요.' }, { status: 400 });
   return NextResponse.json({ attemptKey: result.key });
 }
+
+export const POST = withServerTiming(handlePost);
