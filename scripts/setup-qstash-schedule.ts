@@ -84,7 +84,9 @@ export async function run(args: string[]) {
 
   for (const def of SCHEDULE_DEFINITIONS) {
     try {
+      // 이름을 scheduleId로 지정해 다시 실행하면 같은 스케줄을 갱신한다.
       const res = await client.schedules.create({
+        scheduleId: def.name,
         destination: destinationOf(def),
         cron: def.cron,
         body: JSON.stringify(def.body),

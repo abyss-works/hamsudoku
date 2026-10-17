@@ -66,4 +66,14 @@ describe('setup-qstash-schedule CLI (결함 4)', () => {
       ['http://staging.hamsudoku.dev/api/internal/play-audit', '30 19 * * *', '{}'],
     ]);
   });
+
+  it('--execute는 스케줄 이름을 scheduleId로 지정해 다시 실행해도 같은 스케줄을 갱신한다', async () => {
+    process.env.APP_URL = 'http://staging.hamsudoku.dev';
+    process.env.QSTASH_TOKEN = 'test-token';
+    vi.spyOn(console, 'log').mockImplementation(() => {});
+
+    await run(['--execute']);
+
+    expect(qstash.created.map((input) => input.scheduleId)).toEqual(SCHEDULE_DEFINITIONS.map((def) => def.name));
+  });
 });
