@@ -66,6 +66,16 @@ export async function pickPlayableStage(executor: Executor, userId: string): Pro
   return result.rows[0] ?? null;
 }
 
+/** 사용자가 입장 키를 받은 적 있는 판이면 그 판을 반환한다. 없거나 받은 적 없으면 null이다. */
+export async function findRetryableStage(executor: Executor, userId: string, stageId: string): Promise<PlayableStage | null> {
+  const result = await executor.execute<PlayableStage & Record<string, unknown>>(sql`
+    select s."id", s."size", s."regions", s."solution" from "EndlessStage" s
+    where s."id" = ${stageId}
+      and exists (select 1 from "Attempt" a where a."userId" = ${userId} and a."stageCode" = s."id")
+  `);
+  return result.rows[0] ?? null;
+}
+
 export interface PlaySummary {
   balance: number;
   clearedCount: number;

@@ -23,7 +23,8 @@ export interface StartContext {
   updateState: (updater: (prev: EndlessSessionState) => EndlessSessionState) => void;
 }
 
-export async function runStartWorkflow(ctx: StartContext): Promise<boolean> {
+/** 새 판을 시작한다. stageId를 주면 그 판을 씨앗 3개로 다시 시작한다. */
+export async function runStartWorkflow(ctx: StartContext, stageId?: string): Promise<boolean> {
   if (!ctx.activeRef.current || ctx.startingRef.current) return false;
   ctx.startingRef.current = true;
   const gen = ctx.genRef.current + 1;
@@ -37,7 +38,7 @@ export async function runStartWorkflow(ctx: StartContext): Promise<boolean> {
   ctx.updateState(onStartPending);
 
   try {
-    const next = await nextStage();
+    const next = await nextStage(stageId);
     if (!ctx.activeRef.current || ctx.genRef.current !== gen) return false;
 
     ctx.attemptKeyRef.current = next.attemptKey;

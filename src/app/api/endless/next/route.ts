@@ -24,8 +24,11 @@ export async function handleNext(req: Request, deps?: NextRouteDeps) {
   const body = nextRequestSchema.safeParse(await req.json().catch(() => null));
   if (!body.success) return NextResponse.json({ ok: false, msg: '요청이 올바르지 않아요.' }, { status: 400 });
 
-  const started = await startEndlessStage(uid, new Date(), after, deps?.enqueuer ?? defaultQStashEnqueuer);
-  if (!started) {
+  const started = await startEndlessStage(uid, new Date(), after, deps?.enqueuer ?? defaultQStashEnqueuer, body.data.stageId);
+  if (!started.ok && started.reason === 'not_retryable') {
+    return NextResponse.json({ ok: false, msg: '다시 도전할 수 없는 판이에요.' }, { status: 404 });
+  }
+  if (!started.ok) {
     Sentry.logger.warn('Endless pool empty', {});
     return NextResponse.json({ ok: false, msg: '새 판을 준비 중이에요.' }, { status: 503 });
   }

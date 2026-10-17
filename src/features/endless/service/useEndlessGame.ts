@@ -52,6 +52,33 @@ export function useEndlessGame(session: EndlessSession, { overlay, track, showEn
 
   const hud = endlessHudModel(session.mirror.wallet.balance, session.seeds);
 
+  // 판을 시작하고 결과에 따라 오버레이를 정리한다. stageId를 주면 그 판에 다시 도전한다.
+  const begin = (stageId?: string) => {
+    if (roundRef.current !== boundRoundId || stageRef.current !== boundStageId) return;
+    openedGameOverRef.current = true;
+    overlay.close({ slot: 'endless-gameover' });
+    void track(
+      (stageId === undefined ? session.start() : session.start(stageId)).then(
+        (ok) => {
+          if (ok === false) {
+            if (session.phase === 'gameover') {
+              overlay.open({ type: 'gameover', slot: 'endless-gameover' });
+            }
+          } else {
+            openedGameOverRef.current = false;
+            overlay.close({ slot: 'endless-clear' });
+            overlay.close({ slot: 'endless-gameover' });
+          }
+        },
+        () => {
+          if (session.phase === 'gameover') {
+            overlay.open({ type: 'gameover', slot: 'endless-gameover' });
+          }
+        },
+      ),
+    );
+  };
+
   return {
     ...session,
     showEntryLoading,
@@ -61,31 +88,8 @@ export function useEndlessGame(session: EndlessSession, { overlay, track, showEn
       if (roundRef.current !== boundRoundId || stageRef.current !== boundStageId) return;
       session.reportWrong(log);
     },
-    next: () => {
-      if (roundRef.current !== boundRoundId || stageRef.current !== boundStageId) return;
-      openedGameOverRef.current = true;
-      overlay.close({ slot: 'endless-gameover' });
-      void track(
-        session.start().then(
-          (ok) => {
-            if (ok === false) {
-              if (session.phase === 'gameover') {
-                overlay.open({ type: 'gameover', slot: 'endless-gameover' });
-              }
-            } else {
-              openedGameOverRef.current = false;
-              overlay.close({ slot: 'endless-clear' });
-              overlay.close({ slot: 'endless-gameover' });
-            }
-          },
-          () => {
-            if (session.phase === 'gameover') {
-              overlay.open({ type: 'gameover', slot: 'endless-gameover' });
-            }
-          },
-        ),
-      );
-    },
+    next: () => begin(),
+    retry: () => begin(boundStageId ?? undefined),
     finishBoard: (log?: PlayLog) => {
       if (roundRef.current !== boundRoundId || stageRef.current !== boundStageId) return;
       overlay.open({ type: 'clear', slot: 'endless-clear' });

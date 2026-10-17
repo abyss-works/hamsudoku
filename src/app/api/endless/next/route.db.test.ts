@@ -5,6 +5,7 @@ import {
   callRoute,
   outbound,
   secondsBefore,
+  seedAttempt,
   seedStage,
   seedUser,
   sentryLogs,
@@ -70,9 +71,10 @@ type NextBody = {
   attemptKey: string;
 };
 
-async function next() {
+async function next(stageId?: string) {
   const keys = await clientKeys();
-  const res = await callRoute<NextBody>(POST, { path: '/api/endless/next', body: { clientPublicKey: keys.publicKey } });
+  const body = stageId === undefined ? { clientPublicKey: keys.publicKey } : { clientPublicKey: keys.publicKey, stageId };
+  const res = await callRoute<NextBody>(POST, { path: '/api/endless/next', body });
   return { ...res, keys };
 }
 
@@ -167,6 +169,42 @@ describe('POST /api/endless/next', () => {
     signInAs(USER);
 
     expect((await next()).body.stage.id).toBe('e-20007-0');
+  });
+
+  it('입장 키를 받은 적 있는 판을 지정하면 씨앗 3개로 클리어한 판이어도 그 판의 새 입장 키를 발급한다', async () => {
+    await seedUser(db, USER);
+    await seedStock(20);
+    await seedStage(db, { id: 'e-10000-0', regions: '0123456'.repeat(7), clears: 3 });
+    await seedAttempt(db, { id: 'old-key', userId: USER, stageCode: 'e-10000-0', issuedAt: secondsBefore(ACTIVE_NOW, 600) });
+    await db.query(
+      `insert into "EndlessProgress" ("userId", "stageId", cleared, attempts, "bestSeedLeft", "lastPlayedAt") values ($1, 'e-10000-0', true, 1, 3, $2)`,
+      [USER, ACTIVE_NOW],
+    );
+    signInAs(USER);
+
+    const res = await next('e-10000-0');
+
+    expect(res.status).toBe(200);
+    expect(res.body.stage).toEqual({ id: 'e-10000-0', size: 7, regions: '0123456'.repeat(7) });
+    expect(await decrypt(res.keys.pair, res.body)).toBe(STAGE_SOLUTION);
+    expect(res.body.attemptKey).not.toBe('old-key');
+    expect(await db.query(`select "stageCode", "usedAt" from "Attempt" where id = $1`, [res.body.attemptKey])).toEqual([
+      { stageCode: 'e-10000-0', usedAt: null },
+    ]);
+  });
+
+  it('입장 키를 받은 적 없는 판을 지정하면 거절하고 입장 키를 발급하지 않는다', async () => {
+    await seedUser(db, USER);
+    await seedStock(20);
+    await seedAttempt(db, { id: 'other-key', userId: 'user-b', stageCode: 'e-20000-0', issuedAt: secondsBefore(ACTIVE_NOW, 600) });
+    signInAs(USER);
+
+    for (const stageId of ['e-20000-0', 'e-missing-0']) {
+      const res = await next(stageId);
+      expect(res.status).toBe(404);
+      expect(res.body).toEqual({ ok: false, msg: '다시 도전할 수 없는 판이에요.' });
+    }
+    expect(await db.query(`select id from "Attempt" where "userId" = $1`, [USER])).toEqual([]);
   });
 
   it('재고가 충분하면 공급 작업을 만들지 않는다', async () => {

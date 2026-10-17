@@ -29,6 +29,33 @@ describe('nextStage', () => {
   });
 });
 
+describe('nextStage 판 지정', () => {
+  it('판을 지정하면 요청 본문에 stageId를 싣고, 지정하지 않으면 싣지 않는다', async () => {
+    const bodies: Record<string, unknown>[] = [];
+    vi.stubGlobal(
+      'fetch',
+      vi.fn(async (_url: string, init?: RequestInit) => {
+        const body = JSON.parse(String(init?.body)) as { clientPublicKey: string };
+        bodies.push(body);
+        const encrypted = await encryptSolution(body.clientPublicKey, '0,0');
+        return Response.json({
+          stage: { id: 'e-7', size: 7, regions: '0'.repeat(49) },
+          solutionCipher: encrypted.solutionCipher,
+          serverPublicKey: encrypted.serverPublicKey,
+          iv: encrypted.iv,
+          attemptKey: 'k1',
+        });
+      }),
+    );
+
+    await nextStage('e-7');
+    await nextStage();
+
+    expect(bodies[0]).toMatchObject({ stageId: 'e-7' });
+    expect(bodies[1]).not.toHaveProperty('stageId');
+  });
+});
+
 describe('submitClear', () => {
   it('ok 응답을 파싱한다', async () => {
     vi.stubGlobal('fetch', vi.fn(async () => Response.json({ ok: true, earned: 2, balance: 5, streak: 1, suspicious: false })));

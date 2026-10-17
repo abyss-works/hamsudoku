@@ -10,6 +10,8 @@ export const endlessStageSchema = z.object({
 
 export const nextRequestSchema = z.object({
   clientPublicKey: z.string().min(1),
+  /** 다시 도전할 판. 없으면 서버가 판을 고른다. */
+  stageId: z.string().min(1).optional(),
 });
 
 export const nextResponseSchema = z.object({
