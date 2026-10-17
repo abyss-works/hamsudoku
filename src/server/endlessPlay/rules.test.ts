@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest';
-import { assessSubmission, clearRejection, solutionMatches } from './rules';
+import { assessSubmission, clearRejection, readPlayLog, solutionMatches } from './rules';
 
 describe('solutionMatches', () => {
   it('좌표 순서와 무관하게 저장된 정답과 같으면 true다', () => {
@@ -43,5 +43,29 @@ describe('assessSubmission', () => {
     const perfect = (n: number) => Array.from({ length: n }, (_, i) => ({ verified: true, seedLeft: 3, createdAt: at(60_000 + i) }));
     expect(assessSubmission(perfect(15), at(60_000), now).suspicious).toBe(false);
     expect(assessSubmission(perfect(16), at(60_000), now).suspicious).toBe(true);
+  });
+});
+
+describe('readPlayLog', () => {
+  it('형식에 맞는 기록은 버전과 이벤트를 반환한다', () => {
+    const events = [[0, 'probe-on'], [120, 'correct', 0, 6]];
+    expect(readPlayLog({ version: 1, events })).toEqual({ logVersion: 1, events, logError: null });
+  });
+
+  it('기록이 없으면 missing이다', () => {
+    expect(readPlayLog(undefined)).toEqual({ logVersion: null, events: null, logError: 'missing' });
+  });
+
+  it.each([[null], ['broken'], [{ version: 2, events: [] }], [{ version: 1, events: [[0, 'jump']] }], [{ version: 1 }]])(
+    '형식이 틀린 기록 %j는 invalid이다',
+    (raw) => {
+      expect(readPlayLog(raw)).toEqual({ logVersion: null, events: null, logError: 'invalid' });
+    },
+  );
+
+  it('이벤트가 상한을 넘으면 내용과 무관하게 too_large이다', () => {
+    const events = Array.from({ length: 2001 }, () => 'x');
+    expect(readPlayLog({ version: 1, events })).toEqual({ logVersion: null, events: null, logError: 'too_large' });
+    expect(readPlayLog({ version: 1, events: Array.from({ length: 2000 }, (_, i) => [i, 'mark']) }).logError).toBeNull();
   });
 });

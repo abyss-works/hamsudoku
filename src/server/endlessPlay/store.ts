@@ -1,7 +1,9 @@
 import { sql } from 'drizzle-orm';
 import type { Executor } from '../db/client';
 import { utcTimestamp } from '../db/sql';
-import { endlessEvents } from './schema';
+import type { PlayEvent } from '../../shared/endless';
+import type { PlayLogError } from './rules';
+import { endlessEvents, endlessPlayLogs } from './schema';
 
 /**
  * 같은 사용자의 제출을 트랜잭션이 끝날 때까지 직렬화한다. 다음 문장부터는 앞선 제출의 커밋을 보므로
@@ -93,4 +95,40 @@ export async function appendPlayEvent(
     reason: input.reason,
     createdAt: input.at,
   });
+}
+
+export interface PlayLogRow {
+  attemptId: string;
+  userId: string;
+  stageId: string;
+  outcome: 'clear' | 'fail';
+  accepted: boolean;
+  reason: string | null;
+  claimedSeedLeft: number | null;
+  serverElapsedMs: number;
+  logVersion: number | null;
+  events: PlayEvent[] | null;
+  logError: PlayLogError | null;
+  at: Date;
+}
+
+/** 입장 키 하나의 플레이 기록을 저장한다. 같은 키의 기록이 이미 있으면 바꾸지 않는다. */
+export async function savePlayLog(executor: Executor, row: PlayLogRow): Promise<void> {
+  await executor
+    .insert(endlessPlayLogs)
+    .values({
+      attemptId: row.attemptId,
+      userId: row.userId,
+      stageId: row.stageId,
+      outcome: row.outcome,
+      accepted: row.accepted,
+      reason: row.reason,
+      claimedSeedLeft: row.claimedSeedLeft,
+      serverElapsedMs: row.serverElapsedMs,
+      logVersion: row.logVersion,
+      events: row.events,
+      logError: row.logError,
+      createdAt: row.at,
+    })
+    .onConflictDoNothing({ target: endlessPlayLogs.attemptId });
 }

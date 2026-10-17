@@ -7,6 +7,7 @@ const APP_TABLES = [
   'ClearEvent',
   'ClearRecord',
   'EndlessEvent',
+  'EndlessPlayLog',
   'EndlessProgress',
   'EndlessStage',
   'EndlessStreak',

@@ -50,12 +50,12 @@ async function prepare(key = 'key-1', userId = 'user-a') {
   await seedAttempt(db, { id: key, userId, stageCode: STAGE, issuedAt: secondsBefore(ACTIVE_NOW, 10) });
 }
 
-function clear(key = 'key-1', userId = 'user-a') {
+function clear(key = 'key-1', userId = 'user-a', defer: (task: () => Promise<void>) => void = noDefer) {
   return play.submitEndlessClear(
     userId,
     { attemptKey: key, stageId: STAGE, solution: STAGE_SOLUTION_PAIRS, seedLeft: 2 },
     ACTIVE_NOW.toISOString(),
-    noDefer,
+    defer,
   );
 }
 
@@ -104,10 +104,12 @@ describe('submitEndlessClear', () => {
     await seedStage(db, { id: STAGE });
     await prepare();
     failure.clear = true;
+    const deferred: (() => Promise<void>)[] = [];
 
-    await expect(clear()).rejects.toThrow('clear commit failed');
+    await expect(clear('key-1', 'user-a', (task) => deferred.push(task))).rejects.toThrow('clear commit failed');
     expect(await db.query(`select "usedAt" from "Attempt"`)).toEqual([{ usedAt: null }]);
     expect(await db.query(`select 1 from "SeedLedger"`)).toHaveLength(0);
+    expect(deferred).toHaveLength(0);
 
     expect((await clear()).body).toMatchObject({ ok: true, earned: 2 });
   });
@@ -160,14 +162,18 @@ describe('submitEndlessFail', () => {
     await seedStage(db, { id: STAGE });
     await prepare();
     failure.fail = true;
+    const deferred: (() => Promise<void>)[] = [];
 
-    await expect(play.submitEndlessFail('user-a', { attemptKey: 'key-1' }, ACTIVE_NOW.toISOString())).rejects.toThrow(
-      'fail commit failed',
-    );
+    await expect(
+      play.submitEndlessFail('user-a', { attemptKey: 'key-1' }, ACTIVE_NOW.toISOString(), (task) => deferred.push(task)),
+    ).rejects.toThrow('fail commit failed');
     expect(await db.query(`select "usedAt" from "Attempt"`)).toEqual([{ usedAt: null }]);
     expect(await db.query(`select plays from "EndlessStage"`)).toEqual([{ plays: 0 }]);
+    expect(deferred).toHaveLength(0);
 
-    expect(await play.submitEndlessFail('user-a', { attemptKey: 'key-1' }, ACTIVE_NOW.toISOString())).toEqual({ status: 200 });
+    expect(await play.submitEndlessFail('user-a', { attemptKey: 'key-1' }, ACTIVE_NOW.toISOString(), noDefer)).toEqual({
+      status: 200,
+    });
   });
 });
 

@@ -2,7 +2,7 @@ import { sql } from 'drizzle-orm';
 import { describe, expect, it } from 'vitest';
 import { useStoreDatabase } from '../../../tools/dbTest/storeHarness';
 import { findPlaySummary, findSubmissionHistory, pickUnclearedStage } from './queries';
-import { appendPlayEvent, commitClear, commitFail, lockPlayer } from './store';
+import { appendPlayEvent, commitClear, commitFail, lockPlayer, savePlayLog, type PlayLogRow } from './store';
 
 const store = useStoreDatabase();
 
@@ -194,5 +194,63 @@ describe('endlessPlay 이벤트 인덱스', () => {
     expect(
       await store.query(`select indexdef from pg_indexes where indexname = 'EndlessEvent_userId_createdAt_idx'`),
     ).toEqual([{ indexdef: expect.stringContaining('("userId", "createdAt")') }]);
+  });
+});
+
+describe('endlessPlay 플레이 기록 저장', () => {
+  const row: PlayLogRow = {
+    attemptId: 'key-1',
+    userId: 'user-a',
+    stageId: 'e-1-0',
+    outcome: 'clear',
+    accepted: false,
+    reason: '정답 불일치',
+    claimedSeedLeft: 2,
+    serverElapsedMs: 12000,
+    logVersion: 1,
+    events: [[0, 'probe-on'], [350, 'correct', 0, 6]],
+    logError: null,
+    at: AT,
+  };
+
+  it('기록과 판정 결과를 저장하고 감사 결과는 비워 둔다', async () => {
+    await savePlayLog(store.db, row);
+
+    expect(await store.query(`select * from "EndlessPlayLog"`)).toEqual([
+      {
+        attemptId: 'key-1',
+        userId: 'user-a',
+        stageId: 'e-1-0',
+        outcome: 'clear',
+        accepted: false,
+        reason: '정답 불일치',
+        claimedSeedLeft: 2,
+        serverElapsedMs: 12000,
+        logVersion: 1,
+        events: [[0, 'probe-on'], [350, 'correct', 0, 6]],
+        logError: null,
+        createdAt: AT,
+        auditedAt: null,
+        audit: null,
+      },
+    ]);
+  });
+
+  it('같은 입장 키의 기록은 처음 저장한 값을 유지한다', async () => {
+    await savePlayLog(store.db, row);
+    await savePlayLog(store.db, { ...row, outcome: 'fail', accepted: true, reason: null, events: null, logVersion: null, logError: 'missing' });
+
+    expect(await store.query(`select outcome, accepted, "logError" from "EndlessPlayLog"`)).toEqual([
+      { outcome: 'clear', accepted: false, logError: null },
+    ]);
+  });
+
+  it('미감사 기록 조회용 부분 인덱스와 RLS가 있다', async () => {
+    expect(
+      await store.query(`select indexdef from pg_indexes where tablename = 'EndlessPlayLog' and indexdef like '%WHERE%'`),
+    ).toEqual([{ indexdef: expect.stringContaining('("createdAt") WHERE ("auditedAt" IS NULL)') }]);
+    expect(await store.query(`select relrowsecurity from pg_class where relname = 'EndlessPlayLog'`)).toEqual([
+      { relrowsecurity: true },
+    ]);
   });
 });

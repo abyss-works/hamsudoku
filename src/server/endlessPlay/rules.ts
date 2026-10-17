@@ -1,3 +1,5 @@
+import { PLAY_LOG_MAX_EVENTS, playLogSchema, type PlayEvent } from '../../shared/endless';
+
 export const MIN_CLEAR_MS = 3_000;
 export const MIN_SUBMIT_GAP_MS = 1_000;
 export const PERFECT_WINDOW = 20;
@@ -44,4 +46,27 @@ export function assessSubmission(
   const tooSoon = lastVerifiedAt !== null && now.getTime() - lastVerifiedAt.getTime() < MIN_SUBMIT_GAP_MS;
   const perfectCount = recent.filter((event) => event.verified && event.seedLeft === 3).length;
   return { tooSoon, suspicious: perfectCount >= PERFECT_SUSPICIOUS_AT };
+}
+
+export type PlayLogError = 'missing' | 'invalid' | 'too_large';
+
+export interface PlayLogRecord {
+  logVersion: number | null;
+  events: PlayEvent[] | null;
+  logError: PlayLogError | null;
+}
+
+/**
+ * 요청의 기록 원문을 저장할 값으로 판정한다. 없으면 missing, 이벤트가 상한을 넘으면 내용과 무관하게 too_large,
+ * 형식이 틀리면 invalid이며 이때는 원문을 저장하지 않는다.
+ */
+export function readPlayLog(raw: unknown): PlayLogRecord {
+  if (raw === undefined) return { logVersion: null, events: null, logError: 'missing' };
+  const events = typeof raw === 'object' && raw !== null ? (raw as { events?: unknown }).events : undefined;
+  if (Array.isArray(events) && events.length > PLAY_LOG_MAX_EVENTS) {
+    return { logVersion: null, events: null, logError: 'too_large' };
+  }
+  const parsed = playLogSchema.safeParse(raw);
+  if (!parsed.success) return { logVersion: null, events: null, logError: 'invalid' };
+  return { logVersion: parsed.data.version, events: parsed.data.events, logError: null };
 }

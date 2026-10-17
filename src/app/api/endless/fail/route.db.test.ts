@@ -105,6 +105,49 @@ describe('POST /api/endless/fail', () => {
     expect(await db.query(`select "usedAt" from "Attempt"`)).toEqual([{ usedAt: override.usedAt ?? null }]);
     expect(await db.query(`select 1 from "EndlessProgress"`)).toHaveLength(0);
     expect(await db.query(`select plays from "EndlessStage"`)).toEqual([{ plays: 4 }]);
+    expect(await db.query(`select 1 from "EndlessPlayLog"`)).toHaveLength(0);
     expect(sentryLogs).toEqual([{ level: 'warn', message: 'Endless fail rejected', attributes: { status: 403 } }]);
+  });
+
+  it('실패 보고의 기록을 응답 뒤에 저장한다', async () => {
+    await prepare();
+    const log = { version: 1, events: [[400, 'wrong', 0, 1], [900, 'wrong', 2, 2], [1500, 'wrong', 4, 4]] };
+
+    const res = await fail({ attemptKey: 'key-1', log });
+
+    expect(res).toEqual({ status: 200, body: { ok: true } });
+    expect(await db.query(`select * from "EndlessPlayLog"`)).toEqual([
+      {
+        attemptId: 'key-1',
+        userId: USER,
+        stageId: STAGE,
+        outcome: 'fail',
+        accepted: true,
+        reason: null,
+        claimedSeedLeft: null,
+        serverElapsedMs: 30000,
+        logVersion: 1,
+        events: log.events,
+        logError: null,
+        createdAt: ACTIVE_NOW,
+        auditedAt: null,
+        audit: null,
+      },
+    ]);
+  });
+
+  it.each([
+    ['기록이 없으면', {}, 'missing'],
+    ['기록 형식이 틀리면', { log: { version: 3, events: [] } }, 'invalid'],
+    ['이벤트가 상한을 넘으면', { log: { version: 1, events: Array.from({ length: 2001 }, (_, i) => [i, 'wrong']) } }, 'too_large'],
+  ])('%s 같은 응답을 주고 원문 없이 사유만 저장한다', async (_label, extra, logError) => {
+    await prepare();
+
+    const res = await fail({ attemptKey: 'key-1', ...extra });
+
+    expect(res).toEqual({ status: 200, body: { ok: true } });
+    expect(await db.query(`select outcome, "logVersion", events, "logError" from "EndlessPlayLog"`)).toEqual([
+      { outcome: 'fail', logVersion: null, events: null, logError },
+    ]);
   });
 });
