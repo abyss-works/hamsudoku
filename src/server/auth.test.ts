@@ -17,6 +17,7 @@ afterEach(() => {
 const supabaseStub = vi.hoisted(() => ({
   getClaims: vi.fn(),
   getUser: vi.fn(),
+  signInAnonymously: vi.fn(),
 }));
 vi.mock('next/headers', () => ({ cookies: async () => ({ getAll: () => [], set: () => {} }) }));
 vi.mock('@supabase/ssr', () => ({ createServerClient: () => ({ auth: supabaseStub }) }));
@@ -44,5 +45,33 @@ describe('getSessionUser', () => {
     expect(await getSessionUser()).toEqual({ uid: 'anon-1', email: null });
     supabaseStub.getClaims.mockResolvedValueOnce({ data: null, error: { message: 'invalid' } });
     expect(await getSessionUser()).toEqual({ uid: null, email: null });
+  });
+});
+
+describe('ensureSession', () => {
+  it('검증된 세션이 있으면 Auth 서버를 호출하지 않고 그 사용자를 반환한다', async () => {
+    vi.stubEnv('SUPABASE_URL', 'https://x.supabase.co');
+    vi.stubEnv('SUPABASE_ANON_KEY', 'anon');
+    supabaseStub.getUser.mockClear();
+    supabaseStub.signInAnonymously.mockClear();
+    supabaseStub.getClaims.mockResolvedValueOnce({
+      data: { claims: { sub: 'u1', is_anonymous: true } },
+      error: null,
+    });
+    const { ensureSession } = await import('./auth');
+
+    expect(await ensureSession()).toBe('u1');
+    expect(supabaseStub.getUser).not.toHaveBeenCalled();
+    expect(supabaseStub.signInAnonymously).not.toHaveBeenCalled();
+  });
+
+  it('검증된 세션이 없으면 익명 로그인으로 새 사용자를 만든다', async () => {
+    vi.stubEnv('SUPABASE_URL', 'https://x.supabase.co');
+    vi.stubEnv('SUPABASE_ANON_KEY', 'anon');
+    supabaseStub.getClaims.mockResolvedValueOnce({ data: null, error: null });
+    supabaseStub.signInAnonymously.mockResolvedValueOnce({ data: { user: { id: 'anon-2' } }, error: null });
+    const { ensureSession } = await import('./auth');
+
+    expect(await ensureSession()).toBe('anon-2');
   });
 });
