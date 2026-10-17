@@ -39,12 +39,12 @@ it('공급 발행은 QStash의 전달 헤더로 보호 자격을 전달한다', 
     }) }),
   );
 });
-it('예약 등록은 두 작업 모두 보호 헤더를 전달하고 로그에 자격을 쓰지 않는다', async () => {
+it('예약 등록은 모든 작업에 보호 헤더를 전달하고 로그에 자격을 쓰지 않는다', async () => {
   configure();
   calls.schedule.mockResolvedValue({ scheduleId: 'schedule' });
   const logger = vi.spyOn(console, 'log').mockImplementation(() => {});
   await run(['--execute']);
-  expect(calls.schedule).toHaveBeenCalledTimes(2);
+  expect(calls.schedule).toHaveBeenCalledTimes(3);
   expect(calls.schedule).toHaveBeenCalledWith(expect.objectContaining({
     headers: { 'Content-Type': 'application/json', 'x-vercel-protection-bypass': 'test-bypass' },
   }));
