@@ -54,14 +54,12 @@ function authErr(e: { message?: string; code?: string } | null): AuthResult {
   };
 }
 
-// 익명 세션 확보 — 있으면 재사용 (기기당 계정 유지)
+// 익명 세션 확보 — 있으면 재사용 (기기당 계정 유지). 기존 세션은 로컬 검증한 claims로 판정해 Auth 서버를 왕복하지 않는다.
 export async function ensureSession(): Promise<string | null> {
   const supabase = await userClient();
   if (!supabase) return null;
-  const {
-    data: { user },
-  } = await supabase.auth.getUser();
-  if (user) return user.id;
+  const { data: verified } = await supabase.auth.getClaims();
+  if (verified?.claims?.sub) return verified.claims.sub;
   const { data, error } = await supabase.auth.signInAnonymously();
   if (error) return null;
   return data.user?.id ?? null;
