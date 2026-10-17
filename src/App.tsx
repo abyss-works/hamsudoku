@@ -9,6 +9,7 @@ import { SelectScreen } from './presentation/views/stages/SelectScreen';
 import { SetPasswordScreen } from './presentation/views/account/SetPasswordScreen';
 import { BootSplash } from './presentation/ui/BootSplash';
 import { LoadingProvider } from './core/composition/LoadingProvider';
+import { UpdateNoticeHost } from './core/composition/UpdateNoticeHost';
 export type { Screen } from './core/orchestration/appLogic';
 export { BOOT_TIMEOUT_MS } from './core/orchestration/appLogic';
 
@@ -98,6 +99,7 @@ function AppView() {
           )}
         </>
       )}
+      <UpdateNoticeHost />
       </main>
     </LoadingProvider>
   );

@@ -1032,3 +1032,29 @@ dialog.modal-host::backdrop {
 .admin-actions .btn-sticker {
   flex: 1;
 }
+
+/* 새 배포 안내. 화면을 막지 않고 하단에 고정한다. */
+.update-notice {
+  position: fixed;
+  left: 50%;
+  bottom: 16px;
+  transform: translateX(-50%);
+  z-index: 60;
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  width: max-content;
+  max-width: calc(100% - 32px);
+  padding: 10px 12px 10px 16px;
+  background: var(--card);
+  color: var(--ink);
+  border: 2px solid var(--ink);
+  border-radius: var(--radius-md);
+  box-shadow: var(--shadow-hard-sm);
+}
+
+.update-notice-text {
+  margin: 0;
+  font-family: var(--font-help);
+  font-size: 14px;
+}
