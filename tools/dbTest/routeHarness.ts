@@ -80,19 +80,23 @@ export function mockSentry() {
 
 // ---- 응답 후 작업 ----
 
-const deferred: Promise<unknown>[] = [];
+// 운영의 after처럼 응답이 끝난 뒤에 실행하도록 작업을 모아 두었다가 flushDeferred에서 시작한다.
+const deferred: ((() => unknown) | Promise<unknown>)[] = [];
 
 export function mockNextServer<T extends object>(original: T): T {
   return {
     ...original,
     after: (task: (() => unknown) | Promise<unknown>) => {
-      deferred.push(typeof task === 'function' ? Promise.resolve().then(task) : task);
+      deferred.push(task);
     },
   };
 }
 
 async function flushDeferred(): Promise<void> {
-  while (deferred.length > 0) await Promise.allSettled(deferred.splice(0));
+  while (deferred.length > 0) {
+    const tasks = deferred.splice(0);
+    await Promise.allSettled(tasks.map((task) => (typeof task === 'function' ? Promise.resolve().then(task) : task)));
+  }
 }
 
 // ---- 순위 저장소 ----
@@ -227,6 +231,10 @@ export function useRouteDatabase(): RouteDatabase {
 
   afterAll(async () => {
     await pool?.end();
+    // route가 만든 앱 데이터베이스 싱글톤 풀을 닫아 데이터베이스 삭제 전에 연결을 남기지 않는다.
+    const app = globalThis as unknown as { hamsudokuDatabase?: { pool: Pool } };
+    await app.hamsudokuDatabase?.pool.end();
+    delete app.hamsudokuDatabase;
     await database?.drop();
   });
 

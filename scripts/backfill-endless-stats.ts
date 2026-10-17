@@ -1,10 +1,18 @@
 import { backfillStageStats, type BackfillReport } from '../src/server/endlessPool/statsBackfill';
 
-/** 판 통계 복원 CLI. 기본은 dry-run이며 `--apply`일 때만 DB를 갱신한다. 종료 코드를 반환한다. */
+/**
+ * 판 통계 복원 CLI. 기본은 dry-run이며 `--apply`일 때만 DB를 갱신한다. 종료 코드를 반환한다.
+ * DATABASE_URL이 없으면 드라이버 기본 접속지로 연결하지 않도록 실행 전에 중단한다.
+ */
 export async function runBackfillCli(
   argv: string[] = process.argv.slice(2),
   backfill: (options: { dryRun: boolean }) => Promise<BackfillReport> = backfillStageStats,
+  env: Record<string, string | undefined> = process.env,
 ): Promise<number> {
+  if (!env.DATABASE_URL) {
+    console.error('[backfill] DATABASE_URL이 없어 실행하지 않습니다.');
+    return 1;
+  }
   const report = await backfill({ dryRun: !argv.includes('--apply') });
 
   if (report.ok) {

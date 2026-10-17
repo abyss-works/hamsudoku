@@ -17,6 +17,10 @@ function argValue(argv: string[], name: string): string | undefined {
 
 async function main() {
   loadEnvLocal();
+  if (!process.env.DATABASE_URL) {
+    console.error('DATABASE_URL이 없어 재구축할 수 없습니다.');
+    process.exit(1);
+  }
   const season = argValue(process.argv, '--season') ?? seasonId(new Date());
   const store = rankStoreFromEnv();
   if (!store) {

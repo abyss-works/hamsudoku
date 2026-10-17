@@ -76,6 +76,25 @@ async function next() {
   return { ...res, keys };
 }
 
+/**
+ * 판을 발급받고 공급 판정이 오류 없이 끝났는지 확인한다. 응답 후 공급 판정은 실패를 로그로만 남기므로
+ * 작업·발행이 없다는 단언만으로는 판정 실패와 구분되지 않는다.
+ */
+async function nextWithQuietSupply() {
+  const errors = vi.spyOn(console, 'error').mockImplementation(() => {});
+  const warnings = vi.spyOn(console, 'warn').mockImplementation(() => {});
+  try {
+    const res = await next();
+    expect(res.status).toBe(200);
+    expect(errors).not.toHaveBeenCalled();
+    expect(warnings).not.toHaveBeenCalled();
+    return res;
+  } finally {
+    errors.mockRestore();
+    warnings.mockRestore();
+  }
+}
+
 /** 공급 판정이 재고 충분으로 끝나도록 클리어 수 0인 판을 채운다. */
 async function seedStock(count: number, firstSeed = 20000) {
   for (let i = 0; i < count; i += 1) await seedStage(db, { id: `e-${firstSeed + i}-0`, seed: firstSeed + i });
@@ -142,7 +161,7 @@ describe('POST /api/endless/next', () => {
     await seedStock(20);
     signInAs(USER);
 
-    await next();
+    await nextWithQuietSupply();
 
     expect(await db.query(`select 1 from "EndlessSupplyJob"`)).toHaveLength(0);
     expect(outbound.requests).toHaveLength(0);
@@ -212,7 +231,7 @@ describe('POST /api/endless/next', () => {
     );
     signInAs(USER);
 
-    await next();
+    await nextWithQuietSupply();
 
     expect(await db.query(`select id from "EndlessSupplyJob"`)).toEqual([{ id: 'job-active' }]);
     expect(outbound.requests).toHaveLength(0);
@@ -228,7 +247,7 @@ describe('POST /api/endless/next', () => {
     );
     signInAs(USER);
 
-    await next();
+    await nextWithQuietSupply();
 
     const jobs = await db.query<{ id: string; status: string; seedStart: number }>(
       `select id, status, "seedStart" from "EndlessSupplyJob" order by "seedStart"`,
@@ -249,7 +268,7 @@ describe('POST /api/endless/next', () => {
     );
     signInAs(USER);
 
-    await next();
+    await nextWithQuietSupply();
 
     expect(await db.query(`select id from "EndlessSupplyJob"`)).toEqual([{ id: 'job-done' }]);
     expect(outbound.requests).toHaveLength(0);

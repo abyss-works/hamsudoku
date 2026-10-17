@@ -101,7 +101,8 @@ describe('attempt store 시간대', () => {
     try {
       expect(await consume()).not.toBeNull();
     } finally {
-      process.env.TZ = original;
+      if (original === undefined) delete process.env.TZ;
+      else process.env.TZ = original;
     }
     expect(await store.query(`select to_char("usedAt", 'YYYY-MM-DD HH24:MI') as at from "Attempt"`)).toEqual([
       { at: '2026-10-21 03:00' },

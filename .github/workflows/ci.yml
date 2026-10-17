@@ -16,12 +16,12 @@ jobs:
     runs-on: ubuntu-24.04
     timeout-minutes: 30
     steps:
-      - uses: actions/checkout@v4
+      - uses: actions/checkout@v5
 
       # pnpm 버전은 package.json의 packageManager를 따른다.
       - uses: pnpm/action-setup@v4
 
-      - uses: actions/setup-node@v4
+      - uses: actions/setup-node@v5
         with:
           node-version: 24
           cache: pnpm
@@ -29,6 +29,8 @@ jobs:
       - run: pnpm install --frozen-lockfile
 
       - run: pnpm lint
+
+      - run: pnpm exec tsc --noEmit -p .
 
       - run: pnpm test
 

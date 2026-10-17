@@ -26,6 +26,10 @@ async function main() {
   loadEnvLocal();
   const url = process.env.UPSTASH_REDIS_REST_URL;
   const token = process.env.UPSTASH_REDIS_REST_TOKEN;
+  if (!process.env.DATABASE_URL) {
+    console.error('DATABASE_URL이 없어 점검할 수 없습니다.');
+    process.exit(1);
+  }
   if (!url || !token) {
     console.error('UPSTASH env가 없어 점검할 수 없습니다.');
     process.exit(1);

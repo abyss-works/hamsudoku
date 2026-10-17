@@ -56,6 +56,9 @@ describe('createDatabase', () => {
   });
 
   it('BEGIN이 실패하면 연결을 폐기하고 다음 트랜잭션은 새 연결로 실행한다', async () => {
+    const backendPid = () =>
+      database.withTransaction(async (tx) => (await tx.execute<{ pid: number }>(sql`select pg_backend_pid() as pid`)).rows[0].pid);
+    const before = await backendPid();
     const original = Client.prototype.query;
     vi.spyOn(Client.prototype, 'query').mockImplementationOnce(function (this: Client) {
       return Promise.reject(new Error('begin failed'));
@@ -63,7 +66,8 @@ describe('createDatabase', () => {
 
     await expect(database.withTransaction(async () => 'never')).rejects.toThrow('begin failed');
 
-    expect(await database.withTransaction(async () => 'next')).toBe('next');
+    // 연결이 하나뿐인 풀에서 다른 서버 프로세스가 응답하면 실패한 연결을 폐기한 것이다.
+    expect(await backendPid()).not.toBe(before);
   });
 
   it('트랜잭션 안의 unique 위반을 판정하고 롤백한다', async () => {

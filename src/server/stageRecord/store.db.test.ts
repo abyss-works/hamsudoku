@@ -85,7 +85,8 @@ describe('stageRecord store 시간대', () => {
     try {
       await recordVerifiedClear(store.db, { userId: 'user-a', stageCode: '2-5', elapsedSec: 95, at: AT });
     } finally {
-      process.env.TZ = original;
+      if (original === undefined) delete process.env.TZ;
+      else process.env.TZ = original;
     }
     expect(await store.query(`select to_char("lastClearedAt", 'YYYY-MM-DD HH24:MI') as at from "ClearRecord"`)).toEqual([
       { at: '2026-10-21 03:00' },

@@ -82,7 +82,8 @@ describe('account store 시간대', () => {
     try {
       await upsertAccount(store.db, { userId: 'user-a', email: null, at: AT });
     } finally {
-      process.env.TZ = original;
+      if (original === undefined) delete process.env.TZ;
+      else process.env.TZ = original;
     }
     expect(await store.query(`select to_char("updatedAt", 'YYYY-MM-DD HH24:MI') as at from "Profile"`)).toEqual([
       { at: '2026-10-21 03:00' },

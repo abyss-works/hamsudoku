@@ -74,6 +74,31 @@ async function whileHolding<T>(lock: (tx: Parameters<typeof ranking.lockSeasonFo
   return { result: work(), release: async () => { release(); await holder; } };
 }
 
+/**
+ * 이 데이터베이스에서 advisory 잠금을 기다리는 연결이 보이면 resolve한다. 경과 시간 대신 잠금 대기 상태로
+ * 판정한다. 판정이 끝나면 stop으로 조회를 멈춘다.
+ */
+function watchAdvisoryLockWait() {
+  let stopped = false;
+  const waiting = (async () => {
+    while (!stopped) {
+      const rows = await db.query(
+        `select 1 from pg_stat_activity
+         where datname = current_database() and wait_event_type = 'Lock' and wait_event = 'advisory'`,
+      );
+      if (rows.length > 0) return;
+      await new Promise((resolve) => setTimeout(resolve, 20));
+    }
+  })();
+  return {
+    waiting,
+    stop: async () => {
+      stopped = true;
+      await waiting;
+    },
+  };
+}
+
 describe('submitEndlessClear', () => {
   it('커밋이 실패하면 키 소모를 되돌려 같은 키로 다시 제출할 수 있다', async () => {
     await seedStage(db, { id: STAGE });
@@ -107,7 +132,9 @@ describe('submitEndlessClear', () => {
       (tx) => ranking.lockSeasonForEarning(tx, seasonId(ACTIVE_NOW)),
       () => clear(),
     );
-    const outcome = await Promise.race([held.result.then(() => 'done'), new Promise((r) => setTimeout(() => r('blocked'), 2000))]);
+    const watch = watchAdvisoryLockWait();
+    const outcome = await Promise.race([held.result.then(() => 'done'), watch.waiting.then(() => 'blocked')]);
+    await watch.stop();
     await held.release();
     expect(outcome).toBe('done');
   });
@@ -119,7 +146,9 @@ describe('submitEndlessClear', () => {
       (tx) => ranking.lockSeasonForFinalization(tx, seasonId(ACTIVE_NOW)),
       () => clear(),
     );
-    const before = await Promise.race([held.result.then(() => 'done'), new Promise((r) => setTimeout(() => r('waiting'), 500))]);
+    const watch = watchAdvisoryLockWait();
+    const before = await Promise.race([held.result.then(() => 'done'), watch.waiting.then(() => 'waiting')]);
+    await watch.stop();
     await held.release();
     expect(before).toBe('waiting');
     expect((await held.result).body).toMatchObject({ ok: true });

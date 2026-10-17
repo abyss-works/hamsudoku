@@ -7,7 +7,7 @@ import { Client } from 'pg';
 // 스키마를 만드는 두 경로와 비교 도구.
 // 운영 DB는 Prisma 마이그레이션으로 만들어졌고, 이후에는 Drizzle 마이그레이션이 정본이다.
 
-export const DRIZZLE_MIGRATIONS = join(process.cwd(), 'drizzle');
+const DRIZZLE_MIGRATIONS = join(process.cwd(), 'drizzle');
 // 전환 전 Prisma 마이그레이션 SQL. 운영 DB의 기존 스키마를 재현하는 고정 자료다.
 const PRISMA_MIGRATIONS = join(process.cwd(), 'tools', 'dbTest', 'fixtures', 'prisma-migrations');
 
@@ -16,7 +16,7 @@ interface JournalEntry {
   when: number;
 }
 
-export function drizzleJournal(): JournalEntry[] {
+function drizzleJournal(): JournalEntry[] {
   const journal = JSON.parse(readFileSync(join(DRIZZLE_MIGRATIONS, 'meta', '_journal.json'), 'utf-8')) as {
     entries: JournalEntry[];
   };
