@@ -48,6 +48,7 @@ export function useEndlessGame(session: EndlessSession, { overlay, track, showEn
     error: session.error,
     submitting: session.submitting,
     starting: session.starting,
+    seedLeft: session.seeds,
   });
 
   const hud = endlessHudModel(session.mirror.wallet.balance, session.seeds);

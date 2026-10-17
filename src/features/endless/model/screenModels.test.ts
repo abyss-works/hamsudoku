@@ -3,54 +3,69 @@ import { endlessClearModel, endlessHudModel } from './screenModels';
 
 describe('endless screenModels (순수 표시 모델)', () => {
   it('기록 저장 중이거나 결과가 없을 때 pending 상태를 제공한다', () => {
-    expect(endlessClearModel({ result: null, error: null, submitting: false, starting: false })).toEqual({
+    expect(endlessClearModel({ result: null, error: null, submitting: false, starting: false, seedLeft: 2 })).toEqual({
       showConfetti: false,
       title: '기록을 저장하는 중…',
       note: null,
       actionsDisabled: true,
+      showRetry: true,
     });
-    expect(endlessClearModel({ result: { ok: true, earned: 10 }, error: null, submitting: true, starting: false })).toEqual({
+    expect(endlessClearModel({ result: { ok: true, earned: 10 }, error: null, submitting: true, starting: false, seedLeft: 2 })).toEqual({
       showConfetti: false,
       title: '기록을 저장하는 중…',
       note: null,
       actionsDisabled: true,
+      showRetry: true,
     });
   });
 
   it('저장 실패 시 에러 메시지 또는 기본 실패 문구를 제공한다', () => {
-    expect(endlessClearModel({ result: { ok: false, earned: 0 }, error: '네트워크 연결 실패', submitting: false, starting: false })).toEqual({
+    expect(endlessClearModel({ result: { ok: false, earned: 0 }, error: '네트워크 연결 실패', submitting: false, starting: false, seedLeft: 2 })).toEqual({
       showConfetti: false,
       title: '네트워크 연결 실패',
       note: null,
       actionsDisabled: false,
+      showRetry: true,
     });
-    expect(endlessClearModel({ result: { ok: false, earned: 0 }, error: null, submitting: false, starting: false })).toEqual({
+    expect(endlessClearModel({ result: { ok: false, earned: 0 }, error: null, submitting: false, starting: false, seedLeft: 2 })).toEqual({
       showConfetti: false,
       title: '기록을 저장하지 못했어요.',
       note: null,
       actionsDisabled: false,
+      showRetry: true,
     });
   });
 
+  it('씨앗 3개로 깬 판은 다시 하기를 숨기고, 저장에 실패하면 다시 보인다', () => {
+    const base = { error: null, submitting: false, starting: false, seedLeft: 3 };
+    expect(endlessClearModel({ ...base, result: { ok: true, earned: 3 } }).showRetry).toBe(false);
+    expect(endlessClearModel({ ...base, result: null }).showRetry).toBe(false);
+    expect(endlessClearModel({ ...base, result: { ok: false, earned: 0 } }).showRetry).toBe(true);
+    expect(endlessClearModel({ ...base, seedLeft: 2, result: { ok: true, earned: 2 } }).showRetry).toBe(true);
+  });
+
   it('저장 성공 시 폭죽 표시와 획득 씨앗 문구를 제공하며 earned=0도 보존한다', () => {
-    expect(endlessClearModel({ result: { ok: true, earned: 5 }, error: null, submitting: false, starting: false })).toEqual({
+    expect(endlessClearModel({ result: { ok: true, earned: 5 }, error: null, submitting: false, starting: false, seedLeft: 2 })).toEqual({
       showConfetti: true,
       title: '햄스터를 다 찾았다! 씨앗 5개를 얻었어요',
       note: null,
       actionsDisabled: false,
+      showRetry: true,
     });
-    expect(endlessClearModel({ result: { ok: true, earned: 0 }, error: null, submitting: false, starting: false })).toEqual({
+    expect(endlessClearModel({ result: { ok: true, earned: 0 }, error: null, submitting: false, starting: false, seedLeft: 2 })).toEqual({
       showConfetti: true,
       title: '햄스터를 다 찾았다! 씨앗 0개를 얻었어요',
       note: null,
       actionsDisabled: false,
+      showRetry: true,
     });
     // 성공했지만 부가 경고 에러가 남은 경우 note로 표시
-    expect(endlessClearModel({ result: { ok: true, earned: 3 }, error: '동기화 지연', submitting: false, starting: false })).toEqual({
+    expect(endlessClearModel({ result: { ok: true, earned: 3 }, error: '동기화 지연', submitting: false, starting: false, seedLeft: 2 })).toEqual({
       showConfetti: true,
       title: '햄스터를 다 찾았다! 씨앗 3개를 얻었어요',
       note: '동기화 지연',
       actionsDisabled: false,
+      showRetry: true,
     });
   });
 
