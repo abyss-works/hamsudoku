@@ -1,5 +1,5 @@
-import { describe, expect, it } from 'vitest';
-import { addTiming, classifySpan, formatServerTiming, spanHost, withServerTiming, type Timings } from './serverTiming';
+import { describe, expect, it, vi } from 'vitest';
+import { addTiming, classifySpan, formatServerTiming, spanHost, timingsByRoot, withServerTiming, type Timings } from './serverTiming';
 
 describe('classifySpan', () => {
   it('DB span은 db, 외부 HTTP span은 호스트로 redis·supabase·http로 나누고 나머지는 제외한다', () => {
@@ -67,5 +67,17 @@ describe('withServerTiming', () => {
 
     expect(res).toBe(redirect);
     expect(res.headers.get('server-timing')).toBeNull();
+  });
+});
+
+describe('timingsByRoot', () => {
+  it('모듈을 다시 불러와도 같은 저장소를 쓴다', async () => {
+    const root = {};
+    timingsByRoot().set(root, new Map());
+    vi.resetModules();
+    const reloaded = await import('./serverTiming');
+
+    expect(reloaded.timingsByRoot()).toBe(timingsByRoot());
+    expect(reloaded.timingsByRoot().has(root)).toBe(true);
   });
 });
