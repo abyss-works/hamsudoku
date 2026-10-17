@@ -196,6 +196,41 @@ describe('POST /api/endless/clear', () => {
     expect(await db.query(`select current, best from "EndlessStreak"`)).toEqual([{ current: 3, best: 3 }]);
   });
 
+  it('씨앗 3개로 클리어하지 못한 판의 재클리어는 이전 최고 기록보다 늘어난 씨앗만 적립한다', async () => {
+    await prepare();
+    rankStore.current = new FakeRankStore();
+    await db.query(`insert into "SeedWallet" ("userId", balance) values ($1, 5)`, [USER]);
+    await db.query(
+      `insert into "EndlessProgress" ("userId", "stageId", cleared, attempts, "bestSeedLeft", "lastPlayedAt") values ($1, $2, true, 1, 2, $3)`,
+      [USER, STAGE, secondsBefore(ACTIVE_NOW, 3600)],
+    );
+
+    const res = await submit({ ...validBody, seedLeft: 3 });
+
+    expect(res.body).toEqual({ ok: true, earned: 1, balance: 6, streak: 1, suspicious: false });
+    expect(await db.query(`select amount from "SeedLedger"`)).toEqual([{ amount: 1 }]);
+    expect(rankStore.current.increments).toEqual([{ season: seasonId(ACTIVE_NOW), userId: USER, amount: 1 }]);
+    expect(await db.query(`select attempts, "bestSeedLeft" from "EndlessProgress"`)).toEqual([{ attempts: 2, bestSeedLeft: 3 }]);
+  });
+
+  it('최고 기록을 넘지 못한 재클리어는 적립·원장·순위 가산 없이 진행과 이벤트만 반영한다', async () => {
+    await prepare();
+    rankStore.current = new FakeRankStore();
+    await db.query(`insert into "SeedWallet" ("userId", balance) values ($1, 5)`, [USER]);
+    await db.query(
+      `insert into "EndlessProgress" ("userId", "stageId", cleared, attempts, "bestSeedLeft", "lastPlayedAt") values ($1, $2, true, 1, 2, $3)`,
+      [USER, STAGE, secondsBefore(ACTIVE_NOW, 3600)],
+    );
+
+    const res = await submit(validBody);
+
+    expect(res.body).toEqual({ ok: true, earned: 0, balance: 5, streak: 0, suspicious: false });
+    expect(await db.query(`select 1 from "SeedLedger"`)).toHaveLength(0);
+    expect(rankStore.current.increments).toEqual([]);
+    expect(await db.query(`select attempts, "bestSeedLeft" from "EndlessProgress"`)).toEqual([{ attempts: 2, bestSeedLeft: 2 }]);
+    expect(await db.query(`select "seedLeft", verified from "EndlessEvent"`)).toEqual([{ seedLeft: 2, verified: true }]);
+  });
+
   it('직전 검증 클리어와 1초 안의 제출은 거절한다', async () => {
     await prepare();
     await db.query(

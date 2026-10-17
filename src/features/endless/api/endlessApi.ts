@@ -54,11 +54,12 @@ async function postJson(path: string, body: unknown): Promise<Response> {
   });
 }
 
-export async function nextStage(): Promise<NextStage> {
+/** 판과 입장 키를 받는다. stageId를 주면 그 판에 다시 도전한다. */
+export async function nextStage(stageId?: string): Promise<NextStage> {
   const subtle = globalThis.crypto.subtle;
   const client = (await subtle.generateKey({ name: 'ECDH', namedCurve: 'P-256' }, false, ['deriveBits'])) as CryptoKeyPair;
   const clientPublicKey = bytesToBase64(new Uint8Array(await subtle.exportKey('raw', client.publicKey)));
-  const res = await postJson('/api/endless/next', { clientPublicKey });
+  const res = await postJson('/api/endless/next', stageId === undefined ? { clientPublicKey } : { clientPublicKey, stageId });
   if (!res.ok) throw new EndlessApiError(res.status);
   const payload = nextResponseSchema.parse(await res.json());
   const serverKey = await subtle.importKey('raw', base64ToBytes(payload.serverPublicKey), { name: 'ECDH', namedCurve: 'P-256' }, false, []);

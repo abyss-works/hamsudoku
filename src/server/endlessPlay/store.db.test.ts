@@ -1,7 +1,7 @@
 import { sql } from 'drizzle-orm';
 import { describe, expect, it } from 'vitest';
 import { useStoreDatabase } from '../../../tools/dbTest/storeHarness';
-import { findPlaySummary, findSubmissionHistory, pickUnclearedStage } from './queries';
+import { findPlaySummary, findSubmissionHistory, pickPlayableStage } from './queries';
 import { appendPlayEvent, commitClear, commitFail, lockPlayer, savePlayLog, type PlayLogRow } from './store';
 
 const store = useStoreDatabase();
@@ -22,10 +22,10 @@ describe('endlessPlay 클리어 커밋', () => {
       commitClear(tx, { userId: 'user-a', stageId: 'e-1-0', seedLeft: 3, elapsedMs: 12000, suspicious: false, at: AT }),
     );
 
-    expect(result).toEqual({ balance: 3, streak: { current: 1, best: 1 } });
-    expect(await store.query(`select "userId", "stageId", cleared, attempts, "lastPlayedAt" from "EndlessProgress"`)).toEqual([
-      { userId: 'user-a', stageId: 'e-1-0', cleared: true, attempts: 1, lastPlayedAt: AT },
-    ]);
+    expect(result).toEqual({ earned: 3, balance: 3, streak: { current: 1, best: 1 } });
+    expect(
+      await store.query(`select "userId", "stageId", cleared, attempts, "bestSeedLeft", "lastPlayedAt" from "EndlessProgress"`),
+    ).toEqual([{ userId: 'user-a', stageId: 'e-1-0', cleared: true, attempts: 1, bestSeedLeft: 3, lastPlayedAt: AT }]);
     expect(await store.query(`select "userId", balance from "SeedWallet"`)).toEqual([{ userId: 'user-a', balance: 3 }]);
     expect(
       await store.query(`select "userId", "stageId", "seedLeft", "elapsedMs", verified, suspicious, reason, "createdAt" from "EndlessEvent"`),
@@ -46,7 +46,7 @@ describe('endlessPlay 클리어 커밋', () => {
       commitClear(tx, { userId: 'user-a', stageId: 'e-1-0', seedLeft: 2, elapsedMs: 9000, suspicious: true, at: LATER }),
     );
 
-    expect(result).toEqual({ balance: 12, streak: { current: 0, best: 6 } });
+    expect(result).toEqual({ earned: 2, balance: 12, streak: { current: 0, best: 6 } });
     expect(await store.query(`select cleared, attempts, "lastPlayedAt" from "EndlessProgress"`)).toEqual([
       { cleared: true, attempts: 3, lastPlayedAt: LATER },
     ]);
@@ -59,6 +59,56 @@ describe('endlessPlay 클리어 커밋', () => {
       commitClear(tx, { userId: 'user-a', stageId: 'e-1-0', seedLeft: 3, elapsedMs: 9000, suspicious: false, at: AT }),
     );
     expect(result.streak).toEqual({ current: 7, best: 7 });
+  });
+});
+
+describe('endlessPlay 재클리어 커밋', () => {
+  async function seedCleared(best: number) {
+    await store.query(`insert into "SeedWallet" ("userId", balance) values ('user-a', 10)`);
+    await store.query(`insert into "EndlessStreak" ("userId", current, best) values ('user-a', 2, 5)`);
+    await store.query(
+      `insert into "EndlessProgress" ("userId", "stageId", cleared, attempts, "bestSeedLeft", "lastPlayedAt")
+       values ('user-a', 'e-1-0', true, 1, $1, $2)`,
+      [best, AT],
+    );
+  }
+
+  it('이미 클리어한 판은 이전 최고 잔여 씨앗보다 많이 남긴 만큼만 적립하고 최고 기록을 갱신한다', async () => {
+    await seedCleared(2);
+
+    const result = await store.withTransaction((tx) =>
+      commitClear(tx, { userId: 'user-a', stageId: 'e-1-0', seedLeft: 3, elapsedMs: 9000, suspicious: false, at: LATER }),
+    );
+
+    expect(result).toEqual({ earned: 1, balance: 11, streak: { current: 3, best: 5 } });
+    expect(await store.query(`select cleared, attempts, "bestSeedLeft" from "EndlessProgress"`)).toEqual([
+      { cleared: true, attempts: 2, bestSeedLeft: 3 },
+    ]);
+  });
+
+  it('개선이 없으면 적립하지 않고 최고 기록을 유지하며 연속 기록은 일반 클리어와 같이 반영한다', async () => {
+    await seedCleared(2);
+
+    const result = await store.withTransaction((tx) =>
+      commitClear(tx, { userId: 'user-a', stageId: 'e-1-0', seedLeft: 1, elapsedMs: 9000, suspicious: false, at: LATER }),
+    );
+
+    expect(result).toEqual({ earned: 0, balance: 10, streak: { current: 0, best: 5 } });
+    expect(await store.query(`select attempts, "bestSeedLeft" from "EndlessProgress"`)).toEqual([{ attempts: 2, bestSeedLeft: 2 }]);
+    expect(await store.query(`select "seedLeft", verified from "EndlessEvent"`)).toEqual([{ seedLeft: 1, verified: true }]);
+  });
+
+  it('실패만 했던 판의 첫 클리어는 남은 씨앗 전부를 적립한다', async () => {
+    await store.query(
+      `insert into "EndlessProgress" ("userId", "stageId", cleared, attempts, "lastPlayedAt") values ('user-a', 'e-1-0', false, 2, $1)`,
+      [AT],
+    );
+
+    const result = await store.withTransaction((tx) =>
+      commitClear(tx, { userId: 'user-a', stageId: 'e-1-0', seedLeft: 2, elapsedMs: 9000, suspicious: false, at: LATER }),
+    );
+
+    expect(result.earned).toBe(2);
   });
 });
 
@@ -153,26 +203,28 @@ describe('endlessPlay 이벤트와 잠금', () => {
 });
 
 describe('endlessPlay 조회', () => {
-  it('미클리어 판만 고르고 없으면 null이다', async () => {
+  it('씨앗 3개로 클리어한 판만 빼고 고르며 모두 그렇게 클리어했으면 null이다', async () => {
     await seedStage('e-1-0');
     await seedStage('e-1-1');
+    await seedStage('e-1-2');
     await store.query(
-      `insert into "EndlessProgress" ("userId", "stageId", cleared, attempts, "lastPlayedAt") values
-       ('user-a', 'e-1-0', true, 1, $1), ('user-a', 'e-1-1', false, 3, $1), ('user-b', 'e-1-1', true, 1, $1)`,
+      `insert into "EndlessProgress" ("userId", "stageId", cleared, attempts, "bestSeedLeft", "lastPlayedAt") values
+       ('user-a', 'e-1-0', true, 1, 3, $1), ('user-a', 'e-1-1', true, 2, 2, $1), ('user-a', 'e-1-2', false, 3, 0, $1),
+       ('user-b', 'e-1-1', true, 1, 3, $1), ('user-b', 'e-1-2', true, 1, 3, $1)`,
       [AT],
     );
 
-    for (let i = 0; i < 3; i += 1) {
-      expect(await pickUnclearedStage(store.db, 'user-a')).toEqual({
-        id: 'e-1-1',
-        size: 7,
-        regions: '0123456'.repeat(7),
-        solution: '0,0',
-      });
-    }
-    expect(await pickUnclearedStage(store.db, 'user-b')).toMatchObject({ id: 'e-1-0' });
-    await store.query(`update "EndlessProgress" set cleared = true`);
-    expect(await pickUnclearedStage(store.db, 'user-a')).toBeNull();
+    const picked = new Set<string>();
+    for (let i = 0; i < 30; i += 1) picked.add((await pickPlayableStage(store.db, 'user-a'))!.id);
+    expect([...picked].sort()).toEqual(['e-1-1', 'e-1-2']);
+    expect(await pickPlayableStage(store.db, 'user-b')).toEqual({
+      id: 'e-1-0',
+      size: 7,
+      regions: '0123456'.repeat(7),
+      solution: '0,0',
+    });
+    await store.query(`update "EndlessProgress" set cleared = true, "bestSeedLeft" = 3`);
+    expect(await pickPlayableStage(store.db, 'user-a')).toBeNull();
   });
 
   it('요약은 잔액, 클리어한 판 수, 연속 기록을 한 문장으로 반환한다', async () => {

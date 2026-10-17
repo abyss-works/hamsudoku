@@ -154,6 +154,43 @@ describe('useEndlessGame overlay integration', () => {
     expect(result.current.overlay.isOpen('gameover', 'endless-gameover')).toBe(false);
   });
 
+  it('retry는 현재 판을 지정해 다시 시작하고 next는 판을 지정하지 않으며, 두 경우 모두 오버레이를 닫는다', async () => {
+    let mockPhase: endlessSessionModule.EndlessPhase = 'gameover';
+    const mockStart = vi.fn().mockImplementation(async () => {
+      mockPhase = 'playing';
+      return true;
+    });
+    vi.spyOn(endlessSessionModule, 'useEndlessSession').mockImplementation(() => ({
+      puzzle: { name: 'test', size: 1, islands: [[0]], solution: [[0, 0]] },
+      stageId: 'stg-1',
+      roundId: 1,
+      seeds: 0,
+      phase: mockPhase,
+      mirror: { wallet: { balance: 10 } } as any,
+      error: null,
+      finishResult: null,
+      submitting: false,
+      starting: false,
+      start: mockStart,
+      reportWrong: vi.fn(),
+      finish: vi.fn().mockResolvedValue(undefined),
+    }));
+
+    const { result } = renderHook(() => useEndlessGameWithOverlay(), { wrapper });
+    expect(result.current.overlay.isOpen('gameover', 'endless-gameover')).toBe(true);
+
+    await act(async () => {
+      result.current.game.retry();
+    });
+    expect(mockStart).toHaveBeenLastCalledWith('stg-1');
+    expect(result.current.overlay.isOpen('gameover', 'endless-gameover')).toBe(false);
+
+    await act(async () => {
+      result.current.game.next();
+    });
+    expect(mockStart).toHaveBeenLastCalledWith();
+  });
+
   it('next() 호출 후 phase가 여전히 gameover인 동안 관련없는 리렌더가 일어나도 gameover 오버레이가 재개방되지 않는다', () => {
     const mockPhase: endlessSessionModule.EndlessPhase = 'gameover';
     const mockStart = vi.fn().mockImplementation(() => new Promise(() => {}));

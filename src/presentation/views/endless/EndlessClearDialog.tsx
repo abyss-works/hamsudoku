@@ -6,6 +6,7 @@ import type { EndlessClearModel } from '../../../features/endless/model/screenMo
 export interface EndlessClearDialogProps {
   model: EndlessClearModel;
   onNext: () => void;
+  onRetry: () => void;
   onExit: () => void;
   reduceMotion?: boolean;
 }
@@ -13,6 +14,7 @@ export interface EndlessClearDialogProps {
 export function EndlessClearDialog({
   model,
   onNext,
+  onRetry,
   onExit,
   reduceMotion = false,
 }: EndlessClearDialogProps) {
@@ -25,6 +27,11 @@ export function EndlessClearDialog({
         <Button variant="sticker" className="btn-primary" onClick={onNext} disabled={model.actionsDisabled}>
           다음 판
         </Button>
+        {model.showRetry && (
+          <Button variant="sticker" onClick={onRetry} disabled={model.actionsDisabled}>
+            다시 하기
+          </Button>
+        )}
         <Button variant="sticker" onClick={onExit} disabled={model.actionsDisabled}>
           나가기
         </Button>

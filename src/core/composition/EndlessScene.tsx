@@ -29,13 +29,14 @@ function EndlessSceneContent({ onBack, owner, seed }: EndlessSceneProps) {
         <EndlessClearOverlayHost
           clearModel={session.clearModel}
           onNext={session.next}
+          onRetry={session.retry}
           onExit={onBack}
         />
       }
       gameOverOverlay={
         <EndlessGameOverOverlayHost
           error={session.error}
-          onRetry={session.next}
+          onRetry={session.retry}
           onExit={onBack}
         />
       }

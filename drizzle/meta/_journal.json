@@ -36,6 +36,13 @@
       "when": 1792203732931,
       "tag": "0004_play_log",
       "breakpoints": true
+    },
+    {
+      "idx": 5,
+      "version": "7",
+      "when": 1792225781341,
+      "tag": "0005_progress_best_seed_left",
+      "breakpoints": true
     }
   ]
 }
