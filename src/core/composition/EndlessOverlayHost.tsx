@@ -8,12 +8,14 @@ import { useReducedMotion } from '../../platform/motion/useReducedMotion';
 export interface EndlessClearOverlayHostProps {
   clearModel: EndlessClearModel | null;
   onNext: () => void;
+  onRetry: () => void;
   onExit: () => void;
 }
 
 export function EndlessClearOverlayHost({
   clearModel,
   onNext,
+  onRetry,
   onExit,
 }: EndlessClearOverlayHostProps): ReactNode {
   const reduceMotion = useReducedMotion();
@@ -26,6 +28,7 @@ export function EndlessClearOverlayHost({
             <EndlessClearDialog
               model={clearModel}
               onNext={onNext}
+              onRetry={onRetry}
               onExit={onExit}
               reduceMotion={reduceMotion}
             />
