@@ -2,7 +2,8 @@ import * as Sentry from '@sentry/nextjs';
 
 /** 요청 처리 시간 중 따로 합산하는 외부 호출 구분. */
 export type TimingName = 'db' | 'redis' | 'supabase' | 'http';
-export type Timings = Map<TimingName, { durationMs: number; count: number }>;
+/** 구분별 호출 구간. 시작·종료는 같은 기준의 밀리초다. */
+export type Timings = Map<TimingName, [number, number][]>;
 
 const ORDER: TimingName[] = ['db', 'redis', 'supabase', 'http'];
 
@@ -31,20 +32,47 @@ export function spanHost(data: Record<string, unknown>, description: string | un
   return hostOf(data['url.full']) ?? hostOf(data['http.url']) ?? hostOf(description?.split(' ').find((part) => part.includes('://')));
 }
 
-export function addTiming(timings: Timings, name: TimingName, durationMs: number): void {
-  const entry = timings.get(name) ?? { durationMs: 0, count: 0 };
-  entry.durationMs += durationMs;
-  entry.count += 1;
-  timings.set(name, entry);
+export function addTiming(timings: Timings, name: TimingName, startMs: number, endMs: number): void {
+  const intervals = timings.get(name) ?? [];
+  intervals.push([startMs, endMs]);
+  timings.set(name, intervals);
+}
+
+/** 겹친 구간을 한 번만 더한 실제 소요 시간과, 다른 구간 안에 포함되지 않은 바깥 호출 수. */
+function summarize(intervals: [number, number][]): { durationMs: number; count: number } {
+  const sorted = [...intervals].sort((a, b) => a[0] - b[0] || b[1] - a[1]);
+  let durationMs = 0;
+  let count = 0;
+  let coveredEnd = -Infinity;
+  let mergedStart = 0;
+  let mergedEnd = -Infinity;
+  for (const [start, end] of sorted) {
+    if (end > coveredEnd) count += 1;
+    coveredEnd = Math.max(coveredEnd, end);
+    if (start > mergedEnd) {
+      if (mergedEnd > -Infinity) durationMs += mergedEnd - mergedStart;
+      mergedStart = start;
+      mergedEnd = end;
+    } else {
+      mergedEnd = Math.max(mergedEnd, end);
+    }
+  }
+  if (mergedEnd > -Infinity) durationMs += mergedEnd - mergedStart;
+  return { durationMs, count };
 }
 
 const round = (ms: number) => Math.round(ms * 10) / 10;
 
-/** 구분별 합계 시간·횟수와 전체 처리 시간, 앱 버전을 Server-Timing 헤더 값으로 만든다. 병렬 호출의 합계는 전체보다 클 수 있다. */
+/**
+ * 구분별 실제 소요 시간·바깥 호출 수와 전체 처리 시간, 앱 버전을 Server-Timing 헤더 값으로 만든다.
+ * 연결 span 안의 소켓 연결처럼 포함된 호출과 병렬 호출의 겹친 구간은 한 번만 센다.
+ */
 export function formatServerTiming(timings: Timings | undefined, totalMs: number, version: string): string {
   const parts = ORDER.flatMap((name) => {
-    const entry = timings?.get(name);
-    return entry ? [`${name};dur=${round(entry.durationMs)};desc="${entry.count}"`] : [];
+    const intervals = timings?.get(name);
+    if (!intervals?.length) return [];
+    const { durationMs, count } = summarize(intervals);
+    return [`${name};dur=${round(durationMs)};desc="${count}"`];
   });
   return [...parts, `total;dur=${round(totalMs)}`, `app;desc="${version}"`].join(', ');
 }
@@ -71,7 +99,7 @@ export function collectSpanTimings(): void {
     const name = classifySpan({ op: typeof op === 'string' ? op : undefined, host: spanHost(json.attributes, json.name) });
     if (!name || json.end_timestamp === undefined) return;
     const timings = timingsByRoot().get(root) ?? new Map();
-    addTiming(timings, name, (json.end_timestamp - json.start_timestamp) * 1000);
+    addTiming(timings, name, json.start_timestamp * 1000, json.end_timestamp * 1000);
     timingsByRoot().set(root, timings);
   });
 }

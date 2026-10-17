@@ -25,15 +25,28 @@ describe('spanHost', () => {
 });
 
 describe('formatServerTiming', () => {
-  it('구분별 합계 시간과 횟수, 전체 시간, 앱 버전을 Server-Timing 형식으로 만든다', () => {
+  it('구분별 실제 소요 시간과 바깥 호출 수, 전체 시간, 앱 버전을 Server-Timing 형식으로 만든다', () => {
     const timings: Timings = new Map();
-    addTiming(timings, 'redis', 100.04);
-    addTiming(timings, 'db', 5.26);
-    addTiming(timings, 'db', 4);
+    addTiming(timings, 'redis', 0, 100.04);
+    addTiming(timings, 'db', 0, 5.26);
+    addTiming(timings, 'db', 10, 14);
 
     expect(formatServerTiming(timings, 130.55, '0.5.6')).toBe(
       'db;dur=9.3;desc="2", redis;dur=100;desc="1", total;dur=130.6, app;desc="0.5.6"',
     );
+  });
+
+  it('안쪽 호출은 바깥 호출에 포함해 한 번만 세고, 겹친 병렬 호출은 겹친 구간을 한 번만 더한다', () => {
+    const timings: Timings = new Map();
+    // 풀 연결(0~30) 안의 소켓 연결(1~30), 이어지는 쿼리(30~40)
+    addTiming(timings, 'db', 1, 30);
+    addTiming(timings, 'db', 0, 30);
+    addTiming(timings, 'db', 30, 40);
+    // 병렬 호출 두 개(50~60, 55~65)
+    addTiming(timings, 'db', 50, 60);
+    addTiming(timings, 'db', 55, 65);
+
+    expect(formatServerTiming(timings, 70, '0.5.6')).toBe('db;dur=55;desc="4", total;dur=70, app;desc="0.5.6"');
   });
 
   it('구분별 기록이 없으면 전체 시간과 앱 버전만 만든다', () => {
@@ -44,7 +57,7 @@ describe('formatServerTiming', () => {
 describe('withServerTiming', () => {
   it('응답 상태와 본문을 유지하고 Server-Timing 헤더를 붙인다', async () => {
     const timings: Timings = new Map();
-    addTiming(timings, 'db', 3);
+    addTiming(timings, 'db', 12, 15);
     const clock = [10, 25];
     const handler = withServerTiming(async (value: string) => Response.json({ value }, { status: 201 }), {
       version: '0.5.6',
