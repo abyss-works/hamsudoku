@@ -1,5 +1,5 @@
 import { sql } from 'drizzle-orm';
-import { boolean, index, integer, pgTable, primaryKey, text, timestamp } from 'drizzle-orm/pg-core';
+import { boolean, index, integer, jsonb, pgTable, primaryKey, text, timestamp } from 'drizzle-orm/pg-core';
 
 export const endlessProgress = pgTable(
   'EndlessProgress',
@@ -44,4 +44,29 @@ export const endlessEvents = pgTable(
     index('EndlessEvent_userId_stageId_idx').on(table.userId, table.stageId),
     index('EndlessEvent_userId_createdAt_idx').on(table.userId, table.createdAt),
   ],
+).enableRLS();
+
+/**
+ * 클리어 제출·실패 보고의 플레이 기록과 사후 감사 결과. 소모한 입장 키마다 한 행이다.
+ * events는 형식이 맞는 기록의 이벤트 원문이고, 저장하지 않은 사유는 logError에 둔다.
+ */
+export const endlessPlayLogs = pgTable(
+  'EndlessPlayLog',
+  {
+    attemptId: text('attemptId').primaryKey(),
+    userId: text('userId').notNull(),
+    stageId: text('stageId').notNull(),
+    outcome: text('outcome').notNull(),
+    accepted: boolean('accepted').notNull(),
+    reason: text('reason'),
+    claimedSeedLeft: integer('claimedSeedLeft'),
+    serverElapsedMs: integer('serverElapsedMs').notNull(),
+    logVersion: integer('logVersion'),
+    events: jsonb('events'),
+    logError: text('logError'),
+    createdAt: timestamp('createdAt', { precision: 3, mode: 'date' }).default(sql`CURRENT_TIMESTAMP`).notNull(),
+    auditedAt: timestamp('auditedAt', { precision: 3, mode: 'date' }),
+    audit: jsonb('audit'),
+  },
+  (table) => [index('EndlessPlayLog_unaudited_createdAt_idx').on(table.createdAt).where(sql`"auditedAt" is null`)],
 ).enableRLS();

@@ -34,6 +34,14 @@ describe('submitClear', () => {
     vi.stubGlobal('fetch', vi.fn(async () => Response.json({ ok: true, earned: 2, balance: 5, streak: 1, suspicious: false })));
     expect(await submitClear({ attemptKey: 'k', stageId: 'e-1', solution: [[0, 0]], seedLeft: 2 })).toMatchObject({ ok: true, earned: 2 });
   });
+  it('판 기록을 요청 본문에 싣는다', async () => {
+    const fetchMock = vi.fn(async () => Response.json({ ok: true, earned: 2, balance: 5, streak: 1, suspicious: false }));
+    vi.stubGlobal('fetch', fetchMock);
+    const log = { version: 1 as const, events: [[10, 'correct', 0, 0]] as [number, 'correct', number, number][] };
+    await submitClear({ attemptKey: 'k', stageId: 'e-1', solution: [[0, 0]], seedLeft: 2, log });
+    const [, init] = fetchMock.mock.calls[0] as unknown as [string, RequestInit];
+    expect(JSON.parse(String(init.body))).toEqual({ attemptKey: 'k', stageId: 'e-1', solution: [[0, 0]], seedLeft: 2, log });
+  });
   it('401은 EndlessApiError다', async () => {
     vi.stubGlobal('fetch', vi.fn(async () => new Response(null, { status: 401 })));
     await expect(submitClear({ attemptKey: 'k', stageId: 'e-1', solution: [[0, 0]], seedLeft: 2 })).rejects.toBeInstanceOf(EndlessApiError);
@@ -44,6 +52,17 @@ describe('reportFail', () => {
   it('실패해도 던지지 않는다', async () => {
     vi.stubGlobal('fetch', vi.fn(async () => new Response(null, { status: 403 })));
     await expect(reportFail('k')).resolves.toBeUndefined();
+  });
+  it('판 기록이 있으면 요청 본문에 싣는다', async () => {
+    const fetchMock = vi.fn(async () => Response.json({ ok: true }));
+    vi.stubGlobal('fetch', fetchMock);
+    const log = { version: 1 as const, events: [[10, 'wrong', 0, 1]] as [number, 'wrong', number, number][] };
+    await reportFail('k', log);
+    await reportFail('k');
+    expect(fetchMock.mock.calls.map((call) => JSON.parse(String((call as unknown as [string, RequestInit])[1].body)))).toEqual([
+      { attemptKey: 'k', log },
+      { attemptKey: 'k' },
+    ]);
   });
 });
 

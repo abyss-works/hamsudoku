@@ -1,5 +1,5 @@
 import { useCallback, useEffect, useRef, useState } from 'react';
-import type { EndlessMirror } from '../../../shared/endless';
+import type { EndlessMirror, PlayLog } from '../../../shared/endless';
 import { seasonId } from '../../../shared/season';
 import { loadStoredMirror, storeMirror } from '../api/mirrorApi';
 import { emptyMirror } from '../../../shared/endlessMirrorRules';
@@ -28,8 +28,10 @@ export interface EndlessSession {
   submitting: boolean;
   starting: boolean;
   start(): Promise<boolean>;
-  reportWrong(): void;
-  finish(): Promise<void>;
+  /** 오답을 반영한다. 판 기록은 게임오버 실패 보고에 싣는다. */
+  reportWrong(log?: PlayLog): void;
+  /** 클리어를 제출한다. 판 기록은 클리어 제출에 싣는다. */
+  finish(log?: PlayLog): Promise<void>;
 }
 
 export { RETRY_DELAY_MS };
@@ -109,7 +111,7 @@ export function useEndlessSession(options: EndlessSessionOptions = {}): EndlessS
   const boundStageId = state.stageId;
   const boundRoundId = state.roundId;
 
-  const reportWrong = useCallback(() => {
+  const reportWrong = useCallback((log?: PlayLog) => {
     runWrongWorkflow(
       {
         activeRef,
@@ -123,13 +125,15 @@ export function useEndlessSession(options: EndlessSessionOptions = {}): EndlessS
       },
       boundStageId,
       boundRoundId,
+      log,
     );
   }, [boundStageId, boundRoundId, setMirrorBoth]);
 
-  const finish = useCallback(async () => {
+  const finish = useCallback(async (log?: PlayLog) => {
     await runSubmitWorkflow({
       boundStageId,
       boundRoundId,
+      log,
       finishedRef,
       attemptKeyRef,
       stageRef,

@@ -5,6 +5,8 @@ import {
   clearResponseSchema,
   endlessMirrorSchema,
   failRequestSchema,
+  PLAY_LOG_MAX_EVENTS,
+  playLogSchema,
   nextResponseSchema,
   rankResponseSchema,
   seasonIdSchema,
@@ -93,5 +95,42 @@ describe('계약 스키마', () => {
       season: '2026-W41',
     });
     expect(parsed.success).toBe(true);
+  });
+});
+
+describe('플레이 기록 계약', () => {
+  it('좌표 없는 이벤트와 좌표 있는 이벤트를 함께 파싱한다', () => {
+    const log = {
+      version: 1,
+      events: [[0, 'probe-on'], [120, 'correct', 0, 6], [300, 'mark'], [450, 'wrong', 6, 0], [900, 'probe-off'], [1000, 'reset'], [1200, 'erase', 3, 3]],
+    };
+    expect(playLogSchema.parse(log)).toEqual(log);
+  });
+
+  it.each([
+    ['버전이 1이 아니면', { version: 2, events: [] }],
+    ['알 수 없는 코드면', { version: 1, events: [[0, 'jump']] }],
+    ['t가 음수면', { version: 1, events: [[-1, 'mark']] }],
+    ['t가 정수가 아니면', { version: 1, events: [[1.5, 'mark']] }],
+    ['좌표가 하나만 있으면', { version: 1, events: [[0, 'mark', 1]] }],
+    ['좌표가 판 범위를 벗어나면', { version: 1, events: [[0, 'mark', 7, 0]] }],
+    ['events가 배열이 아니면', { version: 1, events: {} }],
+  ])('%s 거부한다', (_label, log) => {
+    expect(playLogSchema.safeParse(log).success).toBe(false);
+  });
+
+  it('이벤트는 상한 개수까지 허용하고 초과하면 거부한다', () => {
+    const events = (count: number) => Array.from({ length: count }, (_, i) => [i, 'mark']);
+    expect(PLAY_LOG_MAX_EVENTS).toBe(2000);
+    expect(playLogSchema.safeParse({ version: 1, events: events(PLAY_LOG_MAX_EVENTS) }).success).toBe(true);
+    expect(playLogSchema.safeParse({ version: 1, events: events(PLAY_LOG_MAX_EVENTS + 1) }).success).toBe(false);
+  });
+
+  it('clear·fail 요청은 형식이 틀린 기록이 있어도 파싱하고 기록 원문을 유지한다', () => {
+    const clear = clearRequestSchema.parse({ attemptKey: 'k', stageId: 'e-1', solution: [[0, 1]], seedLeft: 2, log: 'broken' });
+    expect(clear.log).toBe('broken');
+    const fail = failRequestSchema.parse({ attemptKey: 'k', log: { version: 9 } });
+    expect(fail.log).toEqual({ version: 9 });
+    expect(failRequestSchema.parse({ attemptKey: 'k' }).log).toBeUndefined();
   });
 });

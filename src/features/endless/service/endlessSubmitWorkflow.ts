@@ -1,7 +1,7 @@
 import { EndlessApiError, submitClear } from '../api/endlessApi';
 import { applyClear, applyClearResponse, markCleared } from '../../../shared/endlessMirrorRules';
 import { playClearSound } from '../../../platform/audio/sound';
-import type { EndlessMirror } from '../../../shared/endless';
+import type { EndlessMirror, PlayLog } from '../../../shared/endless';
 import { createRetryJob, type RetryJob } from './endlessRetryJob';
 import {
   onFinishFailure,
@@ -16,6 +16,8 @@ export const RETRY_DELAY_MS = 3000;
 export interface SubmitContext {
   boundStageId: string | null;
   boundRoundId?: number;
+  /** 판 기록. 재시도에도 같은 기록을 보낸다. */
+  log?: PlayLog;
   finishedRef: { current: boolean };
   attemptKeyRef: { current: string | null };
   stageRef: { current: string | null };
@@ -57,6 +59,7 @@ export async function runSubmitWorkflow(ctx: SubmitContext): Promise<void> {
       stageId: sid,
       solution: ctx.solutionRef.current,
       seedLeft: left,
+      log: ctx.log,
     });
 
   const acceptResponse = (res: Awaited<ReturnType<typeof submitClear>>) => {

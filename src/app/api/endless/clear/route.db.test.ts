@@ -1,4 +1,4 @@
-import { beforeAll, describe, expect, it, vi } from 'vitest';
+import { afterEach, beforeAll, describe, expect, it, vi } from 'vitest';
 import { seasonId } from '../../../../shared/season';
 import {
   ACTIVE_NOW,
@@ -76,6 +76,7 @@ describe('POST /api/endless/clear', () => {
     expect(res).toEqual({ status: 200, body: { ok: false, reason: '알 수 없는 판이에요.' } });
     const [attempt] = await db.query(`select "usedAt" from "Attempt" where id = 'key-1'`);
     expect(attempt.usedAt).toBeNull();
+    expect(await db.query(`select 1 from "EndlessPlayLog"`)).toHaveLength(0);
   });
 
   it.each<[string, Partial<SeedAttempt>]>([
@@ -97,6 +98,7 @@ describe('POST /api/endless/clear', () => {
     const [attempt] = await db.query<{ usedAt: Date | null }>(`select "usedAt" from "Attempt" where id = 'key-1'`);
     expect(attempt.usedAt).toEqual(override.usedAt ?? null);
     expect(await db.query(`select 1 from "EndlessEvent"`)).toHaveLength(0);
+    expect(await db.query(`select 1 from "EndlessPlayLog"`)).toHaveLength(0);
     expect(sentryLogs).toContainEqual({
       level: 'warn',
       message: 'Endless submission rejected',
@@ -133,6 +135,16 @@ describe('POST /api/endless/clear', () => {
     expect(await db.query(`select 1 from "SeedWallet"`)).toHaveLength(0);
     expect(await db.query(`select 1 from "SeedLedger"`)).toHaveLength(0);
     expect(await db.query(`select 1 from "EndlessProgress"`)).toHaveLength(0);
+    expect(await db.query(`select "attemptId", outcome, accepted, reason, "claimedSeedLeft", "serverElapsedMs" from "EndlessPlayLog"`)).toEqual([
+      {
+        attemptId: 'key-1',
+        outcome: 'clear',
+        accepted: false,
+        reason: eventReason,
+        claimedSeedLeft: 'seedLeft' in override ? override.seedLeft : 2,
+        serverElapsedMs: issuedSecondsAgo * 1000,
+      },
+    ]);
   });
 
   it('검증된 클리어는 진행·지갑·원장·연속 기록·이벤트·판 통계를 함께 반영한다', async () => {
@@ -196,6 +208,7 @@ describe('POST /api/endless/clear', () => {
 
     expect(res.body).toEqual({ ok: false, reason: '제출이 너무 잦아요.' });
     expect(await db.query(`select reason from "EndlessEvent" where id <> 'ev-prev'`)).toEqual([{ reason: '제출 간격 하한' }]);
+    expect(await db.query(`select accepted, reason from "EndlessPlayLog"`)).toEqual([{ accepted: false, reason: '제출 간격 하한' }]);
     expect(await db.query(`select 1 from "SeedWallet"`)).toHaveLength(0);
   });
 
@@ -297,5 +310,76 @@ describe('POST /api/endless/clear', () => {
     expect(await db.query(`select balance from "SeedWallet"`)).toEqual([{ balance: 2 }]);
     expect(await db.query(`select 1 from "SeedLedger"`)).toHaveLength(1);
     expect(await db.query(`select 1 from "EndlessEvent" where verified`)).toHaveLength(1);
+  });
+
+  describe('플레이 기록', () => {
+    const log = { version: 1, events: [[0, 'probe-on'], [2500, 'wrong', 3, 3], [7000, 'correct', 0, 0]] };
+
+    afterEach(() => {
+      vi.restoreAllMocks();
+    });
+
+    it('검증된 클리어의 기록을 응답 뒤에 판정 결과와 함께 저장한다', async () => {
+      await prepare();
+
+      const res = await submit({ ...validBody, log });
+
+      expect(res).toEqual({ status: 200, body: { ok: true, earned: 2, balance: 2, streak: 0, suspicious: false } });
+      expect(await db.query(`select * from "EndlessPlayLog"`)).toEqual([
+        {
+          attemptId: 'key-1',
+          userId: USER,
+          stageId: STAGE,
+          outcome: 'clear',
+          accepted: true,
+          reason: null,
+          claimedSeedLeft: 2,
+          serverElapsedMs: 10000,
+          logVersion: 1,
+          events: log.events,
+          logError: null,
+          createdAt: ACTIVE_NOW,
+          auditedAt: null,
+          audit: null,
+        },
+      ]);
+    });
+
+    it.each([
+      ['기록이 없으면', {}, 'missing'],
+      ['기록 형식이 틀리면', { log: { version: 1, events: [[0, 'jump']] } }, 'invalid'],
+      ['기록이 문자열이면', { log: 'broken' }, 'invalid'],
+      ['이벤트가 상한을 넘으면', { log: { version: 1, events: Array.from({ length: 2001 }, (_, i) => [i, 'mark']) } }, 'too_large'],
+    ])('%s 같은 응답과 보상을 주고 원문 없이 사유만 저장한다', async (_label, extra, logError) => {
+      await prepare();
+
+      const res = await submit({ ...validBody, ...extra });
+
+      expect(res).toEqual({ status: 200, body: { ok: true, earned: 2, balance: 2, streak: 0, suspicious: false } });
+      expect(await db.query(`select balance from "SeedWallet"`)).toEqual([{ balance: 2 }]);
+      expect(await db.query(`select accepted, "logVersion", events, "logError" from "EndlessPlayLog"`)).toEqual([
+        { accepted: true, logVersion: null, events: null, logError },
+      ]);
+    });
+
+    it('기록 저장이 실패해도 응답을 바꾸지 않고 오류 요약만 남긴다', async () => {
+      await prepare();
+      const errors = vi.spyOn(console, 'error').mockImplementation(() => {});
+      await db.query(`alter table "EndlessPlayLog" rename to "EndlessPlayLogMoved"`);
+      try {
+        const res = await submit({ ...validBody, log });
+
+        expect(res).toEqual({ status: 200, body: { ok: true, earned: 2, balance: 2, streak: 0, suspicious: false } });
+        expect(errors).toHaveBeenCalledWith('Failed to save play log', {
+          name: expect.any(String),
+          code: '42P01',
+          constraint: undefined,
+          table: undefined,
+        });
+        expect(JSON.stringify(errors.mock.calls)).not.toContain('correct');
+      } finally {
+        await db.query(`alter table "EndlessPlayLogMoved" rename to "EndlessPlayLog"`);
+      }
+    });
   });
 });

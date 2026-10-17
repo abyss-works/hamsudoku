@@ -117,6 +117,41 @@ describe('useEndlessSession', () => {
     });
   });
 
+  it('게임오버 실패 보고에 마지막 오답 시점의 판 기록을 싣는다', async () => {
+    stubFetch(() => Response.json({ ok: true }));
+    const { result } = renderHook(() => useEndlessSession());
+    await act(async () => {
+      await result.current.start();
+    });
+    const logAt = (count: number) => ({
+      version: 1 as const,
+      events: Array.from({ length: count }, (_, i) => [i * 100, 'wrong', 0, i] as [number, 'wrong', number, number]),
+    });
+    act(() => result.current.reportWrong(logAt(1)));
+    act(() => result.current.reportWrong(logAt(2)));
+    act(() => result.current.reportWrong(logAt(3)));
+    await waitFor(() => {
+      const fails = vi.mocked(fetch).mock.calls.filter(([url]) => url === '/api/endless/fail');
+      expect(fails.map(([, init]) => JSON.parse(String(init?.body)))).toEqual([{ attemptKey: 'k1', log: logAt(3) }]);
+    });
+  });
+
+  it('클리어 제출에 판 기록을 싣는다', async () => {
+    stubFetch(() => Response.json({ ok: true, earned: 3, balance: 3, streak: 1, suspicious: false }));
+    const { result } = renderHook(() => useEndlessSession());
+    await act(async () => {
+      await result.current.start();
+    });
+    const log = { version: 1 as const, events: [[350, 'correct', 0, 0], [900, 'correct', 1, 1]] as [number, 'correct', number, number][] };
+    await act(async () => {
+      await result.current.finish(log);
+    });
+    const clears = vi.mocked(fetch).mock.calls.filter(([url]) => url === '/api/endless/clear');
+    expect(clears.map(([, init]) => JSON.parse(String(init?.body)))).toEqual([
+      { attemptKey: 'k1', stageId: 'e-1', solution: [[0, 0], [1, 1]], seedLeft: 3, log },
+    ]);
+  });
+
   it('클리어하면 미러가 낙관 반영되고 서버 응답으로 보정된다', async () => {
     stubFetch(() => Response.json({ ok: true, earned: 3, balance: 3, streak: 1, suspicious: false }));
     const { result } = renderHook(() => useEndlessSession());
