@@ -20,11 +20,33 @@ export const nextResponseSchema = z.object({
   attemptKey: z.string().min(1),
 });
 
+export const PLAY_LOG_VERSION = 1;
+/** 한 판 기록의 이벤트 상한. 초과한 기록은 저장하지 않는다. */
+export const PLAY_LOG_MAX_EVENTS = 2000;
+
+export const playEventCodeSchema = z.enum(['correct', 'wrong', 'mark', 'erase', 'reset', 'probe-on', 'probe-off']);
+
+const playEventTimeSchema = z.number().int().min(0);
+const playEventCellSchema = z.number().int().min(0).max(6);
+
+/** 판 표시 시점부터의 경과 밀리초와 조작 결과. 칸 조작은 행·열 좌표를 함께 담는다. */
+export const playEventSchema = z.union([
+  z.tuple([playEventTimeSchema, playEventCodeSchema]),
+  z.tuple([playEventTimeSchema, playEventCodeSchema, playEventCellSchema, playEventCellSchema]),
+]);
+
+export const playLogSchema = z.object({
+  version: z.literal(PLAY_LOG_VERSION),
+  events: z.array(playEventSchema).max(PLAY_LOG_MAX_EVENTS),
+});
+
 export const clearRequestSchema = z.object({
   attemptKey: z.string().min(1),
   stageId: z.string().min(1),
   solution: z.array(z.tuple([z.number().int().min(0).max(6), z.number().int().min(0).max(6)])),
   seedLeft: z.number().int().min(0).max(3),
+  /** 플레이 기록 원문. 형식 검증은 저장 단계에서 하며 요청 수락 여부에 영향을 주지 않는다. */
+  log: z.unknown().optional(),
 });
 
 export const clearResponseSchema = z.discriminatedUnion('ok', [
@@ -43,6 +65,8 @@ export const clearResponseSchema = z.discriminatedUnion('ok', [
 
 export const failRequestSchema = z.object({
   attemptKey: z.string().min(1),
+  /** 플레이 기록 원문. 형식 검증은 저장 단계에서 하며 요청 수락 여부에 영향을 주지 않는다. */
+  log: z.unknown().optional(),
 });
 
 export const failResponseSchema = z.object({ ok: z.literal(true) });
@@ -90,6 +114,9 @@ export const ENDLESS_MIRROR_KEY = 'hamsudoku:endless:v1';
 export type EndlessStage = z.infer<typeof endlessStageSchema>;
 export type NextRequest = z.infer<typeof nextRequestSchema>;
 export type NextResponse = z.infer<typeof nextResponseSchema>;
+export type PlayEventCode = z.infer<typeof playEventCodeSchema>;
+export type PlayEvent = z.infer<typeof playEventSchema>;
+export type PlayLog = z.infer<typeof playLogSchema>;
 export type ClearRequest = z.infer<typeof clearRequestSchema>;
 export type ClearResponse = z.infer<typeof clearResponseSchema>;
 export type FailRequest = z.infer<typeof failRequestSchema>;

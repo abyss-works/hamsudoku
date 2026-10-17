@@ -1,4 +1,5 @@
 import { useEffect, useLayoutEffect, useRef } from 'react';
+import type { PlayLog } from '../../../shared/endless';
 import type { OverlayActions } from '../../../shared/overlay';
 import type { EndlessSession } from './useEndlessSession';
 import { endlessClearModel, endlessHudModel } from '../model/screenModels';
@@ -56,9 +57,9 @@ export function useEndlessGame(session: EndlessSession, { overlay, track, showEn
     showEntryLoading,
     clearModel,
     hud,
-    reportWrong: () => {
+    reportWrong: (log?: PlayLog) => {
       if (roundRef.current !== boundRoundId || stageRef.current !== boundStageId) return;
-      session.reportWrong();
+      session.reportWrong(log);
     },
     next: () => {
       if (roundRef.current !== boundRoundId || stageRef.current !== boundStageId) return;
@@ -85,10 +86,10 @@ export function useEndlessGame(session: EndlessSession, { overlay, track, showEn
         ),
       );
     },
-    finishBoard: () => {
+    finishBoard: (log?: PlayLog) => {
       if (roundRef.current !== boundRoundId || stageRef.current !== boundStageId) return;
       overlay.open({ type: 'clear', slot: 'endless-clear' });
-      void session.finish();
+      void session.finish(log);
     },
   };
 }
