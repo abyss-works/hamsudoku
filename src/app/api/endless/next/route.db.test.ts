@@ -122,13 +122,13 @@ describe('POST /api/endless/next', () => {
     expect(sentryLogs).toContainEqual({ level: 'warn', message: 'Endless pool empty', attributes: {} });
   });
 
-  it('클리어하지 않은 판과 입장 키를 발급하고 정답을 암호화해 전달한다', async () => {
+  it('씨앗 3개로 클리어하지 않은 판과 입장 키를 발급하고 정답을 암호화해 전달한다', async () => {
     await seedUser(db, USER);
     await seedStock(20);
     await seedStage(db, { id: 'e-10000-0', regions: '0123456'.repeat(7), clears: 3 });
     await db.query(
-      `insert into "EndlessProgress" ("userId", "stageId", cleared, attempts, "lastPlayedAt")
-       select $1, id, true, 1, $2 from "EndlessStage" where id <> 'e-10000-0'`,
+      `insert into "EndlessProgress" ("userId", "stageId", cleared, attempts, "bestSeedLeft", "lastPlayedAt")
+       select $1, id, true, 1, 3, $2 from "EndlessStage" where id <> 'e-10000-0'`,
       [USER, ACTIVE_NOW],
     );
     signInAs(USER);
@@ -143,17 +143,30 @@ describe('POST /api/endless/next', () => {
     ]);
   });
 
-  it('클리어하지 않은 판만 고른다', async () => {
+  it('씨앗 3개로 클리어한 판은 고르지 않는다', async () => {
     await seedUser(db, USER);
     await seedStock(20);
     await db.query(
-      `insert into "EndlessProgress" ("userId", "stageId", cleared, attempts, "lastPlayedAt")
-       select $1, id, id <> 'e-20005-0', 1, $2 from "EndlessStage"`,
+      `insert into "EndlessProgress" ("userId", "stageId", cleared, attempts, "bestSeedLeft", "lastPlayedAt")
+       select $1, id, id <> 'e-20005-0', 1, case when id <> 'e-20005-0' then 3 else 0 end, $2 from "EndlessStage"`,
       [USER, ACTIVE_NOW],
     );
     signInAs(USER);
 
     for (let i = 0; i < 3; i += 1) expect((await next()).body.stage.id).toBe('e-20005-0');
+  });
+
+  it('씨앗을 잃고 클리어한 판은 다시 고를 수 있다', async () => {
+    await seedUser(db, USER);
+    await seedStock(20);
+    await db.query(
+      `insert into "EndlessProgress" ("userId", "stageId", cleared, attempts, "bestSeedLeft", "lastPlayedAt")
+       select $1, id, true, 1, case when id = 'e-20007-0' then 2 else 3 end, $2 from "EndlessStage"`,
+      [USER, ACTIVE_NOW],
+    );
+    signInAs(USER);
+
+    expect((await next()).body.stage.id).toBe('e-20007-0');
   });
 
   it('재고가 충분하면 공급 작업을 만들지 않는다', async () => {

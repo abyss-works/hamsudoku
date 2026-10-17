@@ -53,12 +53,13 @@ export interface PlayableStage {
   solution: string;
 }
 
-/** 사용자가 아직 클리어하지 않은 판 하나를 무작위로 고른다. 없으면 null이다. */
-export async function pickUnclearedStage(executor: Executor, userId: string): Promise<PlayableStage | null> {
+/** 사용자가 씨앗 3개로 클리어하지 않은 판(미클리어 판과 씨앗을 잃고 클리어한 판) 중 하나를 무작위로 고른다. 없으면 null이다. */
+export async function pickPlayableStage(executor: Executor, userId: string): Promise<PlayableStage | null> {
   const result = await executor.execute<PlayableStage & Record<string, unknown>>(sql`
     select s."id", s."size", s."regions", s."solution" from "EndlessStage" s
     where not exists (
-      select 1 from "EndlessProgress" p where p."userId" = ${userId} and p."stageId" = s."id" and p."cleared"
+      select 1 from "EndlessProgress" p
+      where p."userId" = ${userId} and p."stageId" = s."id" and p."cleared" and p."bestSeedLeft" >= 3
     )
     order by random() limit 1
   `);
