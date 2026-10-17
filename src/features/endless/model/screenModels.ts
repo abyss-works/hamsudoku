@@ -31,7 +31,10 @@ export function endlessClearModel({
   } else if (result.ok === false) {
     title = error ?? '기록을 저장하지 못했어요.';
   } else {
-    title = `햄스터를 다 찾았다! 씨앗 ${result.earned}개를 얻었어요`;
+    title =
+      result.earned > 0
+        ? `햄스터를 다 찾았다! 씨앗 ${result.earned}개를 얻었어요`
+        : '햄스터를 다 찾았다! 씨앗을 얻지 못했어요';
   }
 
   const showConfetti = !showPending && !failed;

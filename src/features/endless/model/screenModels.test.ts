@@ -44,7 +44,7 @@ describe('endless screenModels (순수 표시 모델)', () => {
     expect(endlessClearModel({ ...base, seedLeft: 2, result: { ok: true, earned: 2 } }).showRetry).toBe(true);
   });
 
-  it('저장 성공 시 폭죽 표시와 획득 씨앗 문구를 제공하며 earned=0도 보존한다', () => {
+  it('저장 성공 시 폭죽 표시와 획득 씨앗 문구를 제공하고, 적립이 없으면 얻지 못했다고 알린다', () => {
     expect(endlessClearModel({ result: { ok: true, earned: 5 }, error: null, submitting: false, starting: false, seedLeft: 2 })).toEqual({
       showConfetti: true,
       title: '햄스터를 다 찾았다! 씨앗 5개를 얻었어요',
@@ -54,7 +54,7 @@ describe('endless screenModels (순수 표시 모델)', () => {
     });
     expect(endlessClearModel({ result: { ok: true, earned: 0 }, error: null, submitting: false, starting: false, seedLeft: 2 })).toEqual({
       showConfetti: true,
-      title: '햄스터를 다 찾았다! 씨앗 0개를 얻었어요',
+      title: '햄스터를 다 찾았다! 씨앗을 얻지 못했어요',
       note: null,
       actionsDisabled: false,
       showRetry: true,
