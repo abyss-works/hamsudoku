@@ -53,8 +53,12 @@ export function useAuthService(options: AuthServiceOptions = {}): AuthService {
           setState((prev) => applyAuthCloud(prev, bootMe.cloud));
           if (bootMe.uid) return bootMe;
         }
-        await authApi.session();
+        // 세션 확보 응답이 사용자와 이메일을 주므로 me()를 다시 읽지 않는다. 확보하지 못했을 때만 다시 읽는다.
+        const established = await authApi.session();
         if (!isMountedRef.current || instanceId !== mountInstanceIdRef.current) return null;
+        if (established.uid) {
+          return { uid: established.uid, email: established.email ?? null, cloud: bootMe?.cloud ?? true };
+        }
         return authApi.me();
       })
       .then((me) => {
