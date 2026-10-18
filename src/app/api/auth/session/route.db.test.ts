@@ -28,9 +28,15 @@ describe('POST /api/auth/session', () => {
   it('세션이 성립하면 사용자를 반환하고 응답 뒤에 사용자와 프로필 행을 기록한다', async () => {
     signInAs('user-a');
 
-    expect(await establish()).toEqual({ status: 200, body: { ok: true, uid: 'user-a' } });
+    expect(await establish()).toEqual({ status: 200, body: { ok: true, uid: 'user-a', email: null } });
     expect(await db.query(`select id, email from "User"`)).toEqual([{ id: 'user-a', email: null }]);
     expect(await db.query(`select "userId", nickname from "Profile"`)).toEqual([{ userId: 'user-a', nickname: null }]);
+  });
+
+  it('로그인된 세션은 이메일을 함께 반환한다', async () => {
+    signInAs('user-b', 'b@example.com');
+
+    expect(await establish()).toEqual({ status: 200, body: { ok: true, uid: 'user-b', email: 'b@example.com' } });
   });
 
   it('이미 기록된 사용자의 이메일과 닉네임을 유지한다', async () => {

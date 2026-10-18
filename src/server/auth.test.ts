@@ -68,7 +68,7 @@ describe('ensureSession', () => {
     });
     const { ensureSession } = await import('./auth');
 
-    expect(await ensureSession()).toBe('u1');
+    expect(await ensureSession()).toEqual({ uid: 'u1', email: null });
     expect(supabaseStub.getUser).not.toHaveBeenCalled();
     expect(supabaseStub.signInAnonymously).not.toHaveBeenCalled();
   });
@@ -80,7 +80,19 @@ describe('ensureSession', () => {
     supabaseStub.signInAnonymously.mockResolvedValueOnce({ data: { user: { id: 'anon-2' } }, error: null });
     const { ensureSession } = await import('./auth');
 
-    expect(await ensureSession()).toBe('anon-2');
+    expect(await ensureSession()).toEqual({ uid: 'anon-2', email: null });
+  });
+
+  it('로그인된 기존 세션은 이메일을 함께 반환한다', async () => {
+    vi.stubEnv('SUPABASE_URL', 'https://x.supabase.co');
+    vi.stubEnv('SUPABASE_ANON_KEY', 'anon');
+    supabaseStub.getClaims.mockResolvedValueOnce({
+      data: { claims: { sub: 'u3', email: 'u3@x.y', is_anonymous: false } },
+      error: null,
+    });
+    const { ensureSession } = await import('./auth');
+
+    expect(await ensureSession()).toEqual({ uid: 'u3', email: 'u3@x.y' });
   });
 });
 
