@@ -72,7 +72,13 @@ describe('POST /api/internal/play-audit', () => {
 
     expect(res).toEqual({ status: 200, body: { ok: true, audited: 3, flagged: 2 } });
     expect(await db.query(`select count(*)::int as n from "EndlessPlayLog" where "auditedAt" = $1`, [ACTIVE_NOW])).toEqual([{ n: 3 }]);
-    expect(sentryLogs).toEqual([{ level: 'info', message: 'Endless play audit', attributes: { audited: 3, flagged: 2 } }]);
+    expect(sentryLogs).toEqual([
+      {
+        level: 'info',
+        message: 'Endless play audit',
+        attributes: { audited: 3, flagged: 2, flag_no_log: 1, flag_seedMismatch: 1 },
+      },
+    ]);
   });
 
   it('QStash 서명 요청과 GET 요청도 감사한다', async () => {
