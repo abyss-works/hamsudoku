@@ -1,7 +1,7 @@
 import { rankedSeasonId, rankingFrozen, seasonWindow } from '../../shared/season';
 import { findNicknames } from '../account/queries';
 import { db } from '../db/client';
-import type { Defer } from '../defer';
+import { deferTask, type Defer } from '../defer';
 import { createQStashPublisher } from '../qstashPublisher';
 import { rankStoreFromEnv } from '../rank';
 import { findFinalizedSeasonTop, findSeasonStanding, listSeasonEarnings } from './queries';
@@ -66,12 +66,10 @@ export async function fetchSeasonRank(uid: string, now: Date, defer: Defer): Pro
 
   if (frozen) {
     // 중복 방지 키로 등록하므로 여러 요청이 같은 시즌을 요청해도 확정 작업은 하나다.
-    defer(async () => {
-      try {
-        await createQStashPublisher().enqueueFinalize(season);
-      } catch {
-        console.warn('Ranking finalization enqueue failed');
-      }
+    deferTask(defer, {
+      name: 'finalize-enqueue',
+      task: () => createQStashPublisher().enqueueFinalize(season),
+      onError: () => console.warn('Ranking finalization enqueue failed'),
     });
     return { season, top: [], snapshotAt: now.toISOString(), me, frozen: true, status: 'aggregating' };
   }
