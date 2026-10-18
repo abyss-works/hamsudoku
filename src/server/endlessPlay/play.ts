@@ -3,7 +3,7 @@ import { seasonId } from '../../shared/season';
 import { consumeAttempt, issueAttempt, releaseAttempt } from '../attempt/store';
 import { db, withTransaction } from '../db/client';
 import { describeDbError } from '../db/errors';
-import type { Defer } from '../defer';
+import { deferTask, type Defer } from '../defer';
 import { findStage } from '../endlessPool/queries';
 import { recordStagePlay } from '../endlessPool/store';
 import { requestSupply, type SupplyEnqueuer } from '../endlessPool/supply';
@@ -24,12 +24,10 @@ type PlayLogSubmission = Omit<PlayLogRow, 'logVersion' | 'events' | 'logError'> 
  * 실패하면 기록 원문 없이 오류 요약만 남긴다.
  */
 function deferPlayLog(defer: Defer, { rawLog, ...row }: PlayLogSubmission): void {
-  defer(async () => {
-    try {
-      await savePlayLog(db, { ...row, ...readPlayLog(rawLog) });
-    } catch (error) {
-      console.error('Failed to save play log', describeDbError(error));
-    }
+  deferTask(defer, {
+    name: 'play-log',
+    task: () => savePlayLog(db, { ...row, ...readPlayLog(rawLog) }),
+    onError: (error) => console.error('Failed to save play log', describeDbError(error)),
   });
 }
 
@@ -49,13 +47,13 @@ export async function startEndlessStage(
   enqueuer: SupplyEnqueuer,
   retryStageId?: string,
 ): Promise<StartResult> {
-  defer(async () => {
-    try {
+  deferTask(defer, {
+    name: 'supply-request',
+    task: async () => {
       const decision = await requestSupply(now, enqueuer);
       if (decision.enqueueError) console.warn('Supply enqueue warning (non-fatal):', decision.enqueueError);
-    } catch (error) {
-      console.error('Failed to trigger supply', describeDbError(error));
-    }
+    },
+    onError: (error) => console.error('Failed to trigger supply', describeDbError(error)),
   });
   const stage = retryStageId === undefined ? await pickPlayableStage(db, uid) : await findRetryableStage(db, uid, retryStageId);
   if (!stage) return { ok: false, reason: retryStageId === undefined ? 'pool_empty' : 'not_retryable' };
