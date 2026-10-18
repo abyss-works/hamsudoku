@@ -9,6 +9,7 @@ import {
   seedStage,
   sentryLogs,
   useRouteDatabase,
+  sentryEvents,
 } from '../../../../../tools/dbTest/routeHarness';
 
 vi.mock('@sentry/nextjs', async () => (await import('../../../../../tools/dbTest/routeHarness')).mockSentry());
@@ -95,6 +96,7 @@ describe('POST /api/internal/play-audit', () => {
       const res = await callRoute(POST, { path: PATH, rawBody: '', headers: internalAuth() });
 
       expect(res).toEqual({ status: 500, body: { ok: false, msg: '감사를 완료하지 못했어요.' } });
+      expect(sentryEvents.exceptions).toEqual([{ tags: { 'job.name': 'play-audit' } }]);
       expect(errors).toHaveBeenCalledWith('Failed to audit play logs', {
         name: expect.any(String),
         code: '42P01',
