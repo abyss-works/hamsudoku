@@ -1,6 +1,7 @@
 import { rankedSeasonId, seasonWindow } from '../../shared/season';
 import { db, withTransaction } from '../db/client';
 import { describeDbError } from '../db/errors';
+import { captureJobFailure } from '../jobMonitor';
 import { findFinalizedSeason, isSeasonFinalized, listUnfinalizedLedgerSeasons, type FinalizedSeason } from './queries';
 import { insertSeasonResultsFromLedger, lockSeasonForFinalization, saveSeasonFinalizationHeader } from './store';
 
@@ -19,6 +20,7 @@ export class SeasonNotEndedError extends Error {
 export function finalizationFailureMessage(error: unknown): string {
   if (error instanceof SeasonNotEndedError) return error.message;
   console.error('Ranking finalization failed', describeDbError(error));
+  captureJobFailure('ranking-finalize', error);
   return '시즌 확정에 실패했어요.';
 }
 

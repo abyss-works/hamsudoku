@@ -1,5 +1,6 @@
 import { db } from '../db/client';
 import { describeDbError } from '../db/errors';
+import { captureJobFailure } from '../jobMonitor';
 import { findUnauditedPlayLogs } from './queries';
 import { auditPlayLog } from './rules';
 import { saveAudits } from './store';
@@ -33,4 +34,5 @@ export async function auditPlayLogs(now: Date, limit: number = AUDIT_BATCH_LIMIT
 /** 감사 실패를 기록 원문 없이 오류 요약으로 남긴다. */
 export function reportAuditFailure(error: unknown): void {
   console.error('Failed to audit play logs', describeDbError(error));
+  captureJobFailure('play-audit', error);
 }

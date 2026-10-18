@@ -71,11 +71,23 @@ export function mockAuth<T extends object>(original: T): T {
 
 export const sentryLogs: { level: string; message: string; attributes: unknown }[] = [];
 
+/** Sentry로 보낸 오류 이벤트의 태그와 cron 모니터 체크인 이름. */
+export const sentryEvents = { exceptions: [] as { tags: unknown }[], monitors: [] as string[] };
+
 export function mockSentry() {
   const record = (level: string) => (message: string, attributes?: unknown) => {
     sentryLogs.push({ level, message, attributes });
   };
-  return { logger: { info: record('info'), warn: record('warn'), error: record('error') } };
+  return {
+    logger: { info: record('info'), warn: record('warn'), error: record('error') },
+    captureException: (_error: unknown, context?: { tags?: unknown }) => {
+      sentryEvents.exceptions.push({ tags: context?.tags });
+    },
+    withMonitor: (slug: string, callback: () => unknown) => {
+      sentryEvents.monitors.push(slug);
+      return callback();
+    },
+  };
 }
 
 // ---- 응답 후 작업 ----
@@ -250,6 +262,8 @@ export function useRouteDatabase(): RouteDatabase {
     authResults.signUp = { ok: true };
     authResults.nextUid = null;
     sentryLogs.length = 0;
+    sentryEvents.exceptions.length = 0;
+    sentryEvents.monitors.length = 0;
     rankStore.current = null;
     outbound.requests.length = 0;
     outbound.status = 200;
