@@ -1,5 +1,5 @@
 import { beforeAll, describe, expect, it, vi } from 'vitest';
-import { authResults, callRoute, sentryLogs, seedUser, signInAs, useRouteDatabase } from '../../../../../tools/dbTest/routeHarness';
+import { authResults, callRoute, rateLimits, sentryLogs, seedUser, signInAs, useRouteDatabase } from '../../../../../tools/dbTest/routeHarness';
 
 vi.mock('@sentry/nextjs', async () => (await import('../../../../../tools/dbTest/routeHarness')).mockSentry());
 vi.mock('next/server', async (original) =>
@@ -7,6 +7,9 @@ vi.mock('next/server', async (original) =>
 );
 vi.mock('../../../../server/auth', async (original) =>
   (await import('../../../../../tools/dbTest/routeHarness')).mockAuth(await original()),
+);
+vi.mock('../../../../server/rateLimit', async (original) =>
+  (await import('../../../../../tools/dbTest/routeHarness')).mockRateLimit(await original()),
 );
 
 const db = useRouteDatabase();
@@ -26,6 +29,18 @@ describe('POST /api/auth/signup', () => {
       status: 400,
       body: { ok: false, msg: '이메일과 비밀번호를 확인하세요.' },
     });
+  });
+
+  it('한도를 넘으면 429를 반환하고 가입을 시도하지 않는다', async () => {
+    rateLimits.enabled = true;
+    rateLimits.blocked.add('signup');
+    signInAs('anon-a');
+
+    const res = await signUp({ email: 'a@example.com', password: 'secret1' });
+
+    expect(res).toEqual({ status: 429, body: { ok: false, msg: '요청이 많아요. 잠시 후 다시 시도해 주세요.' } });
+    expect(rateLimits.checks).toEqual(['signup:unknown']);
+    expect(await db.query(`select 1 from "User"`)).toHaveLength(0);
   });
 
   it('익명 사용자를 승격하면 같은 사용자 행에 이메일을 기록한다', async () => {
