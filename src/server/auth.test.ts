@@ -20,7 +20,15 @@ const supabaseStub = vi.hoisted(() => ({
   signInAnonymously: vi.fn(),
 }));
 vi.mock('next/headers', () => ({ cookies: async () => ({ getAll: () => [], set: () => {} }) }));
-vi.mock('@supabase/ssr', () => ({ createServerClient: () => ({ auth: supabaseStub }) }));
+const clientOptions = vi.hoisted(() => ({ last: null as null | { global?: { fetch?: unknown } } }));
+const serverFetch = vi.hoisted(() => vi.fn());
+vi.mock('./keepAliveFetch', () => ({ serverFetch }));
+vi.mock('@supabase/ssr', () => ({
+  createServerClient: (_url: string, _key: string, options: { global?: { fetch?: unknown } }) => {
+    clientOptions.last = options;
+    return { auth: supabaseStub };
+  },
+}));
 
 describe('getSessionUser', () => {
   it('서명을 로컬 검증한 claims로 세션을 판정하고 Auth 서버 getUser를 호출하지 않는다', async () => {
@@ -73,5 +81,18 @@ describe('ensureSession', () => {
     const { ensureSession } = await import('./auth');
 
     expect(await ensureSession()).toBe('anon-2');
+  });
+});
+
+describe('Supabase 서버 클라이언트', () => {
+  it('Auth 요청을 연결을 유지하는 서버 fetch로 보낸다', async () => {
+    vi.stubEnv('SUPABASE_URL', 'https://x.supabase.co');
+    vi.stubEnv('SUPABASE_ANON_KEY', 'anon');
+    supabaseStub.getClaims.mockResolvedValueOnce({ data: null, error: null });
+    const { getSessionUser } = await import('./auth');
+
+    await getSessionUser();
+
+    expect(clientOptions.last?.global?.fetch).toBe(serverFetch);
   });
 });

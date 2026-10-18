@@ -1,6 +1,7 @@
 import { cookies } from 'next/headers';
 import { createServerClient } from '@supabase/ssr';
 import type { SupabaseClient } from '@supabase/supabase-js';
+import { serverFetch } from './keepAliveFetch';
 
 export type AuthResult = { ok: true } | { ok: false; msg: string; code?: string };
 
@@ -21,6 +22,7 @@ async function userClient(): Promise<SupabaseClient | null> {
   if (!url || !anonKey) return null;
   const store = await cookies();
   return createServerClient(url, anonKey, {
+    global: { fetch: serverFetch },
     cookies: {
       getAll: () => store.getAll(),
       setAll: (pairs) => {
