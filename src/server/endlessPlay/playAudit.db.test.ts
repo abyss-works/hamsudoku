@@ -56,7 +56,7 @@ describe('auditPlayLogs', () => {
 
     const result = await audit.auditPlayLogs(ACTIVE_NOW);
 
-    expect(result).toEqual({ audited: 3, flagged: 2 });
+    expect(result).toEqual({ audited: 3, flagged: 2, flagCounts: { no_log: 1, seedMismatch: 1 } });
     const rows = await db.query<{ attemptId: string; auditedAt: Date; audit: { flags: string[] } }>(
       `select "attemptId", "auditedAt", audit from "EndlessPlayLog" order by "attemptId"`,
     );
@@ -86,7 +86,7 @@ describe('auditPlayLogs', () => {
     await seedLog(db, { attemptId: 'done', auditedAt: earlier });
     await db.query(`update "EndlessPlayLog" set audit = '{"version":1,"flags":["kept"]}'::jsonb`);
 
-    expect(await audit.auditPlayLogs(ACTIVE_NOW)).toEqual({ audited: 0, flagged: 0 });
+    expect(await audit.auditPlayLogs(ACTIVE_NOW)).toEqual({ audited: 0, flagged: 0, flagCounts: {} });
     expect(await db.query(`select "auditedAt", audit from "EndlessPlayLog"`)).toEqual([
       { auditedAt: earlier, audit: { version: 1, flags: ['kept'] } },
     ]);
@@ -98,7 +98,7 @@ describe('auditPlayLogs', () => {
     await seedLog(db, { attemptId: 'oldest', createdAt: secondsBefore(ACTIVE_NOW, 30) });
     await seedLog(db, { attemptId: 'middle', createdAt: secondsBefore(ACTIVE_NOW, 20) });
 
-    expect(await audit.auditPlayLogs(ACTIVE_NOW, 2)).toEqual({ audited: 2, flagged: 0 });
+    expect(await audit.auditPlayLogs(ACTIVE_NOW, 2)).toEqual({ audited: 2, flagged: 0, flagCounts: {} });
     expect(await db.query(`select "attemptId" from "EndlessPlayLog" where "auditedAt" is null`)).toEqual([
       { attemptId: 'newest' },
     ]);
@@ -116,7 +116,7 @@ describe('auditPlayLogs', () => {
       events: [[100, 'wrong', 0, 1], [200, 'wrong', 0, 2], [300, 'wrong', 0, 3]],
     });
 
-    expect(await audit.auditPlayLogs(ACTIVE_NOW)).toEqual({ audited: 1, flagged: 0 });
+    expect(await audit.auditPlayLogs(ACTIVE_NOW)).toEqual({ audited: 1, flagged: 0, flagCounts: {} });
     expect(await db.query(`select audit from "EndlessPlayLog"`)).toEqual([
       {
         audit: expect.objectContaining({ wrongCount: 3, derivedSeedLeft: 0, seedMismatch: null, missingSolutionCells: null, flags: [] }),

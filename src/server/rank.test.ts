@@ -1,5 +1,8 @@
-import { describe, expect, it } from 'vitest';
+import { describe, expect, it, vi } from 'vitest';
 import { createRankStore, rankStoreFromEnv } from './rank';
+
+const serverFetch = vi.hoisted(() => vi.fn(async () => Response.json({ result: 1 })));
+vi.mock('./keepAliveFetch', () => ({ serverFetch }));
 
 type Call = { url: string; init: RequestInit };
 type Command = unknown[];
@@ -451,3 +454,12 @@ describe('top 스냅샷 조회와 갱신 잠금의 단일 왕복', () => {
   });
 });
 
+describe('rankStoreFromEnv 연결', () => {
+  it('환경 설정으로 만든 저장소는 연결을 유지하는 서버 fetch로 요청한다', async () => {
+    const store = rankStoreFromEnv({ UPSTASH_REDIS_REST_URL: 'https://u', UPSTASH_REDIS_REST_TOKEN: 't' })!;
+
+    await store.remove('2026-W42', 'u1');
+
+    expect(serverFetch).toHaveBeenCalledTimes(1);
+  });
+});

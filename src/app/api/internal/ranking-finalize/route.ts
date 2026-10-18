@@ -2,6 +2,7 @@ import { NextResponse } from 'next/server';
 import { z } from 'zod';
 import { seasonIdSchema } from '../../../../shared/endless';
 import { verifyInternalRequest } from '../../../../server/qstash';
+import { DAILY_RANKING_MONITOR, monitorJob } from '../../../../server/jobMonitor';
 import { finalizationFailureMessage, finalizeSeason, recoverUnfinalizedSeasons } from '../../../../server/seasonRanking/finalization';
 
 const finalizeBodySchema = z
@@ -56,8 +57,8 @@ export async function POST(req: Request) {
       });
     }
 
-    // 시즌 지정이 없거나 복구 요청인 경우: 미확정 종료 시즌 일괄 복구
-    const recovered = await recoverUnfinalizedSeasons(now);
+    // 시즌 지정이 없거나 복구 요청인 경우: 미확정 종료 시즌 일괄 복구. 예약 실행을 cron 모니터로 감시한다.
+    const recovered = await monitorJob(DAILY_RANKING_MONITOR, () => recoverUnfinalizedSeasons(now));
     return NextResponse.json({
       ok: true,
       recoveredSeasons: recovered.map((r) => r.header.season),

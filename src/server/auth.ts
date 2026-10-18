@@ -1,6 +1,7 @@
 import { cookies } from 'next/headers';
 import { createServerClient } from '@supabase/ssr';
 import type { SupabaseClient } from '@supabase/supabase-js';
+import { serverFetch } from './keepAliveFetch';
 
 export type AuthResult = { ok: true } | { ok: false; msg: string; code?: string };
 
@@ -21,6 +22,7 @@ async function userClient(): Promise<SupabaseClient | null> {
   if (!url || !anonKey) return null;
   const store = await cookies();
   return createServerClient(url, anonKey, {
+    global: { fetch: serverFetch },
     cookies: {
       getAll: () => store.getAll(),
       setAll: (pairs) => {
@@ -54,15 +56,17 @@ function authErr(e: { message?: string; code?: string } | null): AuthResult {
   };
 }
 
-// 익명 세션 확보 — 있으면 재사용 (기기당 계정 유지). 기존 세션은 로컬 검증한 claims로 판정해 Auth 서버를 왕복하지 않는다.
-export async function ensureSession(): Promise<string | null> {
+// 익명 세션 확보 — 있으면 재사용 (기기당 계정 유지). 기존 세션은 로컬 검증한 claims로 판정해 Auth 서버를 왕복하지 않으며,
+// 로그인된 세션이면 이메일을 함께 반환한다.
+export async function ensureSession(): Promise<{ uid: string; email: string | null } | null> {
   const supabase = await userClient();
   if (!supabase) return null;
   const { data: verified } = await supabase.auth.getClaims();
-  if (verified?.claims?.sub) return verified.claims.sub;
+  const claims = verified?.claims;
+  if (claims?.sub) return { uid: claims.sub, email: !claims.is_anonymous && claims.email ? claims.email : null };
   const { data, error } = await supabase.auth.signInAnonymously();
-  if (error) return null;
-  return data.user?.id ?? null;
+  if (error || !data.user?.id) return null;
+  return { uid: data.user.id, email: null };
 }
 
 // 세션 판정은 액세스 토큰의 서명을 로컬에서 검증한 claims로 한다. 프로젝트가 비대칭 서명키(ES256)를

@@ -40,19 +40,43 @@ describe('useAuthService 단위 및 생명주기 계약', () => {
     expect(onBootAuth).toHaveBeenCalledWith('u1');
   });
 
-  it('부팅 시 uid가 없으면 session()을 확보하고 me()를 다시 읽는다', async () => {
-    mockedMe
-      .mockResolvedValueOnce({ uid: null, email: null, cloud: true })
-      .mockResolvedValueOnce({ uid: 'anon1', email: null, cloud: true });
-    mockedSession.mockResolvedValueOnce({ uid: 'anon1' });
+  it('부팅 시 uid가 없으면 session()으로 확보한 사용자를 me()를 다시 읽지 않고 쓴다', async () => {
+    mockedMe.mockResolvedValueOnce({ uid: null, email: null, cloud: true });
+    mockedSession.mockResolvedValueOnce({ uid: 'anon1', email: null });
     const onBootAuth = vi.fn();
 
     const { result } = renderHook(() => useAuthService({ onBootAuth }));
 
     await waitFor(() => expect(result.current.loading).toBe(false));
     expect(mockedSession).toHaveBeenCalled();
+    expect(mockedMe).toHaveBeenCalledTimes(1);
     expect(result.current.uid).toBe('anon1');
+    expect(result.current.email).toBeNull();
+    expect(result.current.cloud).toBe(true);
     expect(onBootAuth).toHaveBeenCalledWith('anon1');
+  });
+
+  it('session()이 이메일을 주면 로그인 사용자로 반영한다', async () => {
+    mockedMe.mockResolvedValueOnce({ uid: null, email: null, cloud: true });
+    mockedSession.mockResolvedValueOnce({ uid: 'u2', email: 'u2@test.com' });
+
+    const { result } = renderHook(() => useAuthService());
+
+    await waitFor(() => expect(result.current.loading).toBe(false));
+    expect(result.current.email).toBe('u2@test.com');
+  });
+
+  it('session()으로도 사용자를 얻지 못하면 me()를 다시 읽는다', async () => {
+    mockedMe
+      .mockResolvedValueOnce({ uid: null, email: null, cloud: true })
+      .mockResolvedValueOnce({ uid: null, email: null, cloud: true });
+    mockedSession.mockResolvedValueOnce({ uid: null });
+
+    const { result } = renderHook(() => useAuthService());
+
+    await waitFor(() => expect(result.current.loading).toBe(false));
+    expect(mockedMe).toHaveBeenCalledTimes(2);
+    expect(result.current.uid).toBeNull();
   });
 
   it('warmSession은 로그인 사용자는 건너뛰고 게스트만 세션을 확보한다', async () => {

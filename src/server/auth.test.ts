@@ -20,7 +20,15 @@ const supabaseStub = vi.hoisted(() => ({
   signInAnonymously: vi.fn(),
 }));
 vi.mock('next/headers', () => ({ cookies: async () => ({ getAll: () => [], set: () => {} }) }));
-vi.mock('@supabase/ssr', () => ({ createServerClient: () => ({ auth: supabaseStub }) }));
+const clientOptions = vi.hoisted(() => ({ last: null as null | { global?: { fetch?: unknown } } }));
+const serverFetch = vi.hoisted(() => vi.fn());
+vi.mock('./keepAliveFetch', () => ({ serverFetch }));
+vi.mock('@supabase/ssr', () => ({
+  createServerClient: (_url: string, _key: string, options: { global?: { fetch?: unknown } }) => {
+    clientOptions.last = options;
+    return { auth: supabaseStub };
+  },
+}));
 
 describe('getSessionUser', () => {
   it('서명을 로컬 검증한 claims로 세션을 판정하고 Auth 서버 getUser를 호출하지 않는다', async () => {
@@ -60,7 +68,7 @@ describe('ensureSession', () => {
     });
     const { ensureSession } = await import('./auth');
 
-    expect(await ensureSession()).toBe('u1');
+    expect(await ensureSession()).toEqual({ uid: 'u1', email: null });
     expect(supabaseStub.getUser).not.toHaveBeenCalled();
     expect(supabaseStub.signInAnonymously).not.toHaveBeenCalled();
   });
@@ -72,6 +80,31 @@ describe('ensureSession', () => {
     supabaseStub.signInAnonymously.mockResolvedValueOnce({ data: { user: { id: 'anon-2' } }, error: null });
     const { ensureSession } = await import('./auth');
 
-    expect(await ensureSession()).toBe('anon-2');
+    expect(await ensureSession()).toEqual({ uid: 'anon-2', email: null });
+  });
+
+  it('로그인된 기존 세션은 이메일을 함께 반환한다', async () => {
+    vi.stubEnv('SUPABASE_URL', 'https://x.supabase.co');
+    vi.stubEnv('SUPABASE_ANON_KEY', 'anon');
+    supabaseStub.getClaims.mockResolvedValueOnce({
+      data: { claims: { sub: 'u3', email: 'u3@x.y', is_anonymous: false } },
+      error: null,
+    });
+    const { ensureSession } = await import('./auth');
+
+    expect(await ensureSession()).toEqual({ uid: 'u3', email: 'u3@x.y' });
+  });
+});
+
+describe('Supabase 서버 클라이언트', () => {
+  it('Auth 요청을 연결을 유지하는 서버 fetch로 보낸다', async () => {
+    vi.stubEnv('SUPABASE_URL', 'https://x.supabase.co');
+    vi.stubEnv('SUPABASE_ANON_KEY', 'anon');
+    supabaseStub.getClaims.mockResolvedValueOnce({ data: null, error: null });
+    const { getSessionUser } = await import('./auth');
+
+    await getSessionUser();
+
+    expect(clientOptions.last?.global?.fetch).toBe(serverFetch);
   });
 });

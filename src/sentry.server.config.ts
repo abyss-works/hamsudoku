@@ -1,6 +1,7 @@
 import * as Sentry from '@sentry/nextjs';
 import { traceNewConnections } from './server/connectionTrace';
 import { scrubDatabaseErrorEvent } from './server/db/errors';
+import { createInstanceTracker } from './server/instanceTrace';
 import { collectSpanTimings } from './server/serverTiming';
 
 // node-postgres 쿼리 span과 바깥 fetch span(Supabase Auth)은 기본 통합이 수집한다.
@@ -21,3 +22,9 @@ traceNewConnections(() => {
 
 // API 응답의 Server-Timing 헤더에 쓸 DB·외부 호출 시간을 요청별로 합산한다.
 collectSpanTimings();
+
+// 요청 루트 span에 인스턴스 안 요청 순번과 경과 시간을 남겨 콜드·웜 요청을 구분한다.
+const instance = createInstanceTracker(() => performance.now());
+Sentry.getClient()?.on('spanStart', (span) => {
+  if (Sentry.getRootSpan(span) === span) instance.onRootSpanStart(span);
+});

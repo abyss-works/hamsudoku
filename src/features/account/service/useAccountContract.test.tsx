@@ -87,8 +87,7 @@ describe('useAccount 공개 계약 및 동작 검증 (useAccountContract)', () =
 
   it('signup 성공 시 인증 갱신 및 프로필 조회가 완료될 때까지 대기한다', async () => {
     mockedMe.mockResolvedValueOnce({ uid: null, email: null, cloud: true });
-    mockedSession.mockResolvedValueOnce({ uid: 'guest-1' });
-    mockedMe.mockResolvedValueOnce({ uid: 'guest-1', email: null, cloud: true });
+    mockedSession.mockResolvedValueOnce({ uid: 'guest-1', email: null });
     mockedProfileGet.mockResolvedValueOnce({ nickname: null });
 
     const { result } = renderHook(() => useAccount());

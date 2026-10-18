@@ -1,6 +1,6 @@
 import { rankingFrozen, seasonWindow } from '../../shared/season';
 import { db } from '../db/client';
-import type { Defer } from '../defer';
+import { deferTask, type Defer } from '../defer';
 import { rankStoreFromEnv, type RankStore } from '../rank';
 import { listSeasonEarnings } from './queries';
 
@@ -12,8 +12,10 @@ export function deferRankEarning(defer: Defer, input: { season: string; userId: 
   if (rankingFrozen(input.at)) return;
   const store = rankStoreFromEnv();
   if (!store) return;
-  defer(async () => {
-    await store.increment(input.season, input.userId, input.amount).catch(() => {});
+  deferTask(defer, {
+    name: 'rank-earning',
+    task: () => store.increment(input.season, input.userId, input.amount),
+    onError: () => {},
   });
 }
 

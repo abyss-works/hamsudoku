@@ -148,10 +148,8 @@ describe('useAccount 계정 전환 격리 및 생명주기 (accountLifecycle)', 
   });
 
   it('게스트 시점의 warmSession 함수를 보관한 뒤 signin 완료 후 실행해도 게스트 복원을 실행하지 않는다', async () => {
-    mockedMe
-      .mockResolvedValueOnce({ uid: null, email: null, cloud: true })
-      .mockResolvedValueOnce({ uid: 'guest-init', email: null, cloud: true });
-    mockedSession.mockResolvedValueOnce({ uid: 'guest-init' });
+    mockedMe.mockResolvedValueOnce({ uid: null, email: null, cloud: true });
+    mockedSession.mockResolvedValueOnce({ uid: 'guest-init', email: null });
     mockedProfileGet.mockResolvedValueOnce({ nickname: null });
 
     const { result } = renderHook(() => useAccount());

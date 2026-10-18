@@ -15,6 +15,7 @@ import {
   signInAs,
   useFixedNow,
   useRouteDatabase,
+  sentryEvents,
 } from '../../../../../tools/dbTest/routeHarness';
 
 vi.mock('@sentry/nextjs', async () => (await import('../../../../../tools/dbTest/routeHarness')).mockSentry());
@@ -144,6 +145,7 @@ describe('POST /api/internal/ranking-finalize', () => {
     const res = await finalize({});
 
     expect(res).toEqual({ status: 200, body: { ok: true, recoveredSeasons: [PREVIOUS, SEASON] } });
+    expect(sentryEvents.monitors).toEqual(['daily-ranking-recovery']);
     expect(await db.query(`select season from "SeasonFinalization" order by season`)).toEqual([
       { season: PREVIOUS },
       { season: SEASON },
@@ -158,6 +160,22 @@ describe('POST /api/internal/ranking-finalize', () => {
     const res = await finalize({ season: SEASON, recover: true });
 
     expect(res.body).toMatchObject({ ok: true, season: SEASON, recoveredSeasons: [PREVIOUS] });
+  });
+
+  it('확정 중 오류가 나면 500을 반환하고 작업 이름과 함께 오류 이벤트를 남긴다', async () => {
+    const errors = vi.spyOn(console, 'error').mockImplementation(() => {});
+    await seedSeason(SEASON, secondsBefore(ACTIVE_NOW, 3600));
+    await db.query(`alter table "SeasonRankResult" rename to "SeasonRankResultMoved"`);
+    try {
+      const res = await finalize({ season: SEASON });
+
+      expect(res.status).toBe(500);
+      expect(sentryEvents.exceptions).toEqual([{ tags: { 'job.name': 'ranking-finalize' } }]);
+      expect(sentryEvents.monitors).toEqual([]);
+    } finally {
+      await db.query(`alter table "SeasonRankResultMoved" rename to "SeasonRankResult"`);
+      errors.mockRestore();
+    }
   });
 
   it('GET 요청도 같은 확정 동작을 수행한다', async () => {

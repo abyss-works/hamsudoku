@@ -1,3 +1,5 @@
+import { serverFetch } from './keepAliveFetch';
+
 export interface RankEntry {
   userId: string;
   score: number;
@@ -208,5 +210,5 @@ export function rankStoreFromEnv(env: Record<string, string | undefined> = proce
   const url = env.UPSTASH_REDIS_REST_URL;
   const token = env.UPSTASH_REDIS_REST_TOKEN;
   if (!url || !token) return null;
-  return createRankStore({ url, token });
+  return createRankStore({ url, token, fetchImpl: serverFetch });
 }
