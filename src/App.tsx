@@ -10,6 +10,7 @@ import { SetPasswordScreen } from './presentation/views/account/SetPasswordScree
 import { BootSplash } from './presentation/ui/BootSplash';
 import { LoadingProvider } from './core/composition/LoadingProvider';
 import { UpdateNoticeHost } from './core/composition/UpdateNoticeHost';
+import { ApiTimingReporter } from './core/composition/ApiTimingReporter';
 export type { Screen } from './core/orchestration/appLogic';
 export { BOOT_TIMEOUT_MS } from './core/orchestration/appLogic';
 
@@ -100,6 +101,7 @@ function AppView() {
         </>
       )}
       <UpdateNoticeHost />
+      <ApiTimingReporter />
       </main>
     </LoadingProvider>
   );
