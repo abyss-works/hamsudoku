@@ -3,11 +3,14 @@ import { after, NextResponse } from 'next/server';
 import { z } from 'zod';
 import { rememberAccount } from '../../../../server/account/rememberAccount';
 import { getSessionUser, signUpWithEmail } from '../../../../server/auth';
+import { rateLimiterFromEnv, rejectIfRateLimited } from '../../../../server/rateLimit';
 import { withServerTiming } from '../../../../server/serverTiming';
 
 const Body = z.object({ email: z.string().email(), password: z.string().min(6) });
 
 async function handlePost(req: Request) {
+  const limited = await rejectIfRateLimited(rateLimiterFromEnv(), 'signup', req);
+  if (limited) return limited;
   const parsed = Body.safeParse(await req.json().catch(() => null));
   if (!parsed.success) return NextResponse.json({ ok: false, msg: '이메일과 비밀번호를 확인하세요.' }, { status: 400 });
   const result = await signUpWithEmail(parsed.data.email, parsed.data.password);

@@ -167,6 +167,28 @@ export function mockRank<T extends object>(original: T): T {
   return { ...original, rankStoreFromEnv: () => rankStore.current };
 }
 
+// ---- 요청 속도 제한 ----
+
+/** 한도를 넘은 것으로 응답할 정책과 확인한 정책·식별자. 제한기를 켜지 않으면 null 제한기를 쓴다. */
+export const rateLimits: { enabled: boolean; blocked: Set<string>; checks: string[] } = {
+  enabled: false,
+  blocked: new Set(),
+  checks: [],
+};
+
+export function mockRateLimit<T extends object>(original: T): T {
+  return {
+    ...original,
+    rateLimiterFromEnv: () =>
+      rateLimits.enabled
+        ? async (policy: string, identifier: string) => {
+            rateLimits.checks.push(`${policy}:${identifier}`);
+            return { success: !rateLimits.blocked.has(policy), reset: Date.now() + 60_000 };
+          }
+        : null,
+  };
+}
+
 // ---- 외부 HTTP (QStash) ----
 
 export interface CapturedRequest {
@@ -265,6 +287,9 @@ export function useRouteDatabase(): RouteDatabase {
     sentryEvents.exceptions.length = 0;
     sentryEvents.monitors.length = 0;
     rankStore.current = null;
+    rateLimits.enabled = false;
+    rateLimits.blocked.clear();
+    rateLimits.checks.length = 0;
     outbound.requests.length = 0;
     outbound.status = 200;
     vi.stubGlobal('fetch', fakeFetch);
