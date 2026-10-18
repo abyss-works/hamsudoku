@@ -55,7 +55,7 @@ export function mockAuth<T extends object>(original: T): T {
   return {
     ...original,
     getSessionUser: async () => ({ uid: session.uid, email: session.email }),
-    ensureSession: async () => session.uid,
+    ensureSession: async () => (session.uid ? { uid: session.uid, email: session.email } : null),
     signInWithEmail: async (email: string) => {
       if (authResults.signIn.ok && authResults.nextUid) signInAs(authResults.nextUid, email);
       return authResults.signIn;

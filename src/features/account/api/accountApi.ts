@@ -59,7 +59,8 @@ export interface Me {
 
 export interface AuthApi {
   me(): Promise<Me>;
-  session(): Promise<{ uid: string | null }>;
+  /** 세션을 확보하고 사용자와 로그인 이메일(게스트면 null)을 받는다. */
+  session(): Promise<{ uid: string | null; email?: string | null }>;
   signup(email: string, password: string): Promise<AuthResult>;
   signin(email: string, password: string): Promise<AuthResult>;
   signout(): Promise<void>;
@@ -95,7 +96,7 @@ export const cloudAuthApi: AuthApi = {
     try {
       const res = await fetch('/api/auth/session', { method: 'POST' });
       if (!res.ok) return { uid: null };
-      return (await res.json()) as { uid: string | null };
+      return (await res.json()) as { uid: string | null; email?: string | null };
     } catch {
       return { uid: null };
     }

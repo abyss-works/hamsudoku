@@ -4,10 +4,10 @@ import { ensureSession } from '../../../../server/auth';
 import { withServerTiming } from '../../../../server/serverTiming';
 
 async function handlePost() {
-  const uid = await ensureSession();
-  if (!uid) return NextResponse.json({ ok: false }, { status: 401 });
-  rememberAccount({ uid, email: null }, after);
-  return NextResponse.json({ ok: true, uid });
+  const session = await ensureSession();
+  if (!session) return NextResponse.json({ ok: false }, { status: 401 });
+  rememberAccount({ uid: session.uid, email: session.email }, after);
+  return NextResponse.json({ ok: true, uid: session.uid, email: session.email });
 }
 
 export const POST = withServerTiming(handlePost);
