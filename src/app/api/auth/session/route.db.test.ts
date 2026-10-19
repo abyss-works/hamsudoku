@@ -1,11 +1,14 @@
 import { beforeAll, describe, expect, it, vi } from 'vitest';
-import { callRoute, seedUser, signInAs, useRouteDatabase } from '../../../../../tools/dbTest/routeHarness';
+import { callRoute, rateLimits, seedUser, signInAs, useRouteDatabase } from '../../../../../tools/dbTest/routeHarness';
 
 vi.mock('next/server', async (original) =>
   (await import('../../../../../tools/dbTest/routeHarness')).mockNextServer(await original()),
 );
 vi.mock('../../../../server/auth', async (original) =>
   (await import('../../../../../tools/dbTest/routeHarness')).mockAuth(await original()),
+);
+vi.mock('../../../../server/rateLimit', async (original) =>
+  (await import('../../../../../tools/dbTest/routeHarness')).mockRateLimit(await original()),
 );
 
 const db = useRouteDatabase();
@@ -16,7 +19,7 @@ beforeAll(async () => {
 });
 
 function establish() {
-  return callRoute(POST, { path: '/api/auth/session', method: 'POST' });
+  return callRoute(POST, { path: '/api/auth/session', method: 'POST', headers: { 'x-forwarded-for': '1.2.3.4' } });
 }
 
 describe('POST /api/auth/session', () => {
@@ -37,6 +40,24 @@ describe('POST /api/auth/session', () => {
     signInAs('user-b', 'b@example.com');
 
     expect(await establish()).toEqual({ status: 200, body: { ok: true, uid: 'user-b', email: 'b@example.com' } });
+  });
+
+  it('세션이 없을 때 익명 세션 한도를 넘으면 429를 반환하고 아무것도 기록하지 않는다', async () => {
+    rateLimits.enabled = true;
+    rateLimits.blocked.add('anonymous-session');
+
+    expect(await establish()).toEqual({ status: 429, body: { ok: false, msg: '요청이 많아요. 잠시 후 다시 시도해 주세요.' } });
+    expect(rateLimits.checks).toEqual(['anonymous-session:1.2.3.4']);
+    expect(await db.query(`select 1 from "User"`)).toHaveLength(0);
+  });
+
+  it('기존 세션은 한도를 확인하지 않는다', async () => {
+    rateLimits.enabled = true;
+    rateLimits.blocked.add('anonymous-session');
+    signInAs('user-a');
+
+    expect((await establish()).status).toBe(200);
+    expect(rateLimits.checks).toEqual([]);
   });
 
   it('이미 기록된 사용자의 이메일과 닉네임을 유지한다', async () => {
