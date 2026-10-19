@@ -822,6 +822,7 @@ type ServerRole =
   | 'route'
   | 'apiModule'
   | 'serverShared'
+  | 'health'
   | 'unregistered'
   | 'db'
   | 'schema'
@@ -843,6 +844,7 @@ function serverModule(relPath: string): { role: ServerRole; feature?: string; fo
   if (/^src\/app\/api\/.+\/route$/.test(path)) return { role: 'route' };
   if (path.startsWith('src/app/api/')) return { role: 'apiModule' };
   if (path.startsWith('src/server/db/')) return { role: 'db' };
+  if (path === 'src/server/health') return { role: 'health' };
   if (/^src\/server\/[^/]+$/.test(path)) return { role: 'serverShared' };
   const match = /^src\/server\/([^/]+)\/(.+)$/.exec(path);
   if (!match) return { role: 'other' };
@@ -858,6 +860,7 @@ function roleSubject(role: ServerRole): string {
   if (role === 'route') return 'route handler는';
   if (role === 'apiModule') return 'app/api 모듈은';
   if (role === 'serverShared') return 'server 공용 모듈은';
+  if (role === 'health') return '가용성 확인 모듈은';
   if (role === 'useCase') return 'use case는';
   return `${role}는`;
 }
@@ -1173,7 +1176,7 @@ function serverLayerFailures(path: string, sourceOverride?: ts.SourceFile, virtu
 
   for (const dep of getImportsAndExports(path, sourceOverride)) {
     if (QUERY_BUILDER.test(dep.module)) {
-      if (!dep.isTypeOnly && (dataLayerForbidden || from.role === 'useCase')) {
+      if (!dep.isTypeOnly && (dataLayerForbidden || from.role === 'useCase' || from.role === 'health')) {
         failures.push(`${fromLabel} -> ${dep.module}: ${subject} 쿼리 빌더를 참조할 수 없다`);
       }
       continue;
@@ -1185,6 +1188,14 @@ function serverLayerFailures(path: string, sourceOverride?: ts.SourceFile, virtu
     if (!dep.isTypeOnly) {
       if (dataLayerForbidden && ['db', 'schema', 'store', 'queries'].includes(to.role)) {
         failures.push(`${fromLabel} -> ${toLabel}: ${subject} ${to.role}를 참조할 수 없다`);
+      }
+      // 가용성 확인 모듈은 db 모듈의 연결 확인과 오류 판정만 사용한다.
+      if (from.role === 'health' && ['schema', 'store', 'queries'].includes(to.role)) {
+        failures.push(`${fromLabel} -> ${toLabel}: ${subject} ${to.role}를 참조할 수 없다`);
+      }
+      if (from.role === 'health' && toLabel === DB_CLIENT_MODULE) {
+        const globals = dep.names.length === 0 ? ['namespace'] : dep.names.filter((name) => GLOBAL_DB_EXPORTS.has(name));
+        for (const name of globals) failures.push(`${fromLabel} -> ${toLabel}: ${subject} 전역 db 인스턴스(${name})를 참조할 수 없다`);
       }
       if (from.role === 'useCase' && to.role === 'schema') {
         failures.push(`${fromLabel} -> ${toLabel}: use case는 schema를 참조할 수 없다`);
@@ -1397,6 +1408,29 @@ describe('서버 데이터 계층 경계', () => {
     expect(serverLayerFailures(path, source)).toEqual([
       'src/server/endlessPlay/rules.ts -> drizzle-orm: rules는 쿼리 빌더를 참조할 수 없다',
       'src/server/endlessPlay/rules.ts -> src/server/endlessPlay/schema: rules는 schema를 참조할 수 없다',
+    ]);
+  });
+
+  it('가용성 확인 모듈은 db의 연결 확인과 오류 판정만 참조한다', () => {
+    const [allowedPath, allowed] = fixture(
+      'src/server/health.ts',
+      "import { checkConnection } from './db/client';\nimport { describeDbError } from './db/errors';",
+    );
+    expect(serverLayerFailures(allowedPath, allowed)).toEqual([]);
+    const [deniedPath, denied] = fixture(
+      'src/server/health.ts',
+      [
+        "import { db } from './db/client';",
+        "import * as client from './db/client';",
+        "import { sql } from 'drizzle-orm';",
+        "import { users } from './account/schema';",
+      ].join('\n'),
+    );
+    expect(serverLayerFailures(deniedPath, denied)).toEqual([
+      'src/server/health.ts -> src/server/db/client: 가용성 확인 모듈은 전역 db 인스턴스(db)를 참조할 수 없다',
+      'src/server/health.ts -> src/server/db/client: 가용성 확인 모듈은 전역 db 인스턴스(namespace)를 참조할 수 없다',
+      'src/server/health.ts -> drizzle-orm: 가용성 확인 모듈은 쿼리 빌더를 참조할 수 없다',
+      'src/server/health.ts -> src/server/account/schema: 가용성 확인 모듈은 schema를 참조할 수 없다',
     ]);
   });
 
