@@ -11,6 +11,8 @@ export interface Database {
   pool: Pool;
   /** 연결 하나에서 BEGIN·COMMIT·ROLLBACK을 수행하고 어떤 실패에서도 연결을 풀에 반환한다. */
   withTransaction<T>(work: (tx: Executor) => Promise<T>): Promise<T>;
+  /** 연결을 얻어 단순 쿼리를 실행한다. 연결이나 실행이 실패하면 오류를 전달한다. */
+  checkConnection(): Promise<void>;
 }
 
 export function createDatabase(config: PoolConfig): Database {
@@ -47,7 +49,11 @@ export function createDatabase(config: PoolConfig): Database {
     }
   }
 
-  return { db: drizzle({ client: pool }), pool, withTransaction };
+  async function checkConnection(): Promise<void> {
+    await pool.query('select 1');
+  }
+
+  return { db: drizzle({ client: pool }), pool, withTransaction, checkConnection };
 }
 
 const globalForDatabase = globalThis as unknown as { hamsudokuDatabase?: Database };
@@ -69,3 +75,4 @@ if (process.env.NODE_ENV !== 'production') globalForDatabase.hamsudokuDatabase =
 
 export const db = database.db;
 export const withTransaction = database.withTransaction;
+export const checkConnection = database.checkConnection;

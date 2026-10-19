@@ -1,6 +1,7 @@
 import * as Sentry from '@sentry/nextjs';
 import { traceNewConnections } from './server/connectionTrace';
 import { scrubDatabaseErrorEvent } from './server/db/errors';
+import { isHealthCheckSpan } from './server/healthTrace';
 import { createInstanceTracker } from './server/instanceTrace';
 import { collectSpanTimings } from './server/serverTiming';
 
@@ -9,7 +10,8 @@ import { collectSpanTimings } from './server/serverTiming';
 // 쿼리 빌더 오류 메시지에 실린 쿼리 인자(사용자 식별자 등)는 전송 전에 가린다.
 Sentry.init({
   dsn: process.env.NEXT_PUBLIC_SENTRY_DSN,
-  tracesSampleRate: 1.0,
+  // 가용성 감시 요청은 분마다 들어오므로 트레이스를 남기지 않는다.
+  tracesSampler: ({ name, inheritOrSampleWith }) => (isHealthCheckSpan(name) ? 0 : inheritOrSampleWith(1.0)),
   initialScope: { tags: { 'app.version': process.env.APP_VERSION ?? 'unknown' } },
   beforeSend: (event) => scrubDatabaseErrorEvent(event),
 });

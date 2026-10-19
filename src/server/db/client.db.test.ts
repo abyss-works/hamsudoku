@@ -129,3 +129,19 @@ describe('withTransaction 커밋 결과', () => {
     expect(rows.rows).toHaveLength(0);
   });
 });
+
+describe('checkConnection', () => {
+  it('DB에 쿼리를 실행하고 연결을 풀에 반환한다', async () => {
+    await expect(database.checkConnection()).resolves.toBeUndefined();
+    expect(database.pool.idleCount).toBe(1);
+  });
+
+  it('DB에 연결할 수 없으면 오류를 전달한다', async () => {
+    const unreachable = createDatabase({ connectionString: 'postgres://user:pass@127.0.0.1:1/none', connectionTimeoutMillis: 1000 });
+    try {
+      await expect(unreachable.checkConnection()).rejects.toThrow();
+    } finally {
+      await unreachable.pool.end();
+    }
+  });
+});
