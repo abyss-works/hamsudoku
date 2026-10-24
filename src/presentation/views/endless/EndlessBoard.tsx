@@ -27,6 +27,7 @@ export function EndlessBoard({ puzzle, onWrong, onFinish, clearOverlay }: Endles
         pulse={board.pulse}
         hitKey={board.hitKey}
         shake={board.shake}
+        reaction={board.reaction}
         onCell={board.tapCell}
         onPress={board.beginStroke}
         onEnter={board.strokeEnter}

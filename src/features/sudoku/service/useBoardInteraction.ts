@@ -4,12 +4,14 @@ import { cellsAlongSegment, type GridPoint } from '../model/path';
 import { projectBoard } from '../model/boardProjection';
 import type { CellState, Puzzle } from '../model/puzzles';
 import type { Violations } from '../model/rules';
+import type { Reaction } from '../model/reaction';
 
 export function useBoardInteraction(puzzle: Puzzle, cells: CellState[][], xMarks: ReadonlySet<string>, violations: Violations,
   pulse: ReadonlyMap<string, number>, hitKey: string | null, shake: number, onPress: (r: number, c: number) => void,
-  onEnter: (r: number, c: number) => void, onRelease: () => boolean, autoMarks: ReadonlySet<string> = new Set()) {
+  onEnter: (r: number, c: number) => void, onRelease: () => boolean, autoMarks: ReadonlySet<string> = new Set(),
+  reaction: Reaction | null = null) {
   const size = puzzle.size;
-  const projected = projectBoard(cells, puzzle, xMarks, violations, pulse, hitKey, autoMarks);
+  const projected = projectBoard(cells, puzzle, xMarks, violations, pulse, hitKey, autoMarks, reaction);
   const suppressClick = useRef(false);
   const first = useRef(true);
   const controls = useAnimationControls();
