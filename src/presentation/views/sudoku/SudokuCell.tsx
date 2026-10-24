@@ -4,6 +4,8 @@ import { HamsterFace } from '../../ui/HamsterFace';
 import type { CellState } from '../../../features/sudoku/model/puzzles';
 import type { TapKind } from '../../../features/sudoku/model/tap';
 import { useCellInteraction } from '../../../features/sudoku/service/useCellInteraction';
+import type { CellReaction } from '../../../features/sudoku/model/reaction';
+import { heartBursts, reactionDuration } from './cellReactionPresentation';
 
 export interface SudokuCellProps {
   row: number;
@@ -14,6 +16,8 @@ export interface SudokuCellProps {
   hit?: boolean;
   pulseDelay?: number;
   pulseDelaySec?: number;
+  /** 이 칸이 받은 발견 반응. 없으면 기본 표정이다. */
+  reaction?: CellReaction | null;
   ariaLabel: string;
   onTap: (kind: TapKind) => void;
   onPress: (cancelPendingTap: () => void) => void;
@@ -27,6 +31,7 @@ export function SudokuCell({
   conflicted,
   hit,
   pulseDelaySec = 0,
+  reaction = null,
   ariaLabel,
   onTap,
   onPress,
@@ -66,15 +71,31 @@ export function SudokuCell({
             transition={{ duration: 0.25, ease: 'easeOut' }}
           >
             <HamsterFace />
-            <motion.span
-              className="ham-heart"
-              aria-hidden="true"
-              initial={{ opacity: 0, y: 4, scale: 0.5 }}
-              animate={{ opacity: [0, 1, 0], y: -8, scale: 1 }}
-              transition={{ duration: 0.6, ease: 'easeOut' }}
-            >
-              <Heart size={14} fill="currentColor" aria-hidden="true" />
-            </motion.span>
+            {reaction && (
+              // 반응 표정을 기본 얼굴 위에 겹쳐 그리고 정해진 시간 뒤 사라지게 해 기본 표정으로 돌아간다.
+              <motion.span
+                key={`face-${reaction.seq}`}
+                className="cell-glyph-item"
+                aria-hidden="true"
+                initial={{ opacity: 1 }}
+                animate={{ opacity: [1, 1, 0] }}
+                transition={{ duration: reactionDuration(reaction.expression), times: [0, 0.85, 1] }}
+              >
+                <HamsterFace expression={reaction.expression} />
+              </motion.span>
+            )}
+            {reaction && heartBursts(reaction.hearts).map((heart) => (
+              <motion.span
+                key={`heart-${reaction.seq}-${heart.id}`}
+                className="ham-heart"
+                aria-hidden="true"
+                initial={{ opacity: 0, x: heart.x, y: 4, scale: 0.5 }}
+                animate={{ opacity: [0, 1, 0], y: -8, scale: 1 }}
+                transition={{ duration: 0.6, ease: 'easeOut', delay: heart.delay }}
+              >
+                <Heart size={14} fill="currentColor" aria-hidden="true" />
+              </motion.span>
+            ))}
           </motion.span>
         ) : state === 'anchor' ? (
           <motion.span
