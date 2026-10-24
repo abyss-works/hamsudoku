@@ -170,3 +170,66 @@ describe('game transitions', () => {
     expect(state.cells[0][0]).toBe('mark');
   });
 });
+
+describe('discovery reactions', () => {
+  const puzzle = PUZZLES[0];
+  const confirm = (state: transitions.GameState, [r, c]: [number, number]) =>
+    transitions.transitionGame(state, puzzle, { type: 'tap', r, c, kind: 'double' });
+  const isSolution = (r: number, c: number) => puzzle.solution.some(([sr, sc]) => sr === r && sc === c);
+  const wrongCell = (): [number, number] => {
+    for (let r = 0; r < puzzle.size; r += 1) for (let c = 0; c < puzzle.size; c += 1) if (!isSolution(r, c)) return [r, c];
+    throw new Error('no wrong cell');
+  };
+
+  it('정답 확정마다 연속 횟수를 늘리고 단계별 반응을 남긴다', () => {
+    let state = transitions.createGameState(puzzle.size);
+    const tiers: number[] = [];
+    for (const cell of puzzle.solution) {
+      const result = confirm(state, cell);
+      state = result.state;
+      expect(state.reaction).toMatchObject({ kind: 'correct', key: `${cell[0]},${cell[1]}` });
+      tiers.push(state.reaction!.tier);
+    }
+    expect(state.correctRun).toBe(puzzle.solution.length);
+    expect(tiers).toEqual(puzzle.solution.map((_, i) => (i === puzzle.solution.length - 1 || i >= 3 ? 3 : i === 0 ? 1 : 2)));
+  });
+
+  it('오답 확정은 연속 횟수를 0으로 되돌리고 오답 반응을 남긴다', () => {
+    const first = confirm(transitions.createGameState(puzzle.size), puzzle.solution[0]).state;
+    const [r, c] = wrongCell();
+    const wrong = confirm(transitions.createGameState(puzzle.size), [r, c]).state;
+    expect(wrong.cells[r][c]).toBe('wrong');
+    expect(wrong.correctRun).toBe(0);
+    expect(wrong.reaction).toMatchObject({ kind: 'wrong', key: `${r},${c}` });
+
+    const afterFirst = transitions.transitionGame(first, puzzle, { type: 'reset' }).state;
+    expect(afterFirst.correctRun).toBe(0);
+    expect(afterFirst.reaction).toBeNull();
+  });
+
+  it('반응마다 순번을 올리고 같은 입력이면 같은 반응을 낸다', () => {
+    const initial = transitions.createGameState(puzzle.size);
+    const once = confirm(initial, puzzle.solution[0]).state;
+    const again = confirm(initial, puzzle.solution[0]).state;
+    expect(again.reaction).toEqual(once.reaction);
+    const second = confirm(once, puzzle.solution[1]).state;
+    expect(second.reaction!.seq).toBe(once.reaction!.seq + 1);
+  });
+
+  it('마크 지우기 뒤 마지막 햄스터는 연속 횟수와 관계없이 가장 큰 반응을 낸다', () => {
+    let state = transitions.createGameState(puzzle.size);
+    for (const cell of puzzle.solution.slice(0, -1)) state = confirm(state, cell).state;
+    state = transitions.transitionGame(state, puzzle, { type: 'resetMarks' }).state;
+    expect(state.correctRun).toBe(0);
+    expect(state.reaction).toBeNull();
+    const last = confirm(state, puzzle.solution[puzzle.solution.length - 1]);
+    expect(last.completed).toBe(true);
+    expect(last.state.correctRun).toBe(1);
+    expect(last.state.reaction).toMatchObject({ kind: 'correct', tier: 3 });
+  });
+
+  it('반응을 보드 투영에 노출한다', () => {
+    const state = confirm(transitions.createGameState(puzzle.size), puzzle.solution[0]).state;
+    expect(transitions.projectGame(state, puzzle).reaction).toEqual(state.reaction);
+  });
+});

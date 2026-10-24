@@ -2,6 +2,7 @@ import { countHamsters, getViolations, isCleared, isSolutionCell } from './rules
 import type { CellState, Puzzle } from './puzzles';
 import { ownedProbeCells, resolveMark } from './probe';
 import { nextState, spreadMarks, type TapKind } from './tap';
+import { reactionTier, type Reaction } from './reaction';
 
 function blankBoard(size: number): CellState[][] {
   return Array.from({ length: size }, () => Array<CellState>(size).fill('empty'));
@@ -44,6 +45,12 @@ export interface GameState {
   pulse: ReadonlyMap<string, number>;
   hitKey: string | null;
   shake: number;
+  /** 판 안에서 오답 없이 이어진 정답 확정 횟수. 오답·리셋·마크 지우기에서 0이 된다. */
+  correctRun: number;
+  /** 마지막 확정의 반응. 화면은 이 값으로 표정과 하트 수를 정한다. */
+  reaction: Reaction | null;
+  /** 반응 순번의 마지막 값. 리셋해도 되돌리지 않아 이전 반응과 겹치지 않는다. */
+  reactionSeq: number;
 }
 
 export type GameSound = 'mark' | 'erase' | 'correct' | 'wrong' | 'reset';
@@ -55,14 +62,15 @@ export type GameAction =
 
 export function createGameState(size: number): GameState {
   return { cells: blankBoard(size), probeOwners: new Map(), underlay: new Map(), autoMarks: new Set(), stroke: null,
-    probeActive: false, pulse: new Map(), hitKey: null, shake: 0 };
+    probeActive: false, pulse: new Map(), hitKey: null, shake: 0, correctRun: 0, reaction: null, reactionSeq: 0 };
 }
 
 export function projectGame(state: GameState, puzzle: Puzzle) {
   return { cells: state.cells, xMarks: new Set(state.underlay.keys()), autoMarks: new Set(state.autoMarks),
     violations: getViolations(state.cells, puzzle.islands), cleared: isCleared(state.cells, puzzle.islands),
     hamsterCount: countHamsters(state.cells), probeSlots: PROBE_SLOTS - anchorCount(state.cells),
-    pulse: state.pulse, hitKey: state.hitKey, shake: state.shake, probeActive: state.probeActive };
+    pulse: state.pulse, hitKey: state.hitKey, shake: state.shake, probeActive: state.probeActive,
+    reaction: state.reaction };
 }
 
 /** 입력의 Map·Set을 복제하여 전이 중 원본 상태를 변경하지 않는다. */
@@ -77,6 +85,12 @@ export function transitionGame(previous: GameState, puzzle: Puzzle, action: Game
     state.cells = cells;
     state.pulse = pulse;
     state.hitKey = hitKey;
+  };
+  const react = (kind: Reaction['kind'], key: string, completed: boolean) => {
+    state.correctRun = kind === 'correct' ? state.correctRun + 1 : 0;
+    state.reactionSeq += 1;
+    state.reaction = { kind, tier: kind === 'correct' ? reactionTier(state.correctRun, completed) : 1, key,
+      seq: state.reactionSeq };
   };
   const addProbeOwner = (key: string, owner: string) => {
     const owners = state.probeOwners.get(key) ?? new Set<string>();
@@ -215,6 +229,7 @@ export function transitionGame(previous: GameState, puzzle: Puzzle, action: Game
         }
       }
       commit(next, delays, keyOf(r, c));
+      react('correct', key, isCleared(next, puzzle.islands));
       sounds.push('correct');
     } else {
       const next = after.map((line) => [...line]);
@@ -227,6 +242,7 @@ export function transitionGame(previous: GameState, puzzle: Puzzle, action: Game
       commit(next, new Map(), null);
       if (result === 'wrong' && kind === 'double') {
         state.shake += 1;
+        react('wrong', key, false);
         sounds.push('wrong');
       } else if (result === 'empty') {
         sounds.push('erase');
@@ -245,6 +261,8 @@ export function transitionGame(previous: GameState, puzzle: Puzzle, action: Game
     state.stroke = null;
     state.pulse = new Map();
     state.hitKey = null;
+    state.correctRun = 0;
+    state.reaction = null;
     sounds.push('reset');
   };
 
@@ -259,6 +277,8 @@ export function transitionGame(previous: GameState, puzzle: Puzzle, action: Game
     state.stroke = null;
     state.pulse = new Map();
     state.hitKey = null;
+    state.correctRun = 0;
+    state.reaction = null;
   };
 
   // 칠하기 모드는 빈칸만 마크로, 지우기 모드는 X마커·앵커·덮인 조각을 바꾼다.
