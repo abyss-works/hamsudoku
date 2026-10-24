@@ -62,7 +62,7 @@ function createAppDatabase(): Database {
   const database = createDatabase({
     connectionString: process.env.DATABASE_URL,
     max: 3,
-    idleTimeoutMillis: 5000,
+    idleTimeoutMillis: 30000,
     connectionTimeoutMillis: 5000,
   });
   // Vercel 함수가 유휴 연결을 정리한 뒤 일시 중지되도록 풀을 등록한다. Vercel 밖에서는 동작하지 않는다.
