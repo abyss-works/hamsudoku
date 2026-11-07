@@ -1,0 +1,86 @@
+apiVersion: kustomize.config.k8s.io/v1beta1
+kind: Kustomization
+# 운영 구성을 그대로 쓰고 네임스페이스·환경 라벨·도메인·환경 이름·이미지 태그만 바꾼다.
+# 순위 확정·감사 예약 작업은 두지 않고, 판 공급 작업(endless-supply)만 남긴다.
+namespace: hamsudoku-stage
+resources:
+  - ../prod
+labels:
+  - pairs:
+      abyssworks.dev/environment: stage
+patches:
+  - target:
+      kind: Namespace
+      name: hamsudoku-prod
+    patch: |-
+      - op: replace
+        path: /metadata/name
+        value: hamsudoku-stage
+  - target:
+      kind: Ingress
+      name: hamsudoku
+    patch: |-
+      - op: replace
+        path: /spec/rules/0/host
+        value: hamsudoku-preview.abyssworks.dev
+      - op: replace
+        path: /spec/tls/0/hosts/0
+        value: hamsudoku-preview.abyssworks.dev
+  - target:
+      kind: Certificate
+      name: hamsudoku-tls
+    patch: |-
+      - op: replace
+        path: /spec/dnsNames/0
+        value: hamsudoku-preview.abyssworks.dev
+  - target:
+      kind: Deployment
+      name: hamsudoku
+    patch: |-
+      apiVersion: apps/v1
+      kind: Deployment
+      metadata:
+        name: hamsudoku
+      spec:
+        template:
+          spec:
+            containers:
+              - name: hamsudoku
+                env:
+                  - name: APP_URL
+                    value: https://hamsudoku-preview.abyssworks.dev
+                  - name: BETTER_AUTH_URL
+                    value: https://hamsudoku-preview.abyssworks.dev
+                  - name: DEPLOY_ENV
+                    value: staging
+  - target:
+      kind: CronJob
+      name: weekly-ranking-finalize
+    patch: |-
+      $patch: delete
+      apiVersion: batch/v1
+      kind: CronJob
+      metadata:
+        name: weekly-ranking-finalize
+  - target:
+      kind: CronJob
+      name: daily-ranking-catchup
+    patch: |-
+      $patch: delete
+      apiVersion: batch/v1
+      kind: CronJob
+      metadata:
+        name: daily-ranking-catchup
+  - target:
+      kind: CronJob
+      name: daily-play-audit
+    patch: |-
+      $patch: delete
+      apiVersion: batch/v1
+      kind: CronJob
+      metadata:
+        name: daily-play-audit
+# dev 푸시마다 CI가 이미지 태그를 dev-<커밋 SHA 7자리>로 갱신한다.
+images:
+  - name: ghcr.io/abyss-works/hamsudoku
+    newTag: dev-b06ffb9

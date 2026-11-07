@@ -1,0 +1,13 @@
+.git
+.github
+.worktrees
+node_modules
+.next
+coverage
+storybook-static
+k8s
+.storybook
+.env*
+!.env.example
+Dockerfile
+.dockerignore
