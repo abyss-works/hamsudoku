@@ -128,18 +128,6 @@ export async function reserveSupplyJob(tx: Executor, now: Date, policy: SupplyPo
   return { shouldEnqueue: true, action: 'enqueued', jobId, seedStart, seedEnd };
 }
 
-/**
- * 큐 발행이 실패한 작업과 청크를 publish_failed로 기록해 임대 동안 막히지 않게 한다.
- * 청크 처리와 같은 작업 → 청크 순서로 행을 잠그도록 트랜잭션 안에서 두 문장으로 갱신한다.
- */
-export async function markSupplyJobPublishFailed(tx: Executor, jobId: string, now: Date): Promise<void> {
-  await tx
-    .update(endlessSupplyJobs)
-    .set({ status: 'publish_failed', leaseExpiresAt: null, updatedAt: now })
-    .where(eq(endlessSupplyJobs.id, jobId));
-  await tx.update(endlessSupplyChunks).set({ status: 'publish_failed' }).where(eq(endlessSupplyChunks.jobId, jobId));
-}
-
 // ---- 공급 청크 ----
 
 interface LockedChunk {

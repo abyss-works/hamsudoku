@@ -3,7 +3,6 @@ import {
   ACTIVE_NOW,
   STAGE_SOLUTION,
   callRoute,
-  outbound,
   secondsBefore,
   seedAttempt,
   seedStage,
@@ -215,17 +214,18 @@ describe('POST /api/endless/next', () => {
     await nextWithQuietSupply();
 
     expect(await db.query(`select 1 from "EndlessSupplyJob"`)).toHaveLength(0);
-    expect(outbound.requests).toHaveLength(0);
   });
 
-  it('재고가 부족하면 다음 시드 구간의 공급 작업을 만들고 생성 요청을 발행한다', async () => {
+  it('재고가 부족하면 다음 시드 구간의 공급 작업을 대기 상태로 예약한다', async () => {
     await seedUser(db, USER);
     await seedStock(19);
     signInAs(USER);
+    const fetchSpy = vi.spyOn(globalThis, 'fetch');
 
     const res = await next();
 
     expect(res.status).toBe(200);
+    expect(fetchSpy).not.toHaveBeenCalled();
     const jobs = await db.query<{ id: string }>(
       `select id, "policyVersion", "seedStart", "seedEnd", "targetCount", status, "leaseExpiresAt" from "EndlessSupplyJob"`,
     );
@@ -244,32 +244,6 @@ describe('POST /api/endless/next', () => {
     expect(await db.query(`select id, "jobId", "chunkIndex", status, "stageCount" from "EndlessSupplyChunk"`)).toEqual([
       { id: `${jobId}:0`, jobId, chunkIndex: 0, status: 'pending', stageCount: 0 },
     ]);
-    expect(outbound.requests).toEqual([
-      expect.objectContaining({
-        url: 'http://qstash.test/v2/publish/http://app.test/api/internal/endless-generate',
-        method: 'POST',
-        body: { jobId, chunkIndex: 0 },
-      }),
-    ]);
-    expect(outbound.requests[0].headers).toMatchObject({
-      authorization: 'Bearer test-qstash-token',
-      'upstash-retries': '3',
-    });
-  });
-
-  it('생성 요청 발행이 실패하면 작업을 발행 실패로 기록하고 판은 정상 발급한다', async () => {
-    await seedUser(db, USER);
-    await seedStock(5);
-    outbound.status = 500;
-    signInAs(USER);
-
-    const res = await next();
-
-    expect(res.status).toBe(200);
-    expect(await db.query(`select status, "leaseExpiresAt" from "EndlessSupplyJob"`)).toEqual([
-      { status: 'publish_failed', leaseExpiresAt: null },
-    ]);
-    expect(await db.query(`select status from "EndlessSupplyChunk"`)).toEqual([{ status: 'publish_failed' }]);
   });
 
   it('진행 중인 공급 작업이 있으면 새 작업을 만들지 않는다', async () => {
@@ -285,7 +259,6 @@ describe('POST /api/endless/next', () => {
     await nextWithQuietSupply();
 
     expect(await db.query(`select id from "EndlessSupplyJob"`)).toEqual([{ id: 'job-active' }]);
-    expect(outbound.requests).toHaveLength(0);
   });
 
   it('임대가 만료된 작업은 실패로 바꾸고 새 작업을 만든다', async () => {
@@ -322,6 +295,5 @@ describe('POST /api/endless/next', () => {
     await nextWithQuietSupply();
 
     expect(await db.query(`select id from "EndlessSupplyJob"`)).toEqual([{ id: 'job-done' }]);
-    expect(outbound.requests).toHaveLength(0);
   });
 });

@@ -6,7 +6,7 @@ import { describeDbError } from '../db/errors';
 import { deferTask, type Defer } from '../defer';
 import { findStage } from '../endlessPool/queries';
 import { recordStagePlay } from '../endlessPool/store';
-import { requestSupply, type SupplyEnqueuer } from '../endlessPool/supply';
+import { requestSupply } from '../endlessPool/supply';
 import { countsForRanking } from '../seasonRanking/rules';
 import { appendEarning, lockSeasonForEarning } from '../seasonRanking/store';
 import { findPlaySummary, findSubmissionHistory, findRetryableStage, pickPlayableStage, type PlayableStage, type PlaySummary } from './queries';
@@ -36,22 +36,18 @@ export type StartResult =
 
 /**
  * 판과 입장 키를 발급한다. 다시 도전할 판을 지정하면 사용자가 입장 키를 받은 적 있는 판만 발급하고,
- * 지정하지 않으면 씨앗 3개로 클리어하지 않은 판을 고른다. 판 재고 판정과 생성 요청 발행은 응답 뒤에 수행하며
+ * 지정하지 않으면 씨앗 3개로 클리어하지 않은 판을 고른다. 판 재고 판정과 공급 작업 예약은 응답 뒤에 수행하며
  * 실패는 응답에 영향을 주지 않는다.
  */
 export async function startEndlessStage(
   uid: string,
   now: Date,
   defer: Defer,
-  enqueuer: SupplyEnqueuer,
   retryStageId?: string,
 ): Promise<StartResult> {
   deferTask(defer, {
     name: 'supply-request',
-    task: async () => {
-      const decision = await requestSupply(now, enqueuer);
-      if (decision.enqueueError) console.warn('Supply enqueue warning (non-fatal):', decision.enqueueError);
-    },
+    task: () => requestSupply(now),
     onError: (error) => console.error('Failed to trigger supply', describeDbError(error)),
   });
   const stage = retryStageId === undefined ? await pickPlayableStage(db, uid) : await findRetryableStage(db, uid, retryStageId);

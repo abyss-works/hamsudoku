@@ -7,7 +7,6 @@ import {
   insertStages,
   failSupplyChunk,
   insertSupplyBatch,
-  markSupplyJobPublishFailed,
   recordStagePlay,
   reserveSupplyJob,
   type SupplyPolicy,
@@ -170,15 +169,6 @@ describe('endlessPool 공급 작업 예약', () => {
     const results = await Promise.all([reserve(), reserve(), reserve()]);
     expect(results.filter((r) => r.action === 'enqueued')).toHaveLength(1);
     expect(await store.query(`select count(*)::int as n from "EndlessSupplyJob"`)).toEqual([{ n: 1 }]);
-  });
-
-  it('발행 실패로 기록하면 작업과 청크가 publish_failed가 되고 임대를 비운다', async () => {
-    await seedJob({ status: 'pending', leaseExpiresAt: new Date(NOW.getTime() + 60_000) });
-    await store.withTransaction((tx) => markSupplyJobPublishFailed(tx, 'job-1', NOW));
-    expect(await store.query(`select status, "leaseExpiresAt", "updatedAt" from "EndlessSupplyJob"`)).toEqual([
-      { status: 'publish_failed', leaseExpiresAt: null, updatedAt: NOW },
-    ]);
-    expect(await store.query(`select status from "EndlessSupplyChunk"`)).toEqual([{ status: 'publish_failed' }]);
   });
 });
 
