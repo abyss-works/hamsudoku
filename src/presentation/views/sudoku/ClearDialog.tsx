@@ -33,7 +33,7 @@ export function ClearDialog({ total, onReset, onNextMap, onBrowse, reduceMotion 
             style={{ display: 'inline-flex' }}
             variants={{ hidden: { scale: 0.3 }, show: { scale: [0.3, 1.25, 1], transition: { duration: 0.35, ease: 'easeOut' } } }}
           >
-            <HamsterFace />
+            <HamsterFace expression="excited" />
           </motion.span>
         ))}
       </motion.div>

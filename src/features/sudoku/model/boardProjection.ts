@@ -1,6 +1,7 @@
 import { resolveMark } from './probe';
 import { cellConflicted, type Violations } from './rules';
 import type { CellState, Puzzle } from './puzzles';
+import { cellReaction, type Reaction } from './reaction';
 
 const CELL_STATE_LABEL: Record<CellState, string> = {
   empty: '빈칸',
@@ -24,6 +25,7 @@ export function projectBoard(
   pulse: ReadonlyMap<string, number>,
   hitKey: string | null,
   autoMarks: ReadonlySet<string> = new Set(),
+  reaction: Reaction | null = null,
 ) {
   return cells.map((line, row) =>
     line.map((rawState, col) => {
@@ -35,6 +37,7 @@ export function projectBoard(
       const pulseDelay = pulse.get(key);
       const pulseDelaySec = (pulseDelay ?? 0) / 1000;
       const ariaLabel = cellAriaLabel(state, islandId);
+      const cell = cellReaction(reaction, key, state);
       return {
         row,
         col,
@@ -45,6 +48,7 @@ export function projectBoard(
         pulseDelay,
         pulseDelaySec,
         ariaLabel,
+        reaction: cell,
       };
     }),
   );

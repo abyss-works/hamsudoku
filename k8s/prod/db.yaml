@@ -1,0 +1,30 @@
+# 앱 DB. CNPG가 관리하는 PostgreSQL 17 단일 인스턴스다.
+# WAL과 베이스 백업은 Barman Cloud 플러그인이 R2로 올린다. 저장소 설정(ObjectStore hamsudoku-db-r2)과
+# 그 자격 증명 Secret(r2-backup)은 계정 정보가 들어가 저장소 밖에서 만든다.
+# 앱은 CNPG가 만드는 Secret hamsudoku-db-app의 fqdn-uri로 접속한다.
+apiVersion: postgresql.cnpg.io/v1
+kind: Cluster
+metadata:
+  name: hamsudoku-db
+spec:
+  instances: 1
+  imageName: ghcr.io/cloudnative-pg/postgresql:17.6-standard-trixie
+  # 이관 도구와 복원이 슈퍼유저 접속을 쓴다.
+  enableSuperuserAccess: true
+  storage:
+    storageClass: local-path
+    size: 10Gi
+  affinity:
+    nodeSelector:
+      kubernetes.io/hostname: oci-node
+  resources:
+    requests:
+      cpu: 100m
+      memory: 256Mi
+    limits:
+      memory: 1Gi
+  plugins:
+    - name: barman-cloud.cloudnative-pg.io
+      isWALArchiver: true
+      parameters:
+        barmanObjectName: hamsudoku-db-r2

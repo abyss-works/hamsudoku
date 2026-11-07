@@ -578,7 +578,7 @@ function inspectServiceDirectAccess(path: string, sourceOverride?: ts.SourceFile
       const name = label(path);
       for (const dep of getImportsAndExports(path)) {
         if (dep.isTypeOnly) continue;
-        if (!name.startsWith('src/server/') && /^(?:@supabase\/|drizzle-orm(?:\/|$)|pg$)/.test(dep.module)) {
+        if (!name.startsWith('src/server/') && /^(?:better-auth(?:\/|$)|drizzle-orm(?:\/|$)|pg$)/.test(dep.module)) {
           failures.push(`${name}: 서버 SDK 직접 참조`);
         }
         if (!name.startsWith('src/server/') && dep.module.startsWith('node:')) {
@@ -808,8 +808,9 @@ function inspectPureFailures(path: string, sourceOverride?: ts.SourceFile): stri
 // ---- 서버 데이터 계층 ----
 
 // 서버 기능과 허용 의존. 다른 기능의 테이블은 SQL 안에서 읽을 수 있고 쓰기는 소유 기능의 store만 수행한다.
-const SERVER_FEATURES = new Set(['account', 'attempt', 'stageRecord', 'endlessPool', 'endlessPlay', 'seasonRanking']);
+const SERVER_FEATURES = new Set(['identity', 'account', 'attempt', 'stageRecord', 'endlessPool', 'endlessPlay', 'seasonRanking']);
 const ALLOWED_SERVER_FEATURE_DEPS: Record<string, string[]> = {
+  identity: [],
   account: [],
   attempt: [],
   endlessPool: [],

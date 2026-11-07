@@ -6,8 +6,7 @@ import { describeDbError } from '../db/errors';
 import { deferTask, type Defer } from '../defer';
 import { findStage } from '../endlessPool/queries';
 import { recordStagePlay } from '../endlessPool/store';
-import { requestSupply, type SupplyEnqueuer } from '../endlessPool/supply';
-import { deferRankEarning } from '../seasonRanking/rankCache';
+import { requestSupply } from '../endlessPool/supply';
 import { countsForRanking } from '../seasonRanking/rules';
 import { appendEarning, lockSeasonForEarning } from '../seasonRanking/store';
 import { findPlaySummary, findSubmissionHistory, findRetryableStage, pickPlayableStage, type PlayableStage, type PlaySummary } from './queries';
@@ -37,22 +36,18 @@ export type StartResult =
 
 /**
  * 판과 입장 키를 발급한다. 다시 도전할 판을 지정하면 사용자가 입장 키를 받은 적 있는 판만 발급하고,
- * 지정하지 않으면 씨앗 3개로 클리어하지 않은 판을 고른다. 판 재고 판정과 생성 요청 발행은 응답 뒤에 수행하며
+ * 지정하지 않으면 씨앗 3개로 클리어하지 않은 판을 고른다. 판 재고 판정과 공급 작업 예약은 응답 뒤에 수행하며
  * 실패는 응답에 영향을 주지 않는다.
  */
 export async function startEndlessStage(
   uid: string,
   now: Date,
   defer: Defer,
-  enqueuer: SupplyEnqueuer,
   retryStageId?: string,
 ): Promise<StartResult> {
   deferTask(defer, {
     name: 'supply-request',
-    task: async () => {
-      const decision = await requestSupply(now, enqueuer);
-      if (decision.enqueueError) console.warn('Supply enqueue warning (non-fatal):', decision.enqueueError);
-    },
+    task: () => requestSupply(now),
     onError: (error) => console.error('Failed to trigger supply', describeDbError(error)),
   });
   const stage = retryStageId === undefined ? await pickPlayableStage(db, uid) : await findRetryableStage(db, uid, retryStageId);
@@ -64,7 +59,7 @@ export async function startEndlessStage(
 /**
  * 무한모드 클리어 제출. 판 확인과 입장 키 소모는 트랜잭션 밖에서 한 문장씩 수행하고, 보상 반영은
  * 시즌 공유 잠금 → 사용자 잠금 → 제출 간격 검사 → 진행·지갑·연속 기록·이벤트 → 시즌 원장 → 판 통계 순서로 한 트랜잭션에서 수행한다.
- * 키 소모 뒤 저장이 실패하면 소모를 되돌린다. Redis 순위 가산과 플레이 기록 저장은 응답 뒤로 미룬다.
+ * 키 소모 뒤 저장이 실패하면 소모를 되돌린다. 플레이 기록 저장은 응답 뒤로 미룬다.
  */
 export async function submitEndlessClear(
   uid: string | null,
@@ -144,9 +139,6 @@ export async function submitEndlessClear(
     });
     if (!committed) return await reject('제출 간격 하한', '제출이 너무 잦아요.');
 
-    if (committed.summary.earned > 0) {
-      deferRankEarning(defer, { season, userId: uid, amount: committed.summary.earned, at: now });
-    }
     deferLog(true, null);
     return {
       status: 200,

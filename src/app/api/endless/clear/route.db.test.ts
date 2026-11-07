@@ -3,10 +3,8 @@ import { seasonId } from '../../../../shared/season';
 import {
   ACTIVE_NOW,
   FROZEN_NOW,
-  FakeRankStore,
   STAGE_SOLUTION_PAIRS,
   callRoute,
-  rankStore,
   secondsBefore,
   seedAttempt,
   type SeedAttempt,
@@ -24,9 +22,6 @@ vi.mock('next/server', async (original) =>
 );
 vi.mock('../../../../server/auth', async (original) =>
   (await import('../../../../../tools/dbTest/routeHarness')).mockAuth(await original()),
-);
-vi.mock('../../../../server/rank', async (original) =>
-  (await import('../../../../../tools/dbTest/routeHarness')).mockRank(await original()),
 );
 
 const db = useRouteDatabase();
@@ -149,7 +144,6 @@ describe('POST /api/endless/clear', () => {
 
   it('검증된 클리어는 진행·지갑·원장·연속 기록·이벤트·판 통계를 함께 반영한다', async () => {
     await prepare();
-    rankStore.current = new FakeRankStore();
 
     const res = await submit(validBody);
 
@@ -177,7 +171,6 @@ describe('POST /api/endless/clear', () => {
     expect(
       await db.query(`select plays, clears, "clearTotalMs"::int as "clearTotalMs", "avgClearMs" from "EndlessStage"`),
     ).toEqual([{ plays: 5, clears: 3, clearTotalMs: 50000, avgClearMs: 16666 }]);
-    expect(rankStore.current.increments).toEqual([{ season, userId: USER, amount: 2 }]);
     expect(sentryLogs).toContainEqual({
       level: 'info',
       message: 'Endless stage cleared',
@@ -198,7 +191,6 @@ describe('POST /api/endless/clear', () => {
 
   it('씨앗 3개로 클리어하지 못한 판의 재클리어는 이전 최고 기록보다 늘어난 씨앗만 적립한다', async () => {
     await prepare();
-    rankStore.current = new FakeRankStore();
     await db.query(`insert into "SeedWallet" ("userId", balance) values ($1, 5)`, [USER]);
     await db.query(
       `insert into "EndlessProgress" ("userId", "stageId", cleared, attempts, "bestSeedLeft", "lastPlayedAt") values ($1, $2, true, 1, 2, $3)`,
@@ -209,13 +201,11 @@ describe('POST /api/endless/clear', () => {
 
     expect(res.body).toEqual({ ok: true, earned: 1, balance: 6, streak: 1, suspicious: false });
     expect(await db.query(`select amount from "SeedLedger"`)).toEqual([{ amount: 1 }]);
-    expect(rankStore.current.increments).toEqual([{ season: seasonId(ACTIVE_NOW), userId: USER, amount: 1 }]);
     expect(await db.query(`select attempts, "bestSeedLeft" from "EndlessProgress"`)).toEqual([{ attempts: 2, bestSeedLeft: 3 }]);
   });
 
-  it('최고 기록을 넘지 못한 재클리어는 적립·원장·순위 가산 없이 진행과 이벤트만 반영한다', async () => {
+  it('최고 기록을 넘지 못한 재클리어는 적립·원장 없이 진행과 이벤트만 반영한다', async () => {
     await prepare();
-    rankStore.current = new FakeRankStore();
     await db.query(`insert into "SeedWallet" ("userId", balance) values ($1, 5)`, [USER]);
     await db.query(
       `insert into "EndlessProgress" ("userId", "stageId", cleared, attempts, "bestSeedLeft", "lastPlayedAt") values ($1, $2, true, 1, 2, $3)`,
@@ -226,7 +216,6 @@ describe('POST /api/endless/clear', () => {
 
     expect(res.body).toEqual({ ok: true, earned: 0, balance: 5, streak: 0, suspicious: false });
     expect(await db.query(`select 1 from "SeedLedger"`)).toHaveLength(0);
-    expect(rankStore.current.increments).toEqual([]);
     expect(await db.query(`select attempts, "bestSeedLeft" from "EndlessProgress"`)).toEqual([{ attempts: 2, bestSeedLeft: 2 }]);
     expect(await db.query(`select "seedLeft", verified from "EndlessEvent"`)).toEqual([{ seedLeft: 2, verified: true }]);
   });
@@ -290,7 +279,6 @@ describe('POST /api/endless/clear', () => {
   it('집계 마감 창의 클리어는 지갑에만 적립하고 랭킹 적립을 하지 않는다', async () => {
     useFixedNow(FROZEN_NOW);
     await prepare({ now: FROZEN_NOW });
-    rankStore.current = new FakeRankStore();
 
     const res = await submit(validBody);
 
@@ -298,7 +286,6 @@ describe('POST /api/endless/clear', () => {
     expect(await db.query(`select season, "rankingEligible" from "SeedLedger"`)).toEqual([
       { season: seasonId(FROZEN_NOW), rankingEligible: false },
     ]);
-    expect(rankStore.current.increments).toEqual([]);
   });
 
   it('서로 다른 사용자의 같은 판 동시 클리어는 모두 반영된다', async () => {

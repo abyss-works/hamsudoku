@@ -2,6 +2,7 @@ import { useRef, useState } from 'react';
 import type { Violations } from '../model/rules';
 import type { CellState, Puzzle } from '../model/puzzles';
 import type { TapKind } from '../model/tap';
+import type { Reaction } from '../model/reaction';
 import { createGameState, projectGame, transitionGame, type GameAction, type GameSound } from '../model/gameTransition';
 import { createBoardSounds } from '../../../platform/audio/sound';
 export { PROBE_SLOTS } from '../model/gameTransition';
@@ -18,6 +19,8 @@ export interface HamSudoku {
   pulse: ReadonlyMap<string, number>;
   hitKey: string | null;
   shake: number;
+  /** 마지막 확정의 발견 반응. */
+  reaction: Reaction | null;
   /** 임시 정답 아이템 켜짐. 켠 동안 싱글톡은 앵커 놓기·회수만 한다. */
   probeActive: boolean;
   setProbeActive: (on: boolean) => void;

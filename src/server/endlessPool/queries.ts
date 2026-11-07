@@ -1,6 +1,6 @@
-import { eq, sql } from 'drizzle-orm';
+import { and, asc, eq, inArray, lte, ne, or, sql } from 'drizzle-orm';
 import type { Executor } from '../db/client';
-import { endlessStages } from './schema';
+import { endlessStages, endlessSupplyChunks, endlessSupplyJobs } from './schema';
 
 export interface EndlessStageRow {
   id: string;
@@ -81,4 +81,27 @@ export async function listStageStatsAggregates(executor: Executor, stageId?: str
     clearTotalMs: BigInt(row.clearTotalMs),
     verifiedClearTotalMs: BigInt(row.verifiedClearTotalMs),
   }));
+}
+
+/**
+ * 생성기가 처리할 다음 공급 청크. 대기·발행 실패 작업과 임대가 만료된 실행 중 작업의 미완료 청크 중
+ * 가장 먼저 만든 작업을 고른다. 유효한 임대로 실행 중인 작업과 완료·실패한 작업은 건너뛴다.
+ */
+export async function findNextSupplyChunk(executor: Executor, now: Date): Promise<{ jobId: string; chunkIndex: number } | null> {
+  const [row] = await executor
+    .select({ jobId: endlessSupplyChunks.jobId, chunkIndex: endlessSupplyChunks.chunkIndex })
+    .from(endlessSupplyChunks)
+    .innerJoin(endlessSupplyJobs, eq(endlessSupplyJobs.id, endlessSupplyChunks.jobId))
+    .where(
+      and(
+        ne(endlessSupplyChunks.status, 'completed'),
+        or(
+          inArray(endlessSupplyJobs.status, ['pending', 'publish_failed']),
+          and(eq(endlessSupplyJobs.status, 'running'), lte(endlessSupplyJobs.leaseExpiresAt, now)),
+        ),
+      ),
+    )
+    .orderBy(asc(endlessSupplyJobs.createdAt), asc(endlessSupplyChunks.chunkIndex))
+    .limit(1);
+  return row ?? null;
 }

@@ -1,7 +1,7 @@
 import { NextResponse } from 'next/server';
 import { z } from 'zod';
 import { seasonIdSchema } from '../../../../shared/endless';
-import { verifyInternalRequest } from '../../../../server/qstash';
+import { rejectUnlessCron } from '../../../../server/internalAuth';
 import { DAILY_RANKING_MONITOR, monitorJob } from '../../../../server/jobMonitor';
 import { finalizationFailureMessage, finalizeSeason, recoverUnfinalizedSeasons } from '../../../../server/seasonRanking/finalization';
 
@@ -13,16 +13,14 @@ const finalizeBodySchema = z
   .strict();
 
 export async function POST(req: Request) {
+  const rejected = rejectUnlessCron(req);
+  if (rejected) return rejected;
+
   let rawBody = '';
   try {
     rawBody = await req.text();
   } catch {
     rawBody = '';
-  }
-
-  const authenticated = await verifyInternalRequest(req, rawBody);
-  if (!authenticated) {
-    return NextResponse.json({ ok: false, msg: '인증에 실패했어요.' }, { status: 401 });
   }
 
   let body: z.infer<typeof finalizeBodySchema> = {};

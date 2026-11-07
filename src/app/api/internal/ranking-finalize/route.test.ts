@@ -1,6 +1,5 @@
 // @vitest-environment node
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
-import { createTestQStashSignature } from '../../../../server/qstashTestHelper';
 import { POST } from './route';
 
 const finalization = vi.hoisted(() => ({ error: null as Error | null }));
@@ -19,19 +18,16 @@ vi.mock('../../../../server/seasonRanking/finalization', async (original) => {
 });
 
 const TEST_SECRET = 'test_internal_secret_value';
-const TEST_KEY = 'test_qstash_signing_key';
 
 describe('/api/internal/ranking-finalize 요청 인증과 형식 검증', () => {
   beforeEach(() => {
-    process.env.INTERNAL_SECRET = TEST_SECRET;
-    process.env.QSTASH_CURRENT_SIGNING_KEY = TEST_KEY;
+    process.env.CRON_SECRET = TEST_SECRET;
   });
 
   afterEach(() => {
     vi.useRealTimers();
     vi.restoreAllMocks();
-    delete process.env.INTERNAL_SECRET;
-    delete process.env.QSTASH_CURRENT_SIGNING_KEY;
+    delete process.env.CRON_SECRET;
   });
 
   it('잘못된 인증 요청은 401을 반환한다', async () => {
@@ -52,18 +48,14 @@ describe('/api/internal/ranking-finalize 요청 인증과 형식 검증', () => 
     const resBadBearer = await POST(reqBadBearer);
     expect(resBadBearer.status).toBe(401);
 
-    // 3. 잘못된 서명 키로 서명된 QStash 요청
-    const badSig = createTestQStashSignature(
-      { iss: 'Upstash', exp: Math.floor(Date.now() / 1000) + 300 },
-      'wrong_key',
-    );
-    const reqBadSig = new Request('http://localhost/api/internal/ranking-finalize', {
+    // 3. QStash 서명 헤더만 있는 요청
+    const reqSignature = new Request('http://localhost/api/internal/ranking-finalize', {
       method: 'POST',
-      headers: { 'upstash-signature': badSig },
+      headers: { 'upstash-signature': 'signed' },
       body: JSON.stringify({ season: '2026-W41' }),
     });
-    const resBadSig = await POST(reqBadSig);
-    expect(resBadSig.status).toBe(401);
+    const resSignature = await POST(reqSignature);
+    expect(resSignature.status).toBe(401);
   });
 
   it('zod 요청 검증: null, 배열, 숫자, 유효하지 않은 season은 500이 아닌 400을 반환한다', async () => {
@@ -107,12 +99,12 @@ describe('/api/internal/ranking-finalize 요청 인증과 형식 검증', () => 
 
 describe('/api/internal/ranking-finalize 실패 응답', () => {
   beforeEach(() => {
-    process.env.INTERNAL_SECRET = TEST_SECRET;
+    process.env.CRON_SECRET = TEST_SECRET;
   });
 
   afterEach(() => {
     vi.restoreAllMocks();
-    delete process.env.INTERNAL_SECRET;
+    delete process.env.CRON_SECRET;
     finalization.error = null;
   });
 

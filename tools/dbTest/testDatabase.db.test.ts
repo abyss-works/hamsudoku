@@ -62,7 +62,19 @@ describe('테스트 데이터베이스', () => {
               current_setting('default_transaction_isolation') as iso
          from pg_roles r where r.rolname = current_user`,
     );
-    expect(row).toEqual({ user: 'postgres', super: false, bypass: true, timeout: '2min', tz: 'UTC', iso: 'read committed' });
+    expect(row).toEqual({ user: 'app', super: false, bypass: false, timeout: '2min', tz: 'UTC', iso: 'read committed' });
+  });
+
+  it('애플리케이션 역할이 모든 표의 소유자라 RLS가 켜져 있어도 정책 없이 읽고 쓴다', async () => {
+    const owners = await query<{ tableowner: string }>(
+      first.url,
+      "select distinct tableowner from pg_tables where schemaname = 'public'",
+    );
+    expect(owners).toEqual([{ tableowner: 'app' }]);
+
+    await query(first.url, `insert into "Profile" ("userId", nickname, "updatedAt") values ('rls-user', 'n', now())`);
+    const rows = await query<{ userId: string }>(first.url, `select "userId" from "Profile" where "userId" = 'rls-user'`);
+    expect(rows).toEqual([{ userId: 'rls-user' }]);
   });
 
   it('테스트 데이터베이스마다 데이터가 격리된다', async () => {

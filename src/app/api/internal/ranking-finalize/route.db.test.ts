@@ -6,7 +6,6 @@ import {
   STAGE_SOLUTION_PAIRS,
   callRoute,
   internalAuth,
-  qstashSigned,
   secondsBefore,
   seedAttempt,
   seedLedger,
@@ -24,9 +23,6 @@ vi.mock('next/server', async (original) =>
 );
 vi.mock('../../../../server/auth', async (original) =>
   (await import('../../../../../tools/dbTest/routeHarness')).mockAuth(await original()),
-);
-vi.mock('../../../../server/rank', async (original) =>
-  (await import('../../../../../tools/dbTest/routeHarness')).mockRank(await original()),
 );
 
 const db = useRouteDatabase();
@@ -105,15 +101,18 @@ describe('POST /api/internal/ranking-finalize', () => {
     expect(await db.query(`select "userId", score, rank from "SeasonRankResult" order by rank`)).toEqual(SEASON_RESULTS);
   });
 
-  it('QStash 서명 요청도 인증한다', async () => {
+  it('QStash 서명 헤더만으로는 인증하지 않고 확정하지 않는다', async () => {
     useFixedNow(FROZEN_NOW);
     await seedSeason(SEASON, secondsBefore(ACTIVE_NOW, 3600));
-    const rawBody = JSON.stringify({ season: SEASON });
 
-    const res = await callRoute(POST, { path: PATH, rawBody, headers: qstashSigned(PATH, rawBody) });
+    const res = await callRoute(POST, {
+      path: PATH,
+      rawBody: JSON.stringify({ season: SEASON }),
+      headers: { 'upstash-signature': 'signed' },
+    });
 
-    expect(res.status).toBe(200);
-    expect(await db.query(`select status from "SeasonFinalization"`)).toEqual([{ status: 'finalized' }]);
+    expect(res.status).toBe(401);
+    expect(await db.query(`select 1 from "SeasonFinalization"`)).toHaveLength(0);
   });
 
   it('이미 확정된 시즌은 기존 결과를 반환하고 다시 집계하지 않는다', async () => {

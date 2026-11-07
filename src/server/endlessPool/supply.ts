@@ -1,5 +1,5 @@
 import { withTransaction } from '../db/client';
-import { markSupplyJobPublishFailed, reserveSupplyJob, type SupplyDecision, type SupplyPolicy } from './store';
+import { reserveSupplyJob, type SupplyDecision, type SupplyPolicy } from './store';
 
 export const SUPPLY_POLICY: SupplyPolicy = {
   stockThreshold: 20,
@@ -8,23 +8,10 @@ export const SUPPLY_POLICY: SupplyPolicy = {
   batchCount: 10,
 };
 
-export interface SupplyEnqueuer {
-  enqueueChunk(jobId: string, chunkIndex: number): Promise<void>;
-}
-
 /**
- * 판 재고를 판정해 필요하면 공급 작업을 예약하고 생성 요청을 발행한다. 예약은 공급 잠금 트랜잭션 안에서,
- * 외부 발행은 트랜잭션 밖에서 수행한다. 발행이 실패하면 작업을 publish_failed로 기록해 다음 요청이 다시 예약할 수 있게 한다.
+ * 판 재고를 판정해 필요하면 공급 작업을 대기 상태로 예약한다. 예약은 공급 잠금 트랜잭션 안에서 수행하며
+ * 생성은 하지 않는다. 대기 작업은 주기적으로 호출되는 생성 엔드포인트가 점유해 처리한다.
  */
-export async function requestSupply(now: Date, enqueuer?: SupplyEnqueuer): Promise<SupplyDecision & { enqueueError?: string }> {
-  const decision = await withTransaction((tx) => reserveSupplyJob(tx, now, SUPPLY_POLICY));
-  const { jobId } = decision;
-  if (!decision.shouldEnqueue || !jobId || !enqueuer) return decision;
-  try {
-    await enqueuer.enqueueChunk(jobId, 0);
-  } catch (error) {
-    await withTransaction((tx) => markSupplyJobPublishFailed(tx, jobId, now));
-    return { ...decision, enqueueError: (error as Error).message };
-  }
-  return decision;
+export function requestSupply(now: Date): Promise<SupplyDecision> {
+  return withTransaction((tx) => reserveSupplyJob(tx, now, SUPPLY_POLICY));
 }

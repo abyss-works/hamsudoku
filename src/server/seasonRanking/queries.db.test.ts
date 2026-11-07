@@ -5,7 +5,7 @@ import {
   findFinalizedSeason,
   findFinalizedSeasonTop,
   findSeasonStanding,
-  listSeasonEarnings,
+  listSeasonTopEarnings,
   listUnfinalizedLedgerSeasons,
 } from './queries';
 
@@ -51,14 +51,22 @@ async function finalize(season: string, results: { userId: string; score: number
 }
 
 describe('seasonRanking 원장 조회', () => {
-  it('시즌 적립 합계는 구간 안의 랭킹 대상 적립만 사용자별로 더한다', async () => {
+  it('시즌 상위 적립은 구간 안의 랭킹 대상 적립을 사용자별로 더해 점수 내림차순, 동점은 userId 내림차순으로 반환한다', async () => {
     await seedSeason();
-    const rows = await listSeasonEarnings(store.db, SEASON, WINDOW);
-    expect([...rows].sort((a, b) => a.userId.localeCompare(b.userId))).toEqual([
-      { userId: 'user-a', amount: 5 },
-      { userId: 'user-b', amount: 5 },
-      { userId: 'user-c', amount: 3 },
-      { userId: 'user-e', amount: 1 },
+    expect(await listSeasonTopEarnings(store.db, SEASON, WINDOW, 50)).toEqual([
+      { userId: 'user-b', score: 5 },
+      { userId: 'user-a', score: 5 },
+      { userId: 'user-c', score: 3 },
+      { userId: 'user-e', score: 1 },
+    ]);
+  });
+
+  it('시즌 상위 적립은 limit개로 자르고 적립이 없으면 빈 목록이다', async () => {
+    expect(await listSeasonTopEarnings(store.db, SEASON, WINDOW, 50)).toEqual([]);
+    await seedSeason();
+    expect(await listSeasonTopEarnings(store.db, SEASON, WINDOW, 2)).toEqual([
+      { userId: 'user-b', score: 5 },
+      { userId: 'user-a', score: 5 },
     ]);
   });
 

@@ -5,6 +5,7 @@ import type { Violations } from '../../../features/sudoku/model/rules';
 import { useBoardInteraction } from '../../../features/sudoku/service/useBoardInteraction';
 import type { CellState, Puzzle } from '../../../features/sudoku/model/puzzles';
 import type { TapKind } from '../../../features/sudoku/model/tap';
+import type { Reaction } from '../../../features/sudoku/model/reaction';
 
 const EMPTY_MARKS: ReadonlySet<string> = new Set();
 
@@ -20,6 +21,8 @@ export interface SudokuBoardProps {
   pulse?: ReadonlyMap<string, number>;
   hitKey?: string | null;
   shake?: number;
+  /** 마지막 확정의 발견 반응. 칸별 표정과 하트 수의 입력이다. */
+  reaction?: Reaction | null;
   onCell: (r: number, c: number, kind: TapKind) => void;
   onPress: (r: number, c: number) => void;
   onEnter: (r: number, c: number) => void;
@@ -37,6 +40,7 @@ export function SudokuBoard({
   pulse = new Map(),
   hitKey = null,
   shake = 0,
+  reaction = null,
   onCell,
   onPress,
   onEnter,
@@ -44,7 +48,7 @@ export function SudokuBoard({
   clearOverlay,
 }: SudokuBoardProps) {
   const { projected, boardRef, controls, handlePress, handleMove, handleUp, handleClickCapture, handleCancel, handleLeave } =
-    useBoardInteraction(puzzle, cells, xMarks, violations, pulse, hitKey, shake, onPress, onEnter, onRelease, autoMarks);
+    useBoardInteraction(puzzle, cells, xMarks, violations, pulse, hitKey, shake, onPress, onEnter, onRelease, autoMarks, reaction);
 
   return (
     <motion.div className={`board-wrap${shake > 0 ? ' shake' : ''}`} animate={controls}>

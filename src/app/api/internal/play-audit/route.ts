@@ -1,21 +1,12 @@
 import * as Sentry from '@sentry/nextjs';
 import { NextResponse } from 'next/server';
-import { verifyInternalRequest } from '../../../../server/qstash';
+import { rejectUnlessCron } from '../../../../server/internalAuth';
 import { auditPlayLogs, reportAuditFailure } from '../../../../server/endlessPlay/playAudit';
 
 /** 무한모드 플레이 기록의 사후 감사. 내부 인증 요청만 받고 본문은 사용하지 않으며, 처리 건수를 응답하고 플래그별 건수와 함께 기록한다. */
 export async function POST(req: Request) {
-  let rawBody = '';
-  try {
-    rawBody = await req.text();
-  } catch {
-    rawBody = '';
-  }
-
-  const authenticated = await verifyInternalRequest(req, rawBody);
-  if (!authenticated) {
-    return NextResponse.json({ ok: false, msg: '인증에 실패했어요.' }, { status: 401 });
-  }
+  const rejected = rejectUnlessCron(req);
+  if (rejected) return rejected;
 
   try {
     const { audited, flagged, flagCounts } = await auditPlayLogs(new Date());

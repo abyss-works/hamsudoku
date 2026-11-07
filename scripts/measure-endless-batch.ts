@@ -55,5 +55,5 @@ if (process.argv[1]?.includes('measure-endless-batch')) {
   }
   const avgWall = Math.round(results.reduce((a, b) => a + b.wallMs, 0) / results.length);
   const maxWall = Math.max(...results.map((r) => r.wallMs));
-  console.log(`평균 Wall: ${avgWall}ms | 최대 Wall: ${maxWall}ms | 배포 maxDuration(60s) 대비 여유: ${Math.round((60000 - maxWall) / 1000)}초`);
+  console.log(`평균 Wall: ${avgWall}ms | 최대 Wall: ${maxWall}ms`);
 }

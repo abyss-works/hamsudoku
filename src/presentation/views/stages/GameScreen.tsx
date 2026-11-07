@@ -38,6 +38,7 @@ export function GameScreen({
         pulse={game.pulse}
         hitKey={game.hitKey}
         shake={game.shake}
+        reaction={game.reaction}
         onCell={game.tapCell}
         onPress={game.beginStroke}
         onEnter={game.strokeEnter}
