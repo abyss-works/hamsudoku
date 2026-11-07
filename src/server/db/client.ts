@@ -1,6 +1,6 @@
 import { attachDatabasePool } from '@vercel/functions';
 import { drizzle, type NodePgDatabase } from 'drizzle-orm/node-postgres';
-import { Pool, type PoolConfig } from 'pg';
+import { Client, Pool, type PoolConfig } from 'pg';
 import { describeDbError } from './errors';
 
 /** store·queries 함수가 받는 실행 객체. 풀 기반 db와 트랜잭션 연결 모두 이 타입이다. */
@@ -11,7 +11,7 @@ export interface Database {
   pool: Pool;
   /** 연결 하나에서 BEGIN·COMMIT·ROLLBACK을 수행하고 어떤 실패에서도 연결을 풀에 반환한다. */
   withTransaction<T>(work: (tx: Executor) => Promise<T>): Promise<T>;
-  /** 연결을 얻어 단순 쿼리를 실행한다. 연결이나 실행이 실패하면 오류를 전달한다. */
+  /** 풀과 같은 연결 설정의 일회성 연결로 단순 쿼리를 실행하고 연결을 닫는다. 연결이나 실행이 실패하면 오류를 전달한다. */
   checkConnection(): Promise<void>;
 }
 
@@ -49,8 +49,18 @@ export function createDatabase(config: PoolConfig): Database {
     }
   }
 
+  // 풀 연결을 반환하면 attachDatabasePool이 유휴 시간만큼 함수 인스턴스를 유지하므로 주기적 가용성 확인은 풀을 거치지 않는다.
   async function checkConnection(): Promise<void> {
-    await pool.query('select 1');
+    const client = new Client(config);
+    client.on('error', (error) => {
+      console.warn('Database health client error', describeDbError(error));
+    });
+    try {
+      await client.connect();
+      await client.query('select 1');
+    } finally {
+      await client.end().catch(() => undefined);
+    }
   }
 
   return { db: drizzle({ client: pool }), pool, withTransaction, checkConnection };

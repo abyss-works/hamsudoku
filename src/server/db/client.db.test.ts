@@ -131,15 +131,39 @@ describe('withTransaction 커밋 결과', () => {
 });
 
 describe('checkConnection', () => {
-  it('DB에 쿼리를 실행하고 연결을 풀에 반환한다', async () => {
-    await expect(database.checkConnection()).resolves.toBeUndefined();
-    expect(database.pool.idleCount).toBe(1);
+  it('공용 풀을 거치지 않고 일회성 연결로 쿼리를 실행한 뒤 연결을 닫는다', async () => {
+    const own = createDatabase({ connectionString: testDb.url, max: 1, connectionTimeoutMillis: 2000 });
+    const end = vi.spyOn(Client.prototype, 'end');
+    try {
+      await expect(own.checkConnection()).resolves.toBeUndefined();
+      expect(own.pool.totalCount).toBe(0);
+      expect(end).toHaveBeenCalledTimes(1);
+    } finally {
+      await own.pool.end();
+    }
   });
 
-  it('DB에 연결할 수 없으면 오류를 전달한다', async () => {
+  it('쿼리가 실패해도 일회성 연결을 닫고 오류를 전달한다', async () => {
+    const own = createDatabase({ connectionString: testDb.url, max: 1, connectionTimeoutMillis: 2000 });
+    const end = vi.spyOn(Client.prototype, 'end');
+    vi.spyOn(Client.prototype, 'query').mockImplementationOnce(function () {
+      return Promise.reject(new Error('query failed'));
+    } as unknown as Client['query']);
+    try {
+      await expect(own.checkConnection()).rejects.toThrow('query failed');
+      expect(own.pool.totalCount).toBe(0);
+      expect(end).toHaveBeenCalledTimes(1);
+    } finally {
+      await own.pool.end();
+    }
+  });
+
+  it('DB에 연결할 수 없으면 일회성 연결을 닫고 오류를 전달한다', async () => {
     const unreachable = createDatabase({ connectionString: 'postgres://user:pass@127.0.0.1:1/none', connectionTimeoutMillis: 1000 });
+    const end = vi.spyOn(Client.prototype, 'end');
     try {
       await expect(unreachable.checkConnection()).rejects.toThrow();
+      expect(end).toHaveBeenCalledTimes(1);
     } finally {
       await unreachable.pool.end();
     }
