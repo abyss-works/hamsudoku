@@ -1,6 +1,6 @@
 import { sql } from 'drizzle-orm';
 import type { Executor } from '../db/client';
-import { utcTimestamp } from '../db/sql';
+import { textArray, utcTimestamp } from '../db/sql';
 import type { SeasonFinalizationHeader, SeasonRankResult, SeasonWindow } from './queries';
 import { seasonFinalizations } from './schema';
 
@@ -39,6 +39,20 @@ export async function appendEarning(executor: Executor, input: EarningInput): Pr
     returning "rankingEligible"
   `);
   return { rankingEligible: result.rows[0].rankingEligible };
+}
+
+/**
+ * 지정한 사용자의 해당 시즌 적립을 랭킹 대상에서 제외한다. 표시 순위와 시즌 확정이 같은 원장 필터를 쓰므로
+ * 제외는 이후 갱신과 확정에도 유지된다. 새로 제외된 사용자 수를 반환한다.
+ */
+export async function excludeSeasonEarnings(executor: Executor, season: string, userIds: string[]): Promise<number> {
+  if (userIds.length === 0) return 0;
+  const result = await executor.execute<{ userId: string }>(sql`
+    update "SeedLedger" set "rankingEligible" = false
+    where "season" = ${season} and "kind" = 'earn' and "rankingEligible" and "userId" = any(${textArray(userIds)})
+    returning "userId"
+  `);
+  return new Set(result.rows.map((row) => row.userId)).size;
 }
 
 /** 확정 머리 행을 저장한다. 시즌 배타 잠금 안에서 한 번만 호출한다. */

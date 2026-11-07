@@ -25,9 +25,6 @@ vi.mock('next/server', async (original) =>
 vi.mock('../../../../server/auth', async (original) =>
   (await import('../../../../../tools/dbTest/routeHarness')).mockAuth(await original()),
 );
-vi.mock('../../../../server/rank', async (original) =>
-  (await import('../../../../../tools/dbTest/routeHarness')).mockRank(await original()),
-);
 
 const db = useRouteDatabase();
 let POST: (req: Request) => Promise<Response>;

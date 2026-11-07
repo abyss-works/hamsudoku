@@ -4,7 +4,7 @@ import { afterAll, afterEach, beforeAll, beforeEach, vi } from 'vitest';
 import { createTestDatabase, type TestDatabase } from './testDatabase';
 
 // route handler를 실제 데이터베이스로 호출하는 테스트 도구.
-// 세션·Sentry·순위 저장소·응답 후 작업·외부 HTTP만 대체하고 저장소 구현은 그대로 실행한다.
+// 세션·Sentry·응답 후 작업·요청 속도 제한·외부 HTTP만 대체하고 저장소 구현은 그대로 실행한다.
 
 const KST_OFFSET_MS = 9 * 60 * 60 * 1000;
 const DAY_MS = 24 * 60 * 60 * 1000;
@@ -111,62 +111,6 @@ async function flushDeferred(): Promise<void> {
   }
 }
 
-// ---- 순위 저장소 ----
-
-interface RankEntry {
-  userId: string;
-  score: number;
-}
-
-/** Redis 순위 저장소 대역. 표시 캐시는 항상 비어 있어 원장 조회 함수를 호출한다. */
-export class FakeRankStore {
-  readonly increments: { season: string; userId: string; amount: number }[] = [];
-  readonly removed: { season: string; userId: string }[] = [];
-  scores = new Map<string, number>();
-
-  async increment(season: string, userId: string, amount: number): Promise<void> {
-    this.increments.push({ season, userId, amount });
-    this.scores.set(userId, (this.scores.get(userId) ?? 0) + amount);
-  }
-
-  async top(season: string, limit: number, loadScores?: () => Promise<RankEntry[]>) {
-    const entries = loadScores ? await loadScores() : this.sorted();
-    return { at: new Date().toISOString(), season, entries: sortEntries(entries).slice(0, limit) };
-  }
-
-  async topAll(season: string, limit: number) {
-    return { at: new Date().toISOString(), season, entries: this.sorted().slice(0, limit) };
-  }
-
-  async remove(season: string, userId: string): Promise<number> {
-    this.removed.push({ season, userId });
-    return this.scores.delete(userId) ? 1 : 0;
-  }
-
-  async rankOf(_season: string, userId: string) {
-    const index = this.sorted().findIndex((e) => e.userId === userId);
-    return index < 0 ? { rank: null, score: 0 } : { rank: index + 1, score: this.scores.get(userId) ?? 0 };
-  }
-
-  async setScore(_season: string, userId: string, score: number): Promise<void> {
-    this.scores.set(userId, score);
-  }
-
-  private sorted(): RankEntry[] {
-    return sortEntries([...this.scores].map(([userId, score]) => ({ userId, score })));
-  }
-}
-
-function sortEntries(entries: RankEntry[]): RankEntry[] {
-  return [...entries].sort((a, b) => b.score - a.score || (a.userId < b.userId ? 1 : a.userId > b.userId ? -1 : 0));
-}
-
-export const rankStore: { current: FakeRankStore | null } = { current: null };
-
-export function mockRank<T extends object>(original: T): T {
-  return { ...original, rankStoreFromEnv: () => rankStore.current };
-}
-
 // ---- 요청 속도 제한 ----
 
 /** 한도를 넘은 것으로 응답할 정책과 확인한 정책·식별자. 제한기를 켜지 않으면 null 제한기를 쓴다. */
@@ -234,8 +178,6 @@ const TEST_ENV: Record<string, string | undefined> = {
   RANKING_FINALIZE_DESTINATION_URL: undefined,
   INTERNAL_SECRET,
   CRON_SECRET: undefined,
-  UPSTASH_REDIS_REST_URL: undefined,
-  UPSTASH_REDIS_REST_TOKEN: undefined,
   ADMIN_UIDS: undefined,
 };
 
@@ -286,7 +228,7 @@ export function useRouteDatabase(): RouteDatabase {
     sentryLogs.length = 0;
     sentryEvents.exceptions.length = 0;
     sentryEvents.monitors.length = 0;
-    rankStore.current = null;
+    (await import('../../src/server/rank')).rankCache.clear();
     rateLimits.enabled = false;
     rateLimits.blocked.clear();
     rateLimits.checks.length = 0;

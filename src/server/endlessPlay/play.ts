@@ -7,7 +7,6 @@ import { deferTask, type Defer } from '../defer';
 import { findStage } from '../endlessPool/queries';
 import { recordStagePlay } from '../endlessPool/store';
 import { requestSupply, type SupplyEnqueuer } from '../endlessPool/supply';
-import { deferRankEarning } from '../seasonRanking/rankCache';
 import { countsForRanking } from '../seasonRanking/rules';
 import { appendEarning, lockSeasonForEarning } from '../seasonRanking/store';
 import { findPlaySummary, findSubmissionHistory, findRetryableStage, pickPlayableStage, type PlayableStage, type PlaySummary } from './queries';
@@ -64,7 +63,7 @@ export async function startEndlessStage(
 /**
  * 무한모드 클리어 제출. 판 확인과 입장 키 소모는 트랜잭션 밖에서 한 문장씩 수행하고, 보상 반영은
  * 시즌 공유 잠금 → 사용자 잠금 → 제출 간격 검사 → 진행·지갑·연속 기록·이벤트 → 시즌 원장 → 판 통계 순서로 한 트랜잭션에서 수행한다.
- * 키 소모 뒤 저장이 실패하면 소모를 되돌린다. Redis 순위 가산과 플레이 기록 저장은 응답 뒤로 미룬다.
+ * 키 소모 뒤 저장이 실패하면 소모를 되돌린다. 플레이 기록 저장은 응답 뒤로 미룬다.
  */
 export async function submitEndlessClear(
   uid: string | null,
@@ -144,9 +143,6 @@ export async function submitEndlessClear(
     });
     if (!committed) return await reject('제출 간격 하한', '제출이 너무 잦아요.');
 
-    if (committed.summary.earned > 0) {
-      deferRankEarning(defer, { season, userId: uid, amount: committed.summary.earned, at: now });
-    }
     deferLog(true, null);
     return {
       status: 200,

@@ -36,3 +36,39 @@ describe('finalizeSeason 대량 참여', () => {
     );
   });
 });
+
+describe('finalizeSeason 중복 호출', () => {
+  it('같은 시즌을 동시에 여러 번 확정해도 머리 행과 결과를 한 번만 저장하고 같은 결과를 반환한다', async () => {
+    const at = new Date(WINDOW.startAt.getTime() + 60_000);
+    await db.query(
+      `insert into "SeedLedger" ("userId", kind, amount, season, "createdAt", "rankingEligible")
+       values ('user-a', 'earn', 4, $1, $2, true), ('user-b', 'earn', 6, $1, $2, true)`,
+      [SEASON, at],
+    );
+
+    const results = await Promise.all([1, 2, 3, 4].map(() => finalization.finalizeSeason(SEASON, AFTER_END)));
+
+    for (const result of results) {
+      expect(result.results).toEqual([
+        { season: SEASON, userId: 'user-b', score: 6, rank: 1 },
+        { season: SEASON, userId: 'user-a', score: 4, rank: 2 },
+      ]);
+    }
+    expect(await db.query(`select count(*)::int as n from "SeasonFinalization"`)).toEqual([{ n: 1 }]);
+    expect(await db.query(`select count(*)::int as n from "SeasonRankResult"`)).toEqual([{ n: 2 }]);
+  });
+
+  it('확정된 시즌을 복구 경로로 다시 호출해도 결과가 늘지 않는다', async () => {
+    await db.query(
+      `insert into "SeedLedger" ("userId", kind, amount, season, "createdAt", "rankingEligible")
+       values ('user-a', 'earn', 4, $1, $2, true)`,
+      [SEASON, new Date(WINDOW.startAt.getTime() + 60_000)],
+    );
+    await finalization.finalizeSeason(SEASON, AFTER_END);
+
+    const recovered = await finalization.recoverUnfinalizedSeasons(AFTER_END);
+
+    expect(recovered.filter((r) => r.header.season === SEASON)).toHaveLength(0);
+    expect(await db.query(`select count(*)::int as n from "SeasonRankResult"`)).toEqual([{ n: 1 }]);
+  });
+});
