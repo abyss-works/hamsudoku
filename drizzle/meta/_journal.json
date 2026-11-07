@@ -43,6 +43,13 @@
       "when": 1792225781341,
       "tag": "0005_progress_best_seed_left",
       "breakpoints": true
+    },
+    {
+      "idx": 6,
+      "version": "7",
+      "when": 1794077740250,
+      "tag": "0006_auth_tables",
+      "breakpoints": true
     }
   ]
 }

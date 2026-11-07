@@ -808,8 +808,9 @@ function inspectPureFailures(path: string, sourceOverride?: ts.SourceFile): stri
 // ---- 서버 데이터 계층 ----
 
 // 서버 기능과 허용 의존. 다른 기능의 테이블은 SQL 안에서 읽을 수 있고 쓰기는 소유 기능의 store만 수행한다.
-const SERVER_FEATURES = new Set(['account', 'attempt', 'stageRecord', 'endlessPool', 'endlessPlay', 'seasonRanking']);
+const SERVER_FEATURES = new Set(['identity', 'account', 'attempt', 'stageRecord', 'endlessPool', 'endlessPlay', 'seasonRanking']);
 const ALLOWED_SERVER_FEATURE_DEPS: Record<string, string[]> = {
+  identity: [],
   account: [],
   attempt: [],
   endlessPool: [],
