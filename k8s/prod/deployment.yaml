@@ -1,0 +1,68 @@
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: hamsudoku
+spec:
+  # 순위 캐시와 요청 제한이 프로세스 메모리에 있으므로 replica는 1개로 고정한다.
+  replicas: 1
+  selector:
+    matchLabels:
+      app: hamsudoku
+  template:
+    metadata:
+      labels:
+        app: hamsudoku
+    spec:
+      terminationGracePeriodSeconds: 30
+      nodeSelector:
+        kubernetes.io/hostname: oci-node
+      # 노드의 search 도메인이 SERVFAIL을 돌려주면 musl은 외부 이름 조회 전체를 실패시킨다.
+      # 점이 있는 이름은 절대 이름부터 조회하게 한다.
+      dnsConfig:
+        options:
+          - name: ndots
+            value: "1"
+      containers:
+        - name: hamsudoku
+          image: ghcr.io/abyss-works/hamsudoku
+          # 서버 비밀 환경 변수(BETTER_AUTH_SECRET, RESEND_API_KEY, MAIL_FROM, CRON_SECRET, ADMIN_UIDS 등)는
+          # 저장소 밖에서 만든 Secret이 준다. DB 접속 주소는 CNPG가 만든 앱 사용자 Secret에서 읽는다.
+          # ndots 1에서는 짧은 서비스 이름이 검색 도메인 없이 조회되므로 전체 도메인 주소(fqdn-uri)를 쓴다.
+          envFrom:
+            - secretRef:
+                name: hamsudoku
+          env:
+            - name: DATABASE_URL
+              valueFrom:
+                secretKeyRef:
+                  name: hamsudoku-db-app
+                  key: fqdn-uri
+            - name: APP_URL
+              value: https://hamsudoku.abyssworks.dev
+            - name: BETTER_AUTH_URL
+              value: https://hamsudoku.abyssworks.dev
+            - name: DEPLOY_ENV
+              value: production
+          ports:
+            - containerPort: 3000
+          resources:
+            requests:
+              cpu: 100m
+              memory: 256Mi
+            limits:
+              cpu: "1"
+              memory: 1Gi
+          # /api/health는 DB 연결을 확인한다. DB에 닿지 못하면 앱이 요청을 처리할 수 없으므로 트래픽에서 제외한다.
+          readinessProbe:
+            httpGet:
+              path: /api/health
+              port: 3000
+            periodSeconds: 10
+            timeoutSeconds: 5
+          # DB 장애로 프로세스를 재시작하지 않도록 liveness는 포트 응답만 확인한다.
+          livenessProbe:
+            tcpSocket:
+              port: 3000
+            periodSeconds: 20
+            timeoutSeconds: 5
+            failureThreshold: 6
