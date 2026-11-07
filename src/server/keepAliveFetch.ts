@@ -21,5 +21,5 @@ export function createServerFetch(baseFetch: typeof fetch, dispatcher: unknown):
     baseFetch(input, { ...init, dispatcher } as RequestInit)) as typeof fetch;
 }
 
-/** 서버의 외부 HTTP 호출(Upstash Redis, Supabase Auth)에 쓰는 연결 유지 fetch. */
+/** 서버의 외부 HTTP 호출(Supabase Auth)에 쓰는 연결 유지 fetch. */
 export const serverFetch: typeof fetch = createServerFetch(undiciFetch as unknown as typeof fetch, keepAliveAgent());
