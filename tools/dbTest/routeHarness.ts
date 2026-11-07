@@ -3,7 +3,7 @@ import { afterAll, afterEach, beforeAll, beforeEach, vi } from 'vitest';
 import { createTestDatabase, type TestDatabase } from './testDatabase';
 
 // route handler를 실제 데이터베이스로 호출하는 테스트 도구.
-// 세션·Sentry·응답 후 작업·요청 속도 제한만 대체하고 저장소 구현은 그대로 실행한다.
+// 세션·Sentry·응답 후 작업·요청 속도 제한·외부 HTTP만 대체하고 저장소 구현은 그대로 실행한다.
 
 const KST_OFFSET_MS = 9 * 60 * 60 * 1000;
 const DAY_MS = 24 * 60 * 60 * 1000;
@@ -132,6 +132,38 @@ export function mockRateLimit<T extends object>(original: T): T {
   };
 }
 
+// ---- 외부 HTTP ----
+
+export interface CapturedRequest {
+  url: string;
+  method: string;
+  headers: Record<string, string>;
+  body: unknown;
+}
+
+export const outbound: { requests: CapturedRequest[]; status: number } = { requests: [], status: 200 };
+
+async function fakeFetch(input: RequestInfo | URL, init?: RequestInit): Promise<Response> {
+  const request = new Request(input, init);
+  const text = await request.text();
+  let body: unknown = text;
+  try {
+    body = text ? JSON.parse(text) : null;
+  } catch {
+    // 본문이 JSON이 아니면 문자열로 남긴다.
+  }
+  outbound.requests.push({
+    url: request.url,
+    method: request.method,
+    headers: Object.fromEntries(request.headers),
+    body,
+  });
+  return new Response(JSON.stringify({ messageId: `msg-${outbound.requests.length}` }), {
+    status: outbound.status,
+    headers: { 'content-type': 'application/json' },
+  });
+}
+
 export const CRON_SECRET = 'test-cron-secret';
 
 const TEST_ENV: Record<string, string | undefined> = {
@@ -191,6 +223,9 @@ export function useRouteDatabase(): RouteDatabase {
     rateLimits.enabled = false;
     rateLimits.blocked.clear();
     rateLimits.checks.length = 0;
+    outbound.requests.length = 0;
+    outbound.status = 200;
+    vi.stubGlobal('fetch', fakeFetch);
     useFixedNow(ACTIVE_NOW);
   });
 
