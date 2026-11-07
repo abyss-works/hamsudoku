@@ -1,62 +1,66 @@
 import * as Sentry from '@sentry/nextjs';
-import { Ratelimit, type Duration } from '@upstash/ratelimit';
-import { Redis, type Requester } from '@upstash/redis';
 import { NextResponse } from 'next/server';
-import { serverFetch } from './keepAliveFetch';
 
 export type RateLimitPolicy = 'anonymous-session' | 'signin' | 'signup' | 'reset';
 
+const MINUTE_MS = 60_000;
+
 /** IP당 허용 횟수와 구간. 정상 사용에서는 닿지 않고 반복 시도만 막는 값이다. */
-export const RATE_LIMIT_POLICIES: Record<RateLimitPolicy, { limit: number; window: Duration }> = {
-  'anonymous-session': { limit: 10, window: '10 m' },
-  signin: { limit: 10, window: '1 m' },
-  signup: { limit: 5, window: '10 m' },
-  reset: { limit: 3, window: '10 m' },
+export const RATE_LIMIT_POLICIES: Record<RateLimitPolicy, { limit: number; windowMs: number }> = {
+  'anonymous-session': { limit: 10, windowMs: 10 * MINUTE_MS },
+  signin: { limit: 10, windowMs: MINUTE_MS },
+  signup: { limit: 5, windowMs: 10 * MINUTE_MS },
+  reset: { limit: 3, windowMs: 10 * MINUTE_MS },
 };
 
-/** 확인이 이 시간 안에 끝나지 않으면 라이브러리가 요청을 통과시킨다. */
-const CHECK_TIMEOUT_MS = 1000;
+const LONGEST_WINDOW_MS = Math.max(...Object.values(RATE_LIMIT_POLICIES).map((policy) => policy.windowMs));
 
 export type RateLimitDecision = { success: boolean; reset: number };
 export type RateLimiter = (policy: RateLimitPolicy, identifier: string) => Promise<RateLimitDecision>;
 
-/** Upstash REST 명령을 연결 유지 fetch로 보내는 Redis 요청기. 라이브러리 기본 요청기는 전역 fetch를 쓴다. */
-export function createUpstashRequester(url: string, token: string): Requester {
-  return {
-    async request<TResult>(req: { path?: string[]; body?: unknown }) {
-      const res = await serverFetch([url, ...(req.path ?? [])].join('/'), {
-        method: 'POST',
-        headers: { authorization: `Bearer ${token}`, 'content-type': 'application/json' },
-        body: JSON.stringify(req.body),
-      });
-      const data = (await res.json()) as { result?: TResult; error?: string };
-      if (!res.ok || data.error) throw new Error(data.error ?? `rate limit store ${res.status}`);
-      return data;
-    },
+/**
+ * 프로세스 메모리의 슬라이딩 윈도 제한기. 정책·식별자마다 허용된 요청 시각을 보관하고 구간이 지난 시각은 버린다.
+ * 거절된 요청은 기록하지 않으므로 구간을 늘리지 않는다. reset은 구간 안 가장 오래된 요청이 빠지는 시각(ms)이다.
+ * 상태가 프로세스 안에만 있으므로 복제본마다 따로 센다.
+ */
+export function createMemoryRateLimiter(now: () => number = () => Date.now()): RateLimiter & { size(): number } {
+  const hits = new Map<string, number[]>();
+  let lastSweepAt = 0;
+
+  function sweep(at: number) {
+    if (at - lastSweepAt < LONGEST_WINDOW_MS) return;
+    lastSweepAt = at;
+    for (const [key, times] of hits) {
+      const windowMs = RATE_LIMIT_POLICIES[key.slice(0, key.indexOf(':')) as RateLimitPolicy].windowMs;
+      if (times[times.length - 1] + windowMs <= at) hits.delete(key);
+    }
+  }
+
+  const limiter: RateLimiter = async (policy, identifier) => {
+    const at = now();
+    sweep(at);
+    const { limit, windowMs } = RATE_LIMIT_POLICIES[policy];
+    const key = `${policy}:${identifier}`;
+    const times = (hits.get(key) ?? []).filter((time) => time + windowMs > at);
+    if (times.length >= limit) {
+      hits.set(key, times);
+      return { success: false, reset: times[0] + windowMs };
+    }
+    times.push(at);
+    hits.set(key, times);
+    return { success: true, reset: times[0] + windowMs };
   };
+  return Object.assign(limiter, { size: () => hits.size });
 }
 
-export function rateLimiterFromEnv(env: Record<string, string | undefined> = process.env): RateLimiter | null {
-  const url = env.UPSTASH_REDIS_REST_URL;
-  const token = env.UPSTASH_REDIS_REST_TOKEN;
-  if (!url || !token) return null;
-  const redis = new Redis(createUpstashRequester(url, token));
-  const limiters = Object.fromEntries(
-    Object.entries(RATE_LIMIT_POLICIES).map(([policy, { limit, window }]) => [
-      policy,
-      new Ratelimit({
-        redis,
-        limiter: Ratelimit.slidingWindow(limit, window),
-        prefix: `ratelimit:${policy}`,
-        timeout: CHECK_TIMEOUT_MS,
-        analytics: false,
-      }),
-    ]),
-  ) as Record<RateLimitPolicy, Ratelimit>;
-  return (policy, identifier) => limiters[policy].limit(identifier);
+const processLimiter = createMemoryRateLimiter();
+
+/** 프로세스 전체에서 공유하는 제한기. 요청 사이에 횟수가 이어진다. */
+export function rateLimiterFromEnv(): RateLimiter {
+  return processLimiter;
 }
 
-/** 요청자 IP. 배포 플랫폼이 x-forwarded-for의 첫 값을 접속 주소로 채운다. */
+/** 요청자 IP. ingress가 x-forwarded-for의 첫 값을 접속 주소로 채운다. */
 export function clientIp(req: Request): string {
   return req.headers.get('x-forwarded-for')?.split(',')[0]?.trim() || 'unknown';
 }
