@@ -20,4 +20,4 @@ resources:
 # 태그는 package.json의 버전과 같아야 한다.
 images:
   - name: ghcr.io/abyss-works/hamsudoku
-    newTag: v0.8.2
+    newTag: v0.8.3
