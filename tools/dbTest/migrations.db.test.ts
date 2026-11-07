@@ -77,3 +77,58 @@ describe('Drizzle 마이그레이션', () => {
     ]);
   });
 });
+
+describe('인증 표 마이그레이션', () => {
+  it('auth 스키마에 text id의 사용자·세션·계정·검증 표를 만들고 RLS를 켠다', async () => {
+    const client = await emptyDatabase();
+    await applyDrizzleMigrations(client);
+
+    const tables = await client.query<{ tablename: string; rowsecurity: boolean }>(
+      "select tablename, rowsecurity from pg_tables where schemaname = 'auth' order by tablename",
+    );
+    expect(tables.rows).toEqual([
+      { tablename: 'accounts', rowsecurity: true },
+      { tablename: 'sessions', rowsecurity: true },
+      { tablename: 'users', rowsecurity: true },
+      { tablename: 'verifications', rowsecurity: true },
+    ]);
+
+    const ids = await client.query<{ table_name: string; data_type: string }>(
+      "select table_name, data_type from information_schema.columns where table_schema = 'auth' and column_name in ('id', 'user_id') order by table_name, column_name",
+    );
+    expect(ids.rows.every((r) => r.data_type === 'text')).toBe(true);
+  });
+
+  it('기존 Supabase 사용자 id(UUID 문자열)와 bcrypt 해시를 그대로 저장한다', async () => {
+    const client = await emptyDatabase();
+    await applyDrizzleMigrations(client);
+    const id = '3f2c1a9e-5b7d-4e21-9a0c-6d8f4b1e2a77';
+    const hash = '$2a$10$abcdefghijklmnopqrstuuAbCdEfGhIjKlMnOpQrStUvWxYz012345';
+
+    await client.query(`insert into auth.users (id, email) values ($1, 'a@b.co')`, [id]);
+    await client.query(
+      `insert into auth.accounts (id, user_id, account_id, provider_id, password) values ('acc-1', $1, $1, 'credential', $2)`,
+      [id, hash],
+    );
+
+    const row = await client.query(`select password from auth.accounts where user_id = $1`, [id]);
+    expect(row.rows).toEqual([{ password: hash }]);
+  });
+
+  it('이메일과 세션 토큰은 유일하고 사용자를 지우면 세션과 계정도 지워진다', async () => {
+    const client = await emptyDatabase();
+    await applyDrizzleMigrations(client);
+    await client.query(`insert into auth.users (id, email) values ('u1', 'a@b.co')`);
+    await expect(client.query(`insert into auth.users (id, email) values ('u2', 'a@b.co')`)).rejects.toThrow();
+
+    await client.query(`insert into auth.sessions (id, user_id, token, expires_at) values ('s1', 'u1', 't', now())`);
+    await expect(
+      client.query(`insert into auth.sessions (id, user_id, token, expires_at) values ('s2', 'u1', 't', now())`),
+    ).rejects.toThrow();
+    await client.query(`insert into auth.accounts (id, user_id, account_id, provider_id) values ('a1', 'u1', 'u1', 'credential')`);
+
+    await client.query(`delete from auth.users where id = 'u1'`);
+    expect((await client.query('select 1 from auth.sessions')).rowCount).toBe(0);
+    expect((await client.query('select 1 from auth.accounts')).rowCount).toBe(0);
+  });
+});

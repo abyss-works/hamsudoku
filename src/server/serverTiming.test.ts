@@ -2,11 +2,9 @@ import { describe, expect, it, vi } from 'vitest';
 import { addTiming, classifySpan, formatServerTiming, spanHost, timingsByRoot, withServerTiming, type Timings } from './serverTiming';
 
 describe('classifySpan', () => {
-  it('DB span은 db, 외부 HTTP span은 호스트로 supabase·http로 나누고 나머지는 제외한다', () => {
+  it('DB span은 db, 그 밖의 외부 HTTP span은 http로 나누고 나머지는 제외한다', () => {
     expect(classifySpan({ op: 'db', host: undefined })).toBe('db');
     expect(classifySpan({ op: 'db.query', host: undefined })).toBe('db');
-    expect(classifySpan({ op: 'http.client', host: 'abcd.supabase.co' })).toBe('supabase');
-    expect(classifySpan({ op: 'http.client', host: 'apn1-example.upstash.io' })).toBe('http');
     expect(classifySpan({ op: 'http.client', host: 'example.com' })).toBe('http');
     expect(classifySpan({ op: 'function', host: undefined })).toBeUndefined();
     expect(classifySpan({ op: undefined, host: undefined })).toBeUndefined();
@@ -26,12 +24,12 @@ describe('spanHost', () => {
 describe('formatServerTiming', () => {
   it('구분별 실제 소요 시간과 바깥 호출 수, 전체 시간, 앱 버전을 Server-Timing 형식으로 만든다', () => {
     const timings: Timings = new Map();
-    addTiming(timings, 'supabase', 0, 100.04);
+    addTiming(timings, 'http', 0, 100.04);
     addTiming(timings, 'db', 0, 5.26);
     addTiming(timings, 'db', 10, 14);
 
     expect(formatServerTiming(timings, 130.55, '0.5.6')).toBe(
-      'db;dur=9.3;desc="2", supabase;dur=100;desc="1", total;dur=130.6, app;desc="0.5.6"',
+      'db;dur=9.3;desc="2", http;dur=100;desc="1", total;dur=130.6, app;desc="0.5.6"',
     );
   });
 

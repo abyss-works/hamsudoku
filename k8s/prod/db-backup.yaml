@@ -1,0 +1,13 @@
+# 매일 03:00 KST 베이스 백업. WAL은 계속 올라가므로 이 백업과 WAL로 보존 기간 안의 임의 시점을 복구한다.
+apiVersion: postgresql.cnpg.io/v1
+kind: ScheduledBackup
+metadata:
+  name: hamsudoku-db-daily
+spec:
+  schedule: "0 0 18 * * *"
+  backupOwnerReference: self
+  cluster:
+    name: hamsudoku-db
+  method: plugin
+  pluginConfiguration:
+    name: barman-cloud.cloudnative-pg.io

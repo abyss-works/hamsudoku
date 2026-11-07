@@ -1,15 +1,17 @@
 import * as Sentry from '@sentry/nextjs';
+import { sentryEnvironment } from './platform/deployment/deployEnv';
 import { traceNewConnections } from './server/connectionTrace';
 import { scrubDatabaseErrorEvent } from './server/db/errors';
 import { isHealthCheckSpan } from './server/healthTrace';
 import { createInstanceTracker } from './server/instanceTrace';
 import { collectSpanTimings } from './server/serverTiming';
 
-// node-postgres 쿼리 span과 바깥 fetch span(Supabase Auth)은 기본 통합이 수집한다.
+// node-postgres 쿼리 span과 바깥 fetch span은 기본 통합이 수집한다.
 // 구조화 로그(Sentry.logger)는 기본 활성화되어 있어 별도 옵션이 필요 없다.
 // 쿼리 빌더 오류 메시지에 실린 쿼리 인자(사용자 식별자 등)는 전송 전에 가린다.
 Sentry.init({
   dsn: process.env.NEXT_PUBLIC_SENTRY_DSN,
+  environment: sentryEnvironment(process.env.DEPLOY_ENV),
   // 가용성 감시 요청은 분마다 들어오므로 트레이스를 남기지 않는다.
   tracesSampler: ({ name, inheritOrSampleWith }) => (isHealthCheckSpan(name) ? 0 : inheritOrSampleWith(1.0)),
   initialScope: { tags: { 'app.version': process.env.APP_VERSION ?? 'unknown' } },

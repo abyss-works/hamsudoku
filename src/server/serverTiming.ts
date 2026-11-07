@@ -1,17 +1,16 @@
 import * as Sentry from '@sentry/nextjs';
 
 /** 요청 처리 시간 중 따로 합산하는 외부 호출 구분. */
-export type TimingName = 'db' | 'supabase' | 'http';
+export type TimingName = 'db' | 'http';
 /** 구분별 호출 구간. 시작·종료는 같은 기준의 밀리초다. */
 export type Timings = Map<TimingName, [number, number][]>;
 
-const ORDER: TimingName[] = ['db', 'supabase', 'http'];
+const ORDER: TimingName[] = ['db', 'http'];
 
 /** 완료된 span의 종류와 대상 호스트로 합산 구분을 정한다. DB와 외부 HTTP 호출이 아니면 제외한다. */
 export function classifySpan(span: { op: string | undefined; host: string | undefined }): TimingName | undefined {
   if (span.op === 'db' || span.op?.startsWith('db.')) return 'db';
   if (span.op !== 'http.client') return undefined;
-  if (span.host?.endsWith('.supabase.co')) return 'supabase';
   return 'http';
 }
 

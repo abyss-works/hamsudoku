@@ -26,7 +26,7 @@ describe('POST /api/auth/reset 요청 속도 제한', () => {
 
     expect(res.status).toBe(200);
     expect(limiter).toHaveBeenCalledWith('reset', '1.2.3.4');
-    expect(requestPasswordReset).toHaveBeenCalledTimes(1);
+    expect(requestPasswordReset).toHaveBeenCalledWith('a@b.co');
   });
 
   it('한도를 넘으면 429를 반환하고 메일을 요청하지 않는다', async () => {
