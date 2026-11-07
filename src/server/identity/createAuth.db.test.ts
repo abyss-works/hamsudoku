@@ -77,7 +77,7 @@ describe('익명 세션', () => {
     expect(uid).toMatch(UUID);
     const session = await sessionOf(b);
     expect(session?.user.id).toBe(uid);
-    expect((session?.user as { isAnonymous?: boolean }).isAnonymous).toBe(true);
+    expect((session!.user as { isAnonymous?: boolean }).isAnonymous).toBe(true);
     expect(session?.user.email).toMatch(/^[0-9a-f-]{36}@anonymous\.invalid$/);
   });
 
@@ -106,7 +106,7 @@ describe('익명 승격', () => {
     expect(bcrypt.compareSync('secret1', accounts.rows[0].password)).toBe(true);
     const session = await sessionOf(b);
     expect(session?.user.id).toBe(uid);
-    expect((session?.user as { isAnonymous?: boolean }).isAnonymous).toBe(false);
+    expect((session!.user as { isAnonymous?: boolean }).isAnonymous).toBe(false);
   });
 
   it('이미 쓰는 이메일은 대소문자와 무관하게 거절하고 게스트를 그대로 둔다', async () => {
