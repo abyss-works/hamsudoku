@@ -578,7 +578,7 @@ function inspectServiceDirectAccess(path: string, sourceOverride?: ts.SourceFile
       const name = label(path);
       for (const dep of getImportsAndExports(path)) {
         if (dep.isTypeOnly) continue;
-        if (!name.startsWith('src/server/') && /^(?:@supabase\/|drizzle-orm(?:\/|$)|pg$)/.test(dep.module)) {
+        if (!name.startsWith('src/server/') && /^(?:better-auth(?:\/|$)|drizzle-orm(?:\/|$)|pg$)/.test(dep.module)) {
           failures.push(`${name}: 서버 SDK 직접 참조`);
         }
         if (!name.startsWith('src/server/') && dep.module.startsWith('node:')) {
