@@ -1,7 +1,7 @@
-import { attachDatabasePool } from '@vercel/functions';
 import { drizzle, type NodePgDatabase } from 'drizzle-orm/node-postgres';
 import { Client, Pool, type PoolConfig } from 'pg';
 import { describeDbError } from './errors';
+import { appPoolConfig } from './poolConfig';
 
 /** store·queries 함수가 받는 실행 객체. 풀 기반 db와 트랜잭션 연결 모두 이 타입이다. */
 export type Executor = NodePgDatabase;
@@ -49,7 +49,7 @@ export function createDatabase(config: PoolConfig): Database {
     }
   }
 
-  // 풀 연결을 반환하면 attachDatabasePool이 유휴 시간만큼 함수 인스턴스를 유지하므로 주기적 가용성 확인은 풀을 거치지 않는다.
+  // 주기적 가용성 확인이 풀 연결을 점유하거나 유휴 연결을 남기지 않도록 풀을 거치지 않는다.
   async function checkConnection(): Promise<void> {
     const client = new Client(config);
     client.on('error', (error) => {
@@ -69,15 +69,7 @@ export function createDatabase(config: PoolConfig): Database {
 const globalForDatabase = globalThis as unknown as { hamsudokuDatabase?: Database };
 
 function createAppDatabase(): Database {
-  const database = createDatabase({
-    connectionString: process.env.DATABASE_URL,
-    max: 3,
-    idleTimeoutMillis: 30000,
-    connectionTimeoutMillis: 5000,
-  });
-  // Vercel 함수가 유휴 연결을 정리한 뒤 일시 중지되도록 풀을 등록한다. Vercel 밖에서는 동작하지 않는다.
-  attachDatabasePool(database.pool);
-  return database;
+  return createDatabase(appPoolConfig(process.env.DATABASE_URL));
 }
 
 const database = globalForDatabase.hamsudokuDatabase ?? createAppDatabase();
