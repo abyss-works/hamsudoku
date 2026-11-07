@@ -1,81 +1,40 @@
-import { describe, expect, it } from 'vitest';
-import { handleEndlessGenerate } from './route';
-import type { QStashVerifier } from '../../../../server/qstash';
+// @vitest-environment node
+import { afterEach, beforeEach, describe, expect, it } from 'vitest';
+import { POST } from './route';
 
-const mockVerifierPass: QStashVerifier = {
-  verify: async () => true,
-};
+const SECRET = 'cron-secret-value';
+const url = 'http://localhost/api/internal/endless-generate';
 
-const mockVerifierFail: QStashVerifier = {
-  verify: async () => false,
-};
+function post(body: string | undefined, headers: Record<string, string> = { authorization: `Bearer ${SECRET}` }) {
+  return POST(new Request(url, { method: 'POST', headers: { 'content-type': 'application/json', ...headers }, body }));
+}
 
-describe('/api/internal/endless-generate route input validation and security', () => {
-  const url = 'http://localhost/api/internal/endless-generate';
+beforeEach(() => {
+  process.env.CRON_SECRET = SECRET;
+});
 
-  it('서명이 유효하지 않으면 401을 반환한다', async () => {
-    const req = new Request(url, {
-      method: 'POST',
-      headers: { 'content-type': 'application/json' },
-      body: JSON.stringify({ jobId: 'job-1', chunkIndex: 0 }),
-    });
+afterEach(() => {
+  delete process.env.CRON_SECRET;
+});
 
-    const res = await handleEndlessGenerate(req, { verifier: mockVerifierFail });
-    expect(res.status).toBe(401);
+describe('/api/internal/endless-generate 인증과 입력 검증', () => {
+  it('Bearer 토큰이 없거나 틀리면 401을 반환한다', async () => {
+    const body = JSON.stringify({ jobId: 'job-1', chunkIndex: 0 });
+    expect((await post(body, {})).status).toBe(401);
+    expect((await post(body, { authorization: 'Bearer wrong' })).status).toBe(401);
+    expect((await post(body, { 'upstash-signature': 'x' })).status).toBe(401);
   });
 
-  it('body가 null이면 Zod 검증에 실패하여 400을 반환한다', async () => {
-    const req = new Request(url, {
-      method: 'POST',
-      headers: { 'content-type': 'application/json' },
-      body: 'null',
-    });
-
-    const res = await handleEndlessGenerate(req, { verifier: mockVerifierPass });
-    expect(res.status).toBe(400);
-  });
-
-  it('body가 배열이면 Zod 검증에 실패하여 400을 반환한다', async () => {
-    const req = new Request(url, {
-      method: 'POST',
-      headers: { 'content-type': 'application/json' },
-      body: JSON.stringify([{ jobId: 'job-1', chunkIndex: 0 }]),
-    });
-
-    const res = await handleEndlessGenerate(req, { verifier: mockVerifierPass });
-    expect(res.status).toBe(400);
-  });
-
-  it('chunkIndex가 0이 아니면(non-zero chunkIndex) 400을 반환하여 무한 재시도를 방지한다', async () => {
-    const req = new Request(url, {
-      method: 'POST',
-      headers: { 'content-type': 'application/json' },
-      body: JSON.stringify({ jobId: 'job-1', chunkIndex: 1 }),
-    });
-
-    const res = await handleEndlessGenerate(req, { verifier: mockVerifierPass });
-    expect(res.status).toBe(400);
-  });
-
-  it('chunkIndex가 정수가 아니면 400을 반환한다', async () => {
-    const req = new Request(url, {
-      method: 'POST',
-      headers: { 'content-type': 'application/json' },
-      body: JSON.stringify({ jobId: 'job-1', chunkIndex: '0' }),
-    });
-
-    const res = await handleEndlessGenerate(req, { verifier: mockVerifierPass });
-    expect(res.status).toBe(400);
-  });
-
-  it('jobId가 비어 있으면 400을 반환한다', async () => {
-    const req = new Request(url, {
-      method: 'POST',
-      headers: { 'content-type': 'application/json' },
-      body: JSON.stringify({ jobId: '', chunkIndex: 0 }),
-    });
-
-    const res = await handleEndlessGenerate(req, { verifier: mockVerifierPass });
-    expect(res.status).toBe(400);
+  it.each([
+    ['null', 'null'],
+    ['배열', JSON.stringify([{ jobId: 'job-1', chunkIndex: 0 }])],
+    ['JSON이 아닌 본문', 'x'],
+    ['청크 번호가 0이 아님', JSON.stringify({ jobId: 'job-1', chunkIndex: 1 })],
+    ['청크 번호가 정수가 아님', JSON.stringify({ jobId: 'job-1', chunkIndex: '0' })],
+    ['빈 jobId', JSON.stringify({ jobId: '', chunkIndex: 0 })],
+    ['jobId 없이 청크 번호만 지정', JSON.stringify({ chunkIndex: 0 })],
+    ['알 수 없는 필드', JSON.stringify({ unknown: true })],
+  ])('%s는 400을 반환한다', async (_name, body) => {
+    expect((await post(body)).status).toBe(400);
   });
 });

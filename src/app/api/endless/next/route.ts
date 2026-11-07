@@ -3,28 +3,16 @@ import { after, NextResponse } from 'next/server';
 import { nextRequestSchema, nextResponseSchema } from '../../../../shared/endless';
 import { getSessionUser } from '../../../../server/auth';
 import { encryptSolution } from '../../../../server/crypto';
-import type { SupplyEnqueuer } from '../../../../server/endlessPool/supply';
 import { startEndlessStage } from '../../../../server/endlessPlay/play';
-import { publishQStashChunk } from '../../../../server/qstash';
 import { withServerTiming } from '../../../../server/serverTiming';
 
-export interface NextRouteDeps {
-  enqueuer?: SupplyEnqueuer;
-}
-
-export const defaultQStashEnqueuer: SupplyEnqueuer = {
-  enqueueChunk: async (jobId: string, chunkIndex: number): Promise<void> => {
-    await publishQStashChunk(jobId, chunkIndex);
-  },
-};
-
-export async function handleNext(req: Request, deps?: NextRouteDeps) {
+export async function handleNext(req: Request) {
   const { uid } = await getSessionUser();
   if (!uid) return NextResponse.json({ ok: false, msg: '로그인이 필요해요.' }, { status: 401 });
   const body = nextRequestSchema.safeParse(await req.json().catch(() => null));
   if (!body.success) return NextResponse.json({ ok: false, msg: '요청이 올바르지 않아요.' }, { status: 400 });
 
-  const started = await startEndlessStage(uid, new Date(), after, deps?.enqueuer ?? defaultQStashEnqueuer, body.data.stageId);
+  const started = await startEndlessStage(uid, new Date(), after, body.data.stageId);
   if (!started.ok && started.reason === 'not_retryable') {
     return NextResponse.json({ ok: false, msg: '다시 도전할 수 없는 판이에요.' }, { status: 404 });
   }

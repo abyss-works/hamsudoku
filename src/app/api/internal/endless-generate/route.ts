@@ -1,63 +1,54 @@
 import { NextResponse } from 'next/server';
 import { z } from 'zod';
-import { executeSupplyChunk } from '../../../../server/endlessPool/generation';
-import { OfficialQStashVerifier, type QStashVerifier } from '../../../../server/qstash';
+import { executeSupplyChunk, processNextSupplyChunk } from '../../../../server/endlessPool/generation';
+import { rejectUnlessCron } from '../../../../server/internalAuth';
 
-// 10x1 청크 구성에 대한 Vercel 함수 최대 실행 시간 (초 단위)
-// 주의: 로컬 CLI 측정값은 함수 실행 시간 예산의 참고 자료일 뿐이며 Vercel 환경에서의 실측 완료를 증명하지 않는다.
-export const maxDuration = 60;
+// 작업을 지정하지 않으면 다음 처리 대상을 고른다. 작업당 단일 청크 0 정책이므로 0이 아닌 청크 번호는 400으로 거절한다.
+const endlessGeneratePayloadSchema = z
+  .object({
+    jobId: z.string().min(1).optional(),
+    chunkIndex: z.literal(0).optional(),
+  })
+  .strict()
+  .refine((payload) => payload.chunkIndex === undefined || payload.jobId !== undefined);
 
-export const endlessGeneratePayloadSchema = z.object({
-  jobId: z.string().min(1, 'jobId is required'),
-  // 작업당 단일 청크 0 정책: 0이 아닌 청크 번호는 즉시 400을 반환하여 잘못된 입력에 의한 무한 재시도를 방지한다.
-  chunkIndex: z.literal(0, { message: 'chunkIndex must be 0 (single chunk per job)' }),
-});
+/**
+ * 무한모드 판 공급 생성. CronJob이 Bearer CRON_SECRET으로 주기 호출한다.
+ * 본문이 비어 있거나 `{}`이면 대기·발행 실패·임대 만료 작업 중 가장 먼저 만든 작업 하나를 점유해 처리하고,
+ * `{ jobId, chunkIndex?: 0 }`이면 그 작업의 청크를 처리한다. 처리할 작업이 없으면 200 `{ ok: true, idle: true }`다.
+ */
+export async function POST(req: Request) {
+  const rejected = rejectUnlessCron(req);
+  if (rejected) return rejected;
 
-export interface GenerateRouteDeps {
-  verifier?: QStashVerifier;
-}
-
-export async function handleEndlessGenerate(req: Request, deps?: GenerateRouteDeps) {
-  const verifier = deps?.verifier ?? new OfficialQStashVerifier();
-  const rawBody = await req.text();
-
-  const isVerified = await verifier.verify(req, rawBody);
-  if (!isVerified) {
-    return NextResponse.json({ ok: false, error: 'Unauthorized signature' }, { status: 401 });
-  }
-
-  let parsedJson: unknown;
-  try {
-    parsedJson = JSON.parse(rawBody);
-  } catch {
-    return NextResponse.json({ ok: false, error: 'Invalid JSON body' }, { status: 400 });
+  const rawBody = await req.text().catch(() => '');
+  let parsedJson: unknown = {};
+  if (rawBody.trim()) {
+    try {
+      parsedJson = JSON.parse(rawBody);
+    } catch {
+      return NextResponse.json({ ok: false, error: 'Invalid JSON body' }, { status: 400 });
+    }
   }
 
   const parsed = endlessGeneratePayloadSchema.safeParse(parsedJson);
   if (!parsed.success) {
     return NextResponse.json(
-      { ok: false, error: 'Invalid payload: jobId (string) and chunkIndex (0) are required' },
+      { ok: false, error: 'Invalid payload: jobId must be a non-empty string and chunkIndex must be 0' },
       { status: 400 },
     );
   }
 
-  const result = await executeSupplyChunk({
-    jobId: parsed.data.jobId,
-    chunkIndex: parsed.data.chunkIndex as number,
-  });
+  const result = parsed.data.jobId
+    ? await executeSupplyChunk({ jobId: parsed.data.jobId, chunkIndex: 0 })
+    : await processNextSupplyChunk();
+  if (result === null) return NextResponse.json({ ok: true, idle: true });
 
   if (!result.ok) {
-    // 다른 워커가 유효한 임대를 보유하고 실행 중인 경우 429로 응답하여 QStash의 재시도 백오프를 유도한다.
-    if (result.reason === 'CLAIM_BUSY') {
-      return NextResponse.json(result, { status: 429 });
-    }
-    // 일시적 오류나 생성 실패는 500으로 응답하여 QStash 재시도 정책(최대 3회)을 트리거한다.
+    // 다른 실행이 유효한 임대를 보유하고 있으면 429로 응답한다. 다음 호출에서 다시 처리 대상이 된다.
+    if (result.reason === 'CLAIM_BUSY') return NextResponse.json(result, { status: 429 });
+    // 생성 실패는 500으로 응답한다. 실패한 작업은 다시 점유하지 않으며 다음 재고 부족 요청이 새 작업을 예약한다.
     return NextResponse.json(result, { status: 500 });
   }
-
-  return NextResponse.json(result, { status: 200 });
-}
-
-export async function POST(req: Request) {
-  return handleEndlessGenerate(req);
+  return NextResponse.json(result);
 }

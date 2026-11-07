@@ -1,7 +1,8 @@
 import { serializeRegions, serializeSolution, stageId } from '../../shared/endlessStageFormat';
 import { generateEndlessPool, validateEndlessCandidate } from '../../shared/sudoku/endlessPoolGenerator';
-import { withTransaction } from '../db/client';
+import { db, withTransaction } from '../db/client';
 import { describeDbError } from '../db/errors';
+import { findNextSupplyChunk } from './queries';
 import { claimSupplyChunk, failSupplyChunk, insertSupplyBatch, type SupplyStageRow } from './store';
 import { SUPPLY_POLICY } from './supply';
 
@@ -74,4 +75,14 @@ export async function executeSupplyChunk(
     }
     throw error;
   }
+}
+
+/**
+ * 처리할 다음 공급 청크를 찾아 생성한다. 처리할 작업이 없으면 null이다.
+ * 한 번의 호출은 청크 하나만 처리하고, 다른 실행이 먼저 점유한 청크는 CLAIM_BUSY 결과로 돌려준다.
+ */
+export async function processNextSupplyChunk(nowIso: string = new Date().toISOString()): Promise<ChunkExecutionResult | null> {
+  const next = await findNextSupplyChunk(db, new Date(nowIso));
+  if (!next) return null;
+  return executeSupplyChunk(next, nowIso);
 }

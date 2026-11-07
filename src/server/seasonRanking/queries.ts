@@ -33,16 +33,22 @@ function earningsFilter(season: string, window: SeasonWindow) {
     and "createdAt" >= ${utcTimestamp(window.startAt)} and "createdAt" < ${utcTimestamp(window.endAt)}`;
 }
 
-/** 시즌 구간 안의 랭킹 대상 적립을 사용자별로 더한다. 순서는 정하지 않는다. */
-export async function listSeasonEarnings(
+/**
+ * 시즌 구간 안의 랭킹 대상 적립을 사용자별로 더해 점수 내림차순, 동점은 userId 바이트 순서 내림차순으로
+ * 상위 limit명을 반환한다.
+ */
+export async function listSeasonTopEarnings(
   executor: Executor,
   season: string,
   window: SeasonWindow,
-): Promise<{ userId: string; amount: number }[]> {
-  const result = await executor.execute<{ userId: string; amount: number }>(sql`
-    select "userId", sum("amount")::int as "amount" from "SeedLedger"
+  limit: number,
+): Promise<{ userId: string; score: number }[]> {
+  const result = await executor.execute<{ userId: string; score: number }>(sql`
+    select "userId", sum("amount")::int as "score" from "SeedLedger"
     where ${earningsFilter(season, window)}
     group by "userId"
+    order by "score" desc, "userId" collate "C" desc
+    limit ${limit}
   `);
   return result.rows;
 }

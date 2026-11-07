@@ -2,7 +2,7 @@ import { sql } from 'drizzle-orm';
 import { describe, expect, it } from 'vitest';
 import { useStoreDatabase } from '../../../tools/dbTest/storeHarness';
 import { isUniqueViolation } from '../db/errors';
-import { appendEarning, insertSeasonResultsFromLedger, lockSeasonForEarning, lockSeasonForFinalization, saveSeasonFinalizationHeader } from './store';
+import { appendEarning, excludeSeasonEarnings, insertSeasonResultsFromLedger, lockSeasonForEarning, lockSeasonForFinalization, saveSeasonFinalizationHeader } from './store';
 
 const store = useStoreDatabase();
 
@@ -174,5 +174,42 @@ describe('seasonRanking 확정 저장', () => {
   it('참여자가 없으면 결과 없이 끝난다', async () => {
     await store.withTransaction((tx) => saveSeasonFinalizationHeader(tx, header));
     expect(await store.withTransaction((tx) => insertSeasonResultsFromLedger(tx, SEASON, window))).toEqual([]);
+  });
+});
+
+describe('excludeSeasonEarnings', () => {
+  async function earn(id: string, userId: string, season = SEASON) {
+    await store.query(
+      `insert into "SeedLedger" (id, "userId", kind, amount, "stageId", season, "createdAt") values ($1, $2, 'earn', 3, null, $3, $4)`,
+      [id, userId, season, AT],
+    );
+  }
+
+  it('지정한 사용자의 해당 시즌 적립을 랭킹 대상에서 제외하고 제외된 사용자 수를 반환한다', async () => {
+    await earn('l1', 'user-a');
+    await earn('l2', 'user-a');
+    await earn('l3', 'user-b');
+    await earn('l4', 'user-c');
+    await earn('l5', 'user-a', '2026-W42');
+
+    expect(await excludeSeasonEarnings(store.db, SEASON, ['user-a', 'user-b', 'user-none'])).toBe(2);
+
+    const rows = await store.query<{ id: string; rankingEligible: boolean }>(
+      `select id, "rankingEligible" from "SeedLedger" order by id`,
+    );
+    expect(rows).toEqual([
+      { id: 'l1', rankingEligible: false },
+      { id: 'l2', rankingEligible: false },
+      { id: 'l3', rankingEligible: false },
+      { id: 'l4', rankingEligible: true },
+      { id: 'l5', rankingEligible: true },
+    ]);
+  });
+
+  it('이미 제외된 사용자와 빈 목록은 0을 반환한다', async () => {
+    await earn('l1', 'user-a');
+    expect(await excludeSeasonEarnings(store.db, SEASON, [])).toBe(0);
+    expect(await excludeSeasonEarnings(store.db, SEASON, ['user-a'])).toBe(1);
+    expect(await excludeSeasonEarnings(store.db, SEASON, ['user-a'])).toBe(0);
   });
 });

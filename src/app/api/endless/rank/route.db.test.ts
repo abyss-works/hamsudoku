@@ -3,10 +3,7 @@ import { seasonId, seasonWindow } from '../../../../shared/season';
 import {
   ACTIVE_NOW,
   FROZEN_NOW,
-  FakeRankStore,
   callRoute,
-  outbound,
-  rankStore,
   secondsBefore,
   seedLedger,
   seedUser,
@@ -20,9 +17,6 @@ vi.mock('next/server', async (original) =>
 );
 vi.mock('../../../../server/auth', async (original) =>
   (await import('../../../../../tools/dbTest/routeHarness')).mockAuth(await original()),
-);
-vi.mock('../../../../server/rank', async (original) =>
-  (await import('../../../../../tools/dbTest/routeHarness')).mockRank(await original()),
 );
 
 const db = useRouteDatabase();
@@ -67,25 +61,8 @@ describe('GET /api/endless/rank', () => {
     expect(await rank()).toEqual({ status: 401, body: { ok: false, msg: '로그인이 필요해요.' } });
   });
 
-  it('순위 저장소가 없으면 빈 상위 목록과 원장 기준 내 순위를 반환한다', async () => {
-    await seedSeason();
-    signInAs('user-a');
-    expect(await rank()).toEqual({
-      status: 200,
-      body: {
-        season: SEASON,
-        top: [],
-        snapshotAt: ACTIVE_NOW.toISOString(),
-        me: { rank: 3, score: 5 },
-        frozen: false,
-        status: 'active',
-      },
-    });
-  });
-
   it('진행 중인 시즌은 원장 적립으로 상위 목록을 만들고 닉네임을 붙인다', async () => {
     await seedSeason();
-    rankStore.current = new FakeRankStore();
     signInAs('user-c');
 
     expect((await rank()).body).toEqual({
@@ -102,7 +79,7 @@ describe('GET /api/endless/rank', () => {
     });
   });
 
-  it('집계 마감 창에 확정 전이면 집계 중 상태를 반환하고 확정 작업을 요청한다', async () => {
+  it('집계 마감 창에 확정 전이면 집계 중 상태를 반환한다', async () => {
     useFixedNow(FROZEN_NOW);
     await seedSeason();
     signInAs('user-b');
@@ -115,25 +92,6 @@ describe('GET /api/endless/rank', () => {
       frozen: true,
       status: 'aggregating',
     });
-    expect(outbound.requests).toHaveLength(1);
-    expect(outbound.requests[0]).toMatchObject({
-      method: 'POST',
-      body: { season: SEASON, recover: true },
-      headers: { 'upstash-deduplication-id': `finalize-${SEASON}` },
-    });
-    expect(outbound.requests[0].url).toContain('http://app.test/api/internal/ranking-finalize');
-  });
-
-  it('확정 작업 요청이 실패해도 집계 중 상태를 반환한다', async () => {
-    useFixedNow(FROZEN_NOW);
-    await seedSeason();
-    outbound.status = 400;
-    signInAs('user-b');
-
-    const res = await rank();
-
-    expect(res.status).toBe(200);
-    expect(res.body).toMatchObject({ status: 'aggregating', me: { rank: 1, score: 8 } });
   });
 
   it('확정된 시즌은 확정 결과로 상위 목록과 내 순위를 반환한다', async () => {
@@ -154,7 +112,6 @@ describe('GET /api/endless/rank', () => {
       frozen: true,
       status: 'finalized',
     });
-    expect(outbound.requests).toHaveLength(0);
   });
 
   it('확정 결과에 없는 사용자는 순위 없이 0점이다', async () => {
@@ -163,5 +120,38 @@ describe('GET /api/endless/rank', () => {
     await finalizeSeedSeason();
     signInAs('user-z');
     expect((await rank()).body).toMatchObject({ status: 'finalized', me: { rank: null, score: 0 } });
+  });
+
+  it('상위 목록은 60초 동안 캐시하고 이후 요청에서 최신 원장으로 갱신한다', async () => {
+    await seedSeason();
+    signInAs('user-a');
+    expect((await rank()).body).toMatchObject({ top: [{ userId: 'user-b' }, { userId: 'user-c' }, { userId: 'user-a' }] });
+
+    await seedLedger(db, { id: 'l5', userId: 'user-z', season: SEASON, amount: 50, createdAt: secondsBefore(ACTIVE_NOW, 60) });
+
+    useFixedNow(new Date(ACTIVE_NOW.getTime() + 59_000));
+    const cached = await rank();
+    expect(cached.body).toMatchObject({ top: [{ userId: 'user-b' }, { userId: 'user-c' }, { userId: 'user-a' }], snapshotAt: ACTIVE_NOW.toISOString() });
+    expect(cached.body).toMatchObject({ me: { rank: 4, score: 5 } });
+
+    useFixedNow(new Date(ACTIVE_NOW.getTime() + 60_000));
+    const refreshed = await rank();
+    expect(refreshed.body).toMatchObject({
+      top: [{ userId: 'user-z', score: 50 }, { userId: 'user-b' }, { userId: 'user-c' }, { userId: 'user-a' }],
+      snapshotAt: new Date(ACTIVE_NOW.getTime() + 60_000).toISOString(),
+    });
+  });
+
+  it('상위 목록은 50명까지만 담는다', async () => {
+    await db.query(
+      `insert into "SeedLedger" ("userId", kind, amount, season, "createdAt", "rankingEligible")
+       select 'user-' || lpad(n::text, 3, '0'), 'earn', n, $1, $2, true from generate_series(1, 60) as n`,
+      [SEASON, secondsBefore(ACTIVE_NOW, 3600)],
+    );
+    signInAs('user-001');
+    const body = (await rank()).body as { top: { userId: string; score: number }[] };
+    expect(body.top).toHaveLength(50);
+    expect(body.top[0]).toMatchObject({ userId: 'user-060', score: 60 });
+    expect(body.top[49]).toMatchObject({ userId: 'user-011', score: 11 });
   });
 });

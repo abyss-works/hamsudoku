@@ -4,7 +4,6 @@ import {
   STAGE_SOLUTION,
   callRoute,
   internalAuth,
-  qstashSigned,
   secondsBefore,
   seedStage,
   sentryLogs,
@@ -81,17 +80,17 @@ describe('POST /api/internal/play-audit', () => {
     ]);
   });
 
-  it('QStash 서명 요청과 GET 요청도 감사한다', async () => {
+  it('QStash 서명 헤더만으로는 감사하지 않고 Bearer 인증의 GET 요청은 감사한다', async () => {
     await seedStage(db, { id: STAGE });
     await seedLog('key-1', SOLUTION_EVENTS);
 
-    expect(await callRoute(POST, { path: PATH, rawBody: '{}', headers: qstashSigned(PATH, '{}') })).toEqual({
-      status: 200,
-      body: { ok: true, audited: 1, flagged: 0 },
+    expect(await callRoute(POST, { path: PATH, rawBody: '{}', headers: { 'upstash-signature': 'signed' } })).toEqual({
+      status: 401,
+      body: { ok: false, msg: '인증에 실패했어요.' },
     });
     expect(await callRoute(GET, { path: PATH, headers: internalAuth() })).toEqual({
       status: 200,
-      body: { ok: true, audited: 0, flagged: 0 },
+      body: { ok: true, audited: 1, flagged: 0 },
     });
   });
 
