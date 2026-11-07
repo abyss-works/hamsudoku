@@ -11,8 +11,7 @@ async function handlePost(req: Request) {
   if (limited) return limited;
   const parsed = Body.safeParse(await req.json().catch(() => null));
   if (!parsed.success) return NextResponse.json({ ok: false, msg: '이메일을 확인하세요.' }, { status: 400 });
-  const redirectTo = `${new URL(req.url).origin}/api/auth/callback`;
-  const result = await requestPasswordReset(parsed.data.email, redirectTo);
+  const result = await requestPasswordReset(parsed.data.email);
   return NextResponse.json(result, { status: result.ok ? 200 : 400 });
 }
 
