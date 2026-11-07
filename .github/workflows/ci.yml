@@ -7,9 +7,10 @@ on:
 permissions:
   contents: read
 
+# main은 릴리즈 이미지 작업을 취소하지 않는다.
 concurrency:
   group: ci-${{ github.ref }}
-  cancel-in-progress: true
+  cancel-in-progress: ${{ github.ref != 'refs/heads/main' }}
 
 jobs:
   gates:
@@ -41,3 +42,107 @@ jobs:
       - run: pnpm build
         env:
           SENTRY_AUTH_TOKEN: ''
+
+  # main 푸시마다 운영 이미지를 빌드해 올린다. ArgoCD가 main의 k8s/prod 태그를 보고 배포한다.
+  image:
+    needs: [gates]
+    if: github.event_name == 'push' && github.ref == 'refs/heads/main'
+    runs-on: ubuntu-24.04-arm
+    timeout-minutes: 30
+    permissions:
+      contents: read
+      packages: write
+    steps:
+      - uses: actions/checkout@v5
+      - name: Check image tag matches package version
+        run: |
+          TAG="v$(node -p 'require("./package.json").version')"
+          grep -q "newTag: ${TAG}$" k8s/prod/kustomization.yaml || { echo "k8s/prod/kustomization.yaml newTag must be ${TAG}"; exit 1; }
+          echo "TAG=${TAG}" >> "${GITHUB_ENV}"
+      - name: Log in to GHCR
+        run: echo "${{ secrets.GITHUB_TOKEN }}" | docker login ghcr.io -u "${GITHUB_ACTOR}" --password-stdin
+      - uses: docker/setup-buildx-action@v3
+      - name: Build and push image
+        uses: docker/build-push-action@v6
+        with:
+          context: .
+          push: true
+          tags: ghcr.io/${{ github.repository }}:${{ env.TAG }}
+          labels: org.opencontainers.image.source=https://github.com/${{ github.repository }}
+          build-args: |
+            DEPLOY_ENV=production
+            NEXT_PUBLIC_SENTRY_DSN=${{ vars.NEXT_PUBLIC_SENTRY_DSN }}
+            SENTRY_ORG=${{ vars.SENTRY_ORG }}
+            SENTRY_PROJECT=${{ vars.SENTRY_PROJECT }}
+          secrets: |
+            sentry_auth_token=${{ secrets.SENTRY_AUTH_TOKEN }}
+          cache-from: type=gha
+          cache-to: type=gha,mode=max
+
+  # dev 푸시마다 스테이징 이미지를 빌드해 올린다. 검사를 기다리지 않는다. 검사에 실패하면 stage-tag가 태그를 바꾸지 않아 배포되지 않는다.
+  stage-image:
+    if: github.event_name == 'push' && github.ref == 'refs/heads/dev'
+    runs-on: ubuntu-24.04-arm
+    timeout-minutes: 30
+    permissions:
+      contents: read
+      packages: write
+    steps:
+      - uses: actions/checkout@v5
+      - name: Log in to GHCR
+        run: echo "${{ secrets.GITHUB_TOKEN }}" | docker login ghcr.io -u "${GITHUB_ACTOR}" --password-stdin
+      - name: Stage image tag
+        run: echo "TAG=dev-${GITHUB_SHA::7}" >> "${GITHUB_ENV}"
+      - uses: docker/setup-buildx-action@v3
+      - name: Build and push image
+        uses: docker/build-push-action@v6
+        with:
+          context: .
+          push: true
+          tags: ghcr.io/${{ github.repository }}:${{ env.TAG }}
+          labels: org.opencontainers.image.source=https://github.com/${{ github.repository }}
+          build-args: |
+            DEPLOY_ENV=staging
+            NEXT_PUBLIC_SENTRY_DSN=${{ vars.STAGE_NEXT_PUBLIC_SENTRY_DSN }}
+            SENTRY_ORG=${{ vars.SENTRY_ORG }}
+            SENTRY_PROJECT=${{ vars.SENTRY_PROJECT }}
+          secrets: |
+            sentry_auth_token=${{ secrets.SENTRY_AUTH_TOKEN }}
+          cache-from: type=gha
+          cache-to: type=gha,mode=max
+
+  # 검사와 이미지가 모두 통과한 뒤에만 k8s/stage의 이미지 태그를 갱신한다. ArgoCD가 dev의 k8s/stage를 보고 배포한다.
+  stage-tag:
+    needs: [gates, stage-image]
+    if: github.event_name == 'push' && github.ref == 'refs/heads/dev'
+    runs-on: ubuntu-24.04
+    concurrency:
+      group: stage-tag
+      cancel-in-progress: false
+    permissions:
+      contents: write
+    steps:
+      - uses: actions/checkout@v5
+      - name: Stage image tag
+        run: echo "TAG=dev-${GITHUB_SHA::7}" >> "${GITHUB_ENV}"
+      # 태그는 dev의 최신 사람 커밋을 빌드한 실행만 갱신한다. 그사이 더 새 커밋이 들어왔으면 그 실행이 갱신하므로 건너뛴다.
+      # 다른 실행의 bot 커밋 위에 rebase하면 같은 newTag 줄에서 충돌하므로, 최신 origin/dev 위에서 다시 고친다.
+      - name: Update stage image tag
+        run: |
+          git fetch --depth=50 origin dev
+          LATEST=$(git log origin/dev --format='%H %an' | grep -v ' github-actions$' | head -1 | cut -d' ' -f1)
+          if [ "${LATEST}" != "${GITHUB_SHA}" ]; then
+            echo "dev에 더 새 커밋(${LATEST})이 있어 태그 갱신을 그 실행에 맡긴다."
+            exit 0
+          fi
+          git checkout -B stage-tag origin/dev
+          sed -i "s|newTag: .*|newTag: ${TAG}|" k8s/stage/kustomization.yaml
+          git config user.name "github-actions"
+          git config user.email "actions@github.com"
+          git add k8s/stage/kustomization.yaml
+          git commit -F - <<EOF
+          ci(k8s): 스테이징 이미지 태그를 ${TAG}로 갱신
+
+          - k8s/stage/kustomization.yaml: 스테이징 이미지 태그를 ${TAG}로 지정한다.
+          EOF
+          git push origin HEAD:dev

@@ -1,0 +1,20 @@
+apiVersion: argoproj.io/v1alpha1
+kind: Application
+metadata:
+  name: hamsudoku-stage
+  namespace: argocd
+spec:
+  destination:
+    namespace: hamsudoku-stage
+    server: https://kubernetes.default.svc
+  project: default
+  source:
+    path: k8s/stage
+    repoURL: https://github.com/abyss-works/hamsudoku
+    targetRevision: dev
+  syncPolicy:
+    automated:
+      prune: true
+      selfHeal: true
+    syncOptions:
+      - CreateNamespace=true
