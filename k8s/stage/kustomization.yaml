@@ -83,4 +83,4 @@ patches:
 # dev 푸시마다 CI가 이미지 태그를 dev-<커밋 SHA 7자리>로 갱신한다.
 images:
   - name: ghcr.io/abyss-works/hamsudoku
-    newTag: dev-a3d9d1a
+    newTag: dev-521c47b
