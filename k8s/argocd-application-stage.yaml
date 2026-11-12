@@ -7,7 +7,7 @@ spec:
   destination:
     namespace: hamsudoku-stage
     server: https://kubernetes.default.svc
-  project: default
+  project: hamsudoku
   source:
     path: k8s/stage
     repoURL: https://github.com/abyss-works/hamsudoku

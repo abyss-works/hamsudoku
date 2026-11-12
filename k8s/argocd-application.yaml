@@ -7,7 +7,7 @@ spec:
   destination:
     namespace: hamsudoku-prod
     server: https://kubernetes.default.svc
-  project: default
+  project: hamsudoku
   source:
     path: k8s/prod
     repoURL: https://github.com/abyss-works/hamsudoku
